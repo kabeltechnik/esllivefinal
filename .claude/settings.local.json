@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(node --check \"C:\\\\Users\\\\v3reg\\\\Downloads\\\\CRAW ESL\\\\LIVE ARENA\\\\rc_recon.js\")",
+      "PowerShell(if \\($?\\) { \"Syntax OK\" })"
+    ]
+  }
+}

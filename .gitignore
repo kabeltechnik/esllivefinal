@@ -1,0 +1,11 @@
+node_modules/
+
+# Sensible Daten (PII / Zugangsdaten-Muster) - nicht ins oeffentliche Repo
+Mitarbeiter_IDS_Final_komplett.xlsx
+Mitarbeiter_ID_Und_Namen.xlsx
+Mitarbeiternamen_Vo_Nummer_Team_Standort.txt
+GenesysMonitor.txt
+ESL_ORginal_Konsolen_Elemente_Codes.txt
+Inhalt_Eines_Standort_Excels_Als_Beispiel.txt
+Test Excels/
+~$*

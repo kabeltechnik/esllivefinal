@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>ESL Live-Arena v22 — Sales-League-Demo (echter Tag im Zeitraffer)</title>
+</head>
+<body>
+<!-- Fake-Portal-Formular, damit das Script eine Umgebung vorfindet -->
+<form id="filterForm" action="/fake-export" onsubmit="return false;">
+    <input class="hasDatepicker" name="filterForm:von_input" value="">
+    <input class="hasDatepicker" name="filterForm:bis_input" value="">
+    <button type="submit">Suchen</button>
+    <button type="submit">Excel Export</button>
+    <input type="hidden" name="javax.faces.ViewState" value="test">
+</form>
+
+<!-- Echte Demo-Daten: juengster Export-Tag + 3 Vortage + komplettes Mapping -->
+<script src="league_demo_rows.js"></script>
+
+<script>
+// Heutiges Datum in die Fake-Datumsfelder + localStorage VOR dem Dashboard setzen
+(function(){
+    const d = new Date(); const p = n => String(n).padStart(2,'0');
+    const val = p(d.getDate()) + '.' + p(d.getMonth()+1) + '.' + d.getFullYear();
+    document.querySelectorAll('.hasDatepicker').forEach(i => i.value = val);
+    localStorage.setItem('rcWcaMapping', JSON.stringify(window.RC_DEMO_MAPPING));
+    localStorage.setItem('rcEslHistory', JSON.stringify(window.RC_DEMO_HIST));
+    localStorage.setItem('rcEslHistCheck', d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate()));
+    localStorage.setItem('rcRadarMode', 'league');
+})();
+</script>
+
+<!-- Dashboard-Script (Cache-Buster, damit Code-Aenderungen sofort greifen) -->
+<script>document.write('<scr'+'ipt src="esl_live_arena_v22.js?t='+Date.now()+'"></scr'+'ipt>');</script>
+
+<script>
+// ---- Echter Tag im Zeitraffer: Export-Zeilen als wachsender Poll-Stream ----
+let fed = 0;
+function feed(n){
+    const rows = [window.RC_DEMO_HEADER].concat(window.RC_DEMO_ROWS.slice(0, n));
+    window.processDataStream(rows);
+    fed = n;
+}
+// Zeitraffer-Tempo: simulierte Stunden pro ECHTER Minute (2 = zwei Stunden in einer Minute)
+const SPEED_H_PER_MIN = 2;
+function startDemo(){
+    if (!window.processDataStream || !window.Chart) { setTimeout(startDemo, 500); return; }
+    window.rcNoCelebrate = true; // Abschluss-Popup aus — die Stadion-Szenen sind die Buehne
+    // Flutlicht fuer die Demo + direkt auf die Radar-Seite
+    if (window.rcLeague) window.rcLeague.forceEvening = true;
+    feed(Math.floor(window.RC_DEMO_ROWS.length * 0.30));   // Stand 08:00-11:00 auf einen Schlag
+    document.getElementById('rcPageRadar').click();
+    // Nachschub im Zeitraffer: Zeilen/Stunde aus dem echten Tag (08:00-17:30 = 9,5 h)
+    const rowsPerTick = Math.max(2, Math.round(window.RC_DEMO_ROWS.length / 9.5 * SPEED_H_PER_MIN / 30));
+    setInterval(() => {
+        if (fed < window.RC_DEMO_ROWS.length) feed(Math.min(window.RC_DEMO_ROWS.length, fed + rowsPerTick));
+    }, 2000);
+    // Auto-Rotation fuer die Demo auf der Radar-Seite festhalten
+    setInterval(() => {
+        if (window.rcActivePage !== 'radar') document.getElementById('rcPageRadar').click();
+    }, 5000);
+    console.log('[LEAGUE-DEMO] gestartet — ' + window.RC_DEMO_ROWS.length + ' echte Zeilen, Spieltag-Simulation laeuft');
+}
+setTimeout(startDemo, 1500);
+</script>
+</body>
+</html>

@@ -1,0 +1,166 @@
+
+Genau richtig gedacht — das ist sogar die architektonisch sauberste Lösung. Bevor ich sie in den Plan einarbeite, prüfe ich kurz im Code, welche Granularität die vorhandene Tages-Historie wirklich speichert (das entscheidet, ob wir das Harvest-Format erweitern müssen).
+
+
+Ausgeführt 2 Befehle, gelesen eine Datei, bearbeitet eine Datei
+
+Gespeichert eine Erinnerung
+Ja, ich verstehe dich genau — und deine Idee ist nicht nur ein Workaround, sie ist die bessere Architektur. Ich habe sie als verbindliche Regel in den Plan geschrieben (Abschnitt 4.1): Die Woche ist eine Funktion, kein Speicherstand.
+
+Konkret heißt das: Beim Start rechnet rcLeagueRebuild() die Woche jedes Mal komplett neu — heute ist Dienstag, also war gestern Spieltag 1; die Montag-Daten kommen aus der Historie oder werden per rcFetchRangeViaUI frisch vom Server geholt (Liga-Calls über den Crawler mit last_week/current_week, die Montag-Falle ist ja schon dokumentiert). Daraus werden Montags-Paarungen, Duell-Ergebnisse und sogar die Elfmeter exakt nachgerechnet — die Elfmeter sind ja geseedet, also ergibt der Rebuild haargenau dieselben Tore wie der Live-Tag. localStorage bleibt nur als Cache für schnelleren Start; wenn Citrix ihn löscht, baut sich alles in Sekunden neu auf. Und am Freitag rechnet das Finale einfach Mo–Do aus dem Rebuild plus den Live-Tag.
+
+Ich habe im Code verifiziert, dass die Datenlage dafür schon reicht: Das Tagesaggregat (rcNewAgg/rcAccumRow/rcFinalizeAgg) speichert pro Agent Kontakte, Ansprachen, BNT, VVL, mob, kip und die CCS-ID — und classify zählt mob/kip sauber nur als BNT (VVL läuft getrennt). Damit sind Traumtore (mob+kip), Rest-BNT (bnt−mob−kip), Paraden (vvl) und die Elfmeter-Anzahl (floor(Ansprachen/5)) für jeden vergangenen Tag rekonstruierbar. Es braucht kein neues Speicherformat.
+
+Zwei Design-Konsequenzen habe ich dabei festgezurrt, damit der Rebuild immer exakt dasselbe ergibt wie der Live-Tag:
+
+Paarungen und Underdog-Status werden morgens fixiert (aus dem Wochenstand nach dem Vortag), nicht aus dem Live-Zwischenstand — denn die Reihenfolge der Ereignisse innerhalb eines Tages ist aus den Aggregaten nicht rekonstruierbar. Nebeneffekt: Man kann es morgens ansagen — „Ihr seid heute das Underdog-Team, euer Elfmeter trifft mit 2/3."
+Nachträge werden ehrlich gewertet: Trägt jemand einen Montag-Sale erst Dienstag ein, ändert der Rebuild die Montag-Wertung — der Server ist die Wahrheit. Der Ticker meldet das offen als „Nachträgliche Wertung" statt es zu verstecken.
+Der Bonus, den deine Idee gratis mitliefert: Da jeder Monitor an jedem Standort aus denselben Serverdaten und denselben Seeds rechnet, zeigen alle Bildschirme identische Wochenstände ohne jede Synchronisation. Der Plan in SALES_LEAGUE_PLAN.md ist entsprechend aktualisiert (neue Abschnitte 4.1–4.3). Damit ist auch die letzte offene Architekturfrage geklärt — Stufe 1 kann gebaut werden.
+
+Wir machen nicht stack nach stack sondern alle nehmen teil die anfangen. und alle mit wenigsten tore  oder  0 tore am ende des tages scheitern aus. die übrigen spielen am nächsten tag weiter. wenn ein agent am nächsten tag nicht arbeitet weil er krank oder urlaub hat dann scheidet er auch aus irgendwann weil er am wenigsten tore haben wird. jeder standort hat als trikot sein landesfahne und oben drüber sein namen in trikot. jeden tag wenn agents bnt machen kommen verschiedene tor szenes, wie rückwärtstor bei bnt kip oder mobil freistoss tor usw verstehst du? denkst du das ist gut so>? wenn ja setze den bitte sofort um! wichtig ist dass der arena bereich auch mit infos voll wird auch von tore von vortag usw.. lass die was einfallen sei kreativ und leg los. ich will am ende ein demo sehen du hast ja die test excels also kannst du einen tag simulieren. aber lass das mit burg auch stehen, falls ich mich doch anders entscheidee. wichtig ist: dass dadurch nichts kaputt geht an code. grafik muss auf jeden fall besser sein als dein billiges bild von oben.
+
+Ja — deine Version ist deutlich besser als Geminis Intraday-Cut: Die Ausscheidung am Tagesende gibt jedem den vollen Tag, Kranke/Urlauber scheiden natürlich aus, und über die Woche entsteht automatisch dein „Last One Standing"-Finale am Freitag. Das setze ich jetzt um. Ich lege eine Task-Liste an und erkunde zuerst gezielt die Radar-Struktur im Code, damit der Burg-Modus unangetastet bleibt.
+
+
+Lädt
+ESL Live-Arena v22 — Offline-Test
+test_dashboard_offline.html · Im Browser geöffnet
+
+Ausgeführt 15 Befehle, gelesen 3 Dateien, bearbeitet eine Datei, erstellt 3 Dateien, verwendet 29 Tools
+Jetzt die Panel-Zeilen, die Banden und die Namensauflösung im Rückblick:
+
+
+Bearbeitet 2 Dateien, ausgeführt 8 Befehle, gelesen 3 Dateien, verwendet 15 Tools
+
+Widerrufen eine Erinnerung, gespeichert 4 Erinnerungen
+Aufgaben aktualisiert
+Fertig — die Regiocom Sales League ist gebaut, läuft mit deinen echten Daten und der Burg-Modus ist unversehrt. Die drei Screenshots oben zeigen den Stand: das Traumtor mit Konfetti und Schriftzug, der Elfmeter mit hechtendem Keeper, und das Flutlicht-Stadion mit den fünf Top-Torjägern beim Aufwärmen — jeder im Landesflaggen-Trikot (Türkei rot mit Halbmond, Griechenland blau-weiß, Deutschland schwarz-rot-gold) mit Namensschild überm Kopf.
+
+Was umgesetzt ist:
+
+Deine K.-o.-Regel: Alle, die tracken, sind im Turnier. Am Tagesende scheidet aus, wer 0 Tore hat (haben alle getroffen, fliegt das Minimum) — Kranke und Urlauber scheiden dadurch von selbst aus, genau wie du es beschrieben hast. Das K.-o.-Panel zeigt live „115 im Feld · 46 ohne Tor · 131 ausgeschieden" plus die Gefährdet-Liste mit Namen. Die Woche rebuildet sich aus rcEslHistory — Citrix-Wipe egal.
+Deine Torszenen: KIP = Fallrückzieher (dein „Rückwärtstor"), Mobilfunk = Freistoß mit Mauer, ENV = Flachschuss, Premium-TV = Schlenzer, DSL = Abstauber, VVL = Keeper-Parade, plus der geseedete Elfmeter jede 5. Team-Ansprache (Schütze = fleißigster Ansprecher des Teams, überall dasselbe Würfelergebnis).
+Arena voll mit Infos: Anzeigetafel oben (Spieltag, Tore, Paraden, Uhr), rechts Tabelle mit Flaggen, Torjäger heute mit Traumtor-Spalte, K.-o.-Stand, Rückblick auf den Vortag (gestern: „Aleksandar N. — 13 Tore, 50 Agenten ausgeschieden"), unten der laufende Ticker mit Elfmeter-Countdown.
+Burg bleibt: Der Button oben im Radar schaltet zwischen „Sales League" und „Klassik (Burg)" um — getestet, beide Modi laufen, node --check sauber, keine JS-Fehler in der Konsole.
+Demo selbst ansehen: python -m http.server 8412 --bind 127.0.0.1 im Projektordner, dann test_league_demo.html öffnen. Sie spielt den echten 14.07. (1.796 Zeilen aus deinem Export, mit echten Namen aus dem Mapping) als Live-Tag im Zeitraffer ab; die drei Export-Tage davor liegen als Spieltage 1–3 in der Historie. In der Konsole startet rcLeagueDemo() zusätzlich alle Szenen im Durchlauf.
+
+Noch offen für die nächste Runde: die 18:00-Schlusspfiff-Zeremonie mit Last-One-Standing-Spot, eine sichtbare Ausscheidungs-Animation am Tagesende, und Feinschliff an der Volley-Ballphysik. Der Plan (SALES_LEAGUE_PLAN.md) ist auf deine Entscheidungen aktualisiert. Sag Bescheid, wenn ich weitermachen soll — oder schau dir erst die Demo an.
+
+Mach mal den Scheiß-Pop-Up da weg, der kommt jede Sekunde mit dem Abschluss-Abschluss-Abschluss. Und simulier mal eine Stunde oder zwei Stunden in einer Minute.
+
+Verstanden — das „Abschluss"-Popup (queueCelebration) feuert bei jedem neuen BNT im Zeitraffer. Ich baue einen Schalter ein, den die Demo setzt, und stelle die Demo auf 2 Stunden pro Minute um.
+
+Celebration-Aufruf lokalisieren
+Die Stelle ist bekannt (Zeile 1886, bereits vorher gelesen) — ich setze jetzt die drei Änderungen um.
+
+
+Bearbeitet 2 Dateien, ausgeführt ein Befehl, verwendet 3 Tools
+Beides erledigt und im Browser verifiziert:
+
+Popup ist weg. Es gibt jetzt einen Schalter window.rcNoCelebrate in esl_live_arena_v22.js — die Demo setzt ihn automatisch, damit die Stadion-Szenen die einzige Bühne sind. Verifiziert: nach 300 simulierten Frames null Popup-Elemente im DOM, Szenen und Zähler laufen normal weiter. Im echten Portal-Betrieb bleibt das Popup wie bisher an (falls du es auch dort weghaben willst: einmal rcNoCelebrate = true in der Konsole, oder ich schalte es dauerhaft ab, wenn der League-Modus aktiv ist — sag einfach Bescheid).
+
+Zeitraffer auf 2 Stunden pro Minute. Die Demo startet jetzt beim Stand von ca. 11 Uhr (30 % des Tages) und legt dann alle 2 Sekunden 13 echte Export-Zeilen nach — das entspricht exakt zwei simulierten Arbeitsstunden pro echter Minute; der restliche Tag läuft in gut 3 Minuten bis zum 17:30-Stand durch. Das Tempo ist oben in test_league_demo.html als SPEED_H_PER_MIN = 2 einstellbar (1 = eine Stunde pro Minute).
+
+Dazu ein Feinschliff, den das hohe Tempo nötig machte: Wenn die Szenen-Warteschlange voll läuft (viele Abschlüsse gleichzeitig), spielen die Torszenen automatisch bis zu 1,8-fach schneller ab — so staut sich nichts, und bei ruhigem Betrieb bleibt das normale TV-Tempo. Die Zeitlupe beim Traumtor bleibt davon unberührt. node --check ist sauber, Burg-Modus unverändert.
+
+was für ein schrott!! ich hätte mir vwas vieeel besseres vorgestellt
+
+Verstanden — zu klein, zu weit weg, kein TV-Gefühl. Das Kernproblem: Alles spielt auf der taktischen Totalen, dadurch wirken die Figuren wie Ameisen. Ich baue jetzt das, was echte Übertragungen ausmacht: eine Kino-Kamera — bei jeder Torszene schneidet das Bild auf eine bildschirmfüllende Nahaufnahme (Spieler ~200 px groß, Seitenansicht, großes Tor mit Netz, Bokeh-Tribüne, Zeitlupe, Knierutscher-Jubel), danach zurück zur Totalen. Das ist der Sprung von „Browserspiel" zu „Sportschau".
+
+
+Bearbeitet eine Datei, ausgeführt 6 Befehle, gelesen 3 Dateien, verwendet 12 Tools
+Das sitzt. Jetzt noch das Memory aktualisieren und abschließen:
+
+
+Gespeichert eine Erinnerung
+Du hattest recht — die Totale allein war zu wenig. Der Fehler lag nicht an den Regeln, sondern an der Kameraführung: Alles spielte weit weg auf dem Taktik-Feld, dadurch sahen selbst gute Szenen nach Browserspiel aus. Jetzt gibt es das, was Fernsehen ausmacht: den Schnitt in die Nahaufnahme.
+
+So läuft eine Torszene jetzt ab: Die Totale zeigt das Stadion, dann Blenden-Wisch — und die Kamera schneidet auf eine bildschirmfüllende Kino-Bühne: Spieler in Seitenansicht, rund 200 Pixel groß, mit richtigem Körper (Gelenke, Schuhe, Hose, Auge, Haar-Varianten je Agent), das Trikot ist die komplette Landesflagge. Großes Tor mit Netz, das beim Einschlag wellt, unscharfe Bokeh-Tribüne mit Flutlichtkegeln dahinter, Werbebanden. Beim Freistoß steht eine echte Mauer, der Ball zieht mit Tempolinien und Schweif über sie hinweg, der Keeper hechtet in die Ecke. Beim Treffer knallt „TRAUMTOR!" beziehungsweise „TOR!" als riesiger Schriftzug mit rotem Balken ins Bild, Konfetti regnet in den Winkel, der Torschütze rutscht auf den Knien übers Gras — und danach schneidet die Regie zurück in die Totale, wo der Jubel weiterläuft. Der letzte Screenshot oben zeigt genau diesen Moment mit Demir B. aus Sakarya im Türkei-Trikot.
+
+Jede Szene hat ihre eigene Choreografie in der Nahaufnahme: Fallrückzieher mit voller Körperrotation in Zeitlupe (KIP), Freistoß über die Mauer (Mobilfunk), Flachschuss, Schlenzer, Abstauber, die VVL-Parade, bei der dein Agent der Keeper mit Flaggen-Trikot ist, und der Elfmeter mit dem geseedeten Würfel. Gehaltene Bälle zeigen „GEHALTEN!" mit frustriertem Schützen — ehrlich bleibt ehrlich.
+
+Alles verifiziert: node --check sauber, keine JS-Fehler, Burg-Modus unangetastet, Panels und Zähler laufen unverändert weiter. Die Demo unter test_league_demo.html läuft weiter mit deinem echten Export-Tag im 2-Stunden-pro-Minute-Zeitraffer und ohne das Abschluss-Popup.
+
+Wenn dich jetzt noch etwas stört, sag mir konkret welche Szene oder welches Detail — dann treffe ich genau das, statt breit zu raten. Nächste sinnvolle Ausbaustufen wären die 18:00-Schlusspfiff-Zeremonie mit Siegerehrung im Kino-Format und Wiederholungs-Replays der Traumtore.
+
+es gefaellt mir nicht, ich erwarte das beste von besten was grafik an geht, gamifaction, ujnd spass sowie motivation angeht.
+
+Ich höre dich — und bevor ich ein drittes Mal rate und wieder daneben liege, sage ich dir ehrlich, wo wir stehen, denn „das Beste vom Besten" ist eine Richtungsentscheidung, keine weitere Polier-Runde.
+
+Die ehrliche Diagnose: Die Zahlen, Regeln und das K.-o.-System stehen — woran es hakt, ist der Look, und der hat mit der aktuellen Technik eine Decke. Handgezeichnete Canvas-Figuren (Kreise, Linien, Rechtecke) erreichen nie FIFA- oder Konsolen-Qualität, egal wie oft ich nachschleife. Es gibt drei Wege, die wirklich nach „Bestes vom Besten" aussehen können — sie kosten sehr unterschiedlich viel, und welcher dich begeistert, ist Geschmackssache. Deshalb frage ich dich jetzt, statt deine Zeit mit einem weiteren Blindflug zu verbrennen:
+
+Gefragt
+Grafik-Weg
+Gestoppt
+Wir machen mal Folgendes: Wir machen mal, das liegt dem Fußball beiseite, also der soll ja auch ausgewählt werden, ja, aber wir gehen jetzt wieder zum Burg und Krieg.  ich möchte dass duj das b urg und krieg radar bisschen realistischer und auch witzig mo0tivierender machhst.  und zwar möchte ich dass du beim burg und krieg die deutschen soldaten dicker machst und bisschen witzig hässlich. zudem die griechen auch so aber die griechen mit röcke bitte. es soll witzig sein einfach. die griechische soldaten sollen sich wie frauen verhalten einwenig. sei kreativ
+
+Verstanden — der Fußball bleibt als wählbarer Modus drin, aber wir drehen jetzt die Burg auf: dicke, witzig-hässliche Karikaturen-Krieger mit Nationalcharakter. Eine Sache setze ich bewusst klug um: Die Griechen bekommen den ikonischen Evzonen-Look — Faltenrock (Fustanella), Bommelschuhe, tänzelnd-theatralischer Gang mit Hüftschwung, Pirouette und Luftkuss nach gewonnenem Duell. Das ist genau der Witz, den du willst, aber als liebevolle Karikatur, über die auch die Kollegen in Serres lachen können — und damit es fair bleibt, kriegt jede Nation ihre Karikatur: die Deutschen dick mit Bierbauch, Pickelhaube und Watschelgang samt Bierkrug-Prost, die Türken mit Fes und gezwirbeltem Schnurrbart, Österreich mit Federhut.
+
+Da Ultracode aktiv ist, lasse ich die Figuren-Designs parallel von Spezialisten entwerfen und integriere danach selbst mit Browser-Verifikation.
+
+
+Verwendet 2 Tools
+Workflow ausgeführt
+burg-karikaturen
+
+Bearbeitet eine Datei, ausgeführt 2 Befehle, gelesen eine Datei
+Das Fundament steht: Default-Modus ist wieder Burg, alle neun Figuren-Aufrufstellen reichen jetzt Nation und Sieges-Gag durch, Syntax sauber. Die Design-Agenten arbeiten parallel am Karikaturen-Rig (dicke Deutsche mit Pickelhaube und Bierkrug, Evzonen-Griechen mit Faltenrock, Bommelschuhen und Pirouette, Türken mit Fes und Zwirbelbart) und an den Verhaltens-Gags — sobald ihre Entwürfe samt Kompatibilitäts-Review da sind, baue ich sie ein und verifiziere im Browser mit Screenshots.
+
+claude remote-control
+
+
+/claude
+ remote-control
+
+die türken machst du nicht witzig!!
+
+
+Ausgeführt ein Agent, verwendet ein Tool
+Beides beantwortet:
+
+1. Türken — notiert und fest zugesagt. Bei der Integration der Design-Entwürfe bekommt der TR-Zweig explizit KEINE Karikatur: normale, stolze Krieger-Statur, kein Gag, nichts Witziges. Karikiert werden nur Deutsche (dick, Pickelhaube, Watschelgang, Bierkrug-Prost) und Griechen (Evzonen-Faltenrock, Bommelschuhe, tänzelnd, Pirouette mit Luftkuss) — plus Österreich mit Federhut. Ich habe das im Projektgedächtnis verankert, damit es auch in künftigen Sessions gilt.
+
+2. „claude remote-control" ist das Feature, mit dem du eine lokale Claude-Code-Session vom Handy oder Browser aus weitersteuerst — die Ausführung bleibt auf deinem Rechner, nur die Bedienoberfläche wandert auf claude.ai/code bzw. die Claude-App. So nutzt du es:
+
+Neues Terminal: claude remote-control startet den Server-Modus (zeigt dir Session-URL und QR-Code — Leertaste drücken, mit dem Handy scannen, fertig). Alternativ claude --rc für eine normale Terminal-Session mit Remote-Zugriff.
+In einer laufenden CLI-Session: einfach /rc tippen — die bisherige Unterhaltung wird mit übernommen.
+Verbinden: claude.ai/code oder die Claude-App öffnen — deine Session erscheint dort mit grünem Punkt in der Liste.
+Voraussetzungen: Pro/Max/Team-Plan und Login via claude /login (OAuth, kein API-Key). Wichtig: Der lokale Prozess muss weiterlaufen — Terminal zu heißt Session zu.
+Eine Einschränkung für dich konkret: Diese Session hier läuft in der Desktop-App — von hier aus kann ich Remote Control nicht selbst aktivieren; du startest es in einem Terminal mit einem der Befehle oben. Praktisch um 2:30 Uhr: Du könntest dich hinlegen und die Karikaturen-Abnahme morgen früh vom Handy aus machen.
+
+Der Design-Workflow für die Burg-Krieger läuft übrigens noch im Hintergrund — sobald Rig, Gags und der Kompatibilitäts-Review fertig sind, baue ich alles ein (mit der Türken-Korrektur), verifiziere im Browser und zeige dir Screenshots.
+
+Unknown command: /claude
+
+Der Workflow ist fertig (Rig, Gags, Review) — und zu deinem Tipp-Versuch: /claude remote-control funktioniert nicht im Chat — der Befehl gehört in ein normales Terminal (PowerShell): dort claude remote-control ohne Schrägstrich eingeben, dann QR-Code mit dem Handy scannen.
+
+Jetzt integriere ich die Designs — mit deiner Korrektur: Der gelieferte Entwurf hatte die Türken noch als Karikatur (Fes, Pluderhosen), den Zweig baue ich auf würdevoll-stolz um. Erst hole ich die vollen Ergebnisse:
+
+Seitenvorschau
+Directory listing for /
+localhost:8412 · Im Browser geöffnet
+
+Ausgeführt 7 Befehle, gelesen 5 Dateien, bearbeitet 2 Dateien, verwendet 9 Tools
+Der Export kam diesmal inline — ich erzeuge ihn größer, damit er als Datei landet und ich ihn ansehen kann:
+
+
+Ausgeführt ein Befehl, gelesen eine Datei, verwendet 3 Tools
+
+Gespeichert 2 Erinnerungen
+Aufgaben aktualisiert
+Fertig — der Burg-Modus ist wieder Standard und hat jetzt seine Karikaturen-Krieger. Die Collage oben zeigt die Abnahme:
+
+Die Griechen sind dicke Evzonen-Karikaturen: weißer Fustanella-Faltenrock mit Zickzack-Saum und Faltenlinien, rote Tsarouchia-Schuhe mit weißen Bommeln, kesse rote Kappe mit Quaste, weißes Hemd mit Weste in Teamfarbe. Sie tänzeln mit flotterem Schritt und Hüftschwung auf Zehenspitzen über die Karte, eine Hand elegant erhoben — und nach einem gewonnenen Duell drehen sie eine Pirouette, bei der der Rock aufschwingt, und werfen einen Luftkuss (das rote Herz fliegt davon, per Bezier gezeichnet, kein Emoji).
+
+Die Deutschen sind dick und witzig-hässlich: XXL-Bierbauch, der beim breitbeinigen Watschelgang wackelt (trägerer Marschtakt), Knollennase, Doppelkinn, buschiger Schnauzer, preußische Pickelhaube mit goldener Spitze, Gürtel mit Goldschnalle. Nach dem Sieg heben sie einen Bierkrug mit Schaumkrone zum Prost — und der Funk-Feed kommentiert gelegentlich trocken dazu („…selbstverständlich alkoholfrei, es ist Schicht").
+
+Die Türken bleiben würdevoll, wie du es angeordnet hast: schlanke, aufrechte Statur, normales entschlossenes Gesicht, Eisenhelm mit rotem Federbusch in Teamfarbe — keine Witzfigur, kein Gag. Ich habe das zusätzlich als harte Regel im Projektgedächtnis verankert, damit sie auch in allen künftigen Sessions gilt. Österreich (Zeitwert) trägt den grünen Trachtenhut mit Feder.
+
+Technisch: Das neue Figuren-Rig ersetzt rcWarDrawMan vollständig rückwärtskompatibel (alle zehn Aufrufstellen samt Schwert-Duell, Bogenschütze, Speerwerfer, Träger, Bote wurden vom Review-Agenten geprüft — keine Mängel), die Sieges-Gags triggern nach Duell-Sieg und Katapult-Volltreffer, und der Moduswechsel Burg ↔ Sales League läuft fehlerfrei in beide Richtungen. node --check sauber, Graph aktualisiert. Der Fußball bleibt über den Button oben rechts im Radar jederzeit wählbar — Standard ist jetzt wieder die Burg.
+
+Wenn du die Figuren live wackeln sehen willst: python -m http.server 8412 --bind 127.0.0.1 im Projektordner, dann test_dashboard_offline.html öffnen und in der Konsole rcWarDemo() — oder morgen direkt im Portal per Re-Inject.
+
+Wo sind die GRiechen?
+
+Guter Zeitpunkt für einen kompletten Audit. Ich fahre das zweigleisig: **Ein Workflow prüft parallel den Code** (League-Logik, Burg-Rig, Integration/Moduswechsel — jede Findung wird danach adversarial verifiziert), während **ich live im Browser beide Modi durchteste** (alle Einheiten, alle Szenen, Zahlenkonsistenz, Moduswechsel im Dauertest). Am Ende bekommst du einen Prüfbericht: was funktioniert, was gefixt wurde, was bewusstes Design ist.
+

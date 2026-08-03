@@ -1,0 +1,382 @@
+{
+  "kpi_crawler.js": {
+    "mtime": 1785278417.1683893,
+    "ast_hash": "9310e502b9269c204786d8e816ee5678",
+    "semantic_hash": ""
+  },
+  "CLAUDE.md": {
+    "mtime": 1785282738.29828,
+    "ast_hash": "c12ae90acdf36ca340e58783753e71bb",
+    "semantic_hash": ""
+  },
+  "CR-Berechnung.md": {
+    "mtime": 1785189005.6312332,
+    "ast_hash": "58681f88383f07b18d6de87244d5e3b0",
+    "semantic_hash": ""
+  },
+  "Chat_mit_Gemini_um_zu_verstehen.md": {
+    "mtime": 1785189005.6071124,
+    "ast_hash": "fe6e270e86afa3ebda8fb99b554feee3",
+    "semantic_hash": ""
+  },
+  "ESL_ORginal_Konsolen_Elemente_Codes.txt": {
+    "mtime": 1785189005.6765838,
+    "ast_hash": "ef9c35a4a204318b80d2a7bbe205f79b",
+    "semantic_hash": ""
+  },
+  "Inhalt_Eines_Standort_Excels_Als_Beispiel.txt": {
+    "mtime": 1785189005.7216952,
+    "ast_hash": "84b3f68f2a2779ce3a51c2d3397ac3ed",
+    "semantic_hash": ""
+  },
+  "Mitarbeiternamen_Vo_Nummer_Team_Standort.txt": {
+    "mtime": 1785189005.8166611,
+    "ast_hash": "c83c96bd5e53dcb3597922e938dae76f",
+    "semantic_hash": ""
+  },
+  "SETUP_BroadcastChannel.md": {
+    "mtime": 1785189005.8513503,
+    "ast_hash": "9c85b2323b06c7394c6b110121d4fc73",
+    "semantic_hash": ""
+  },
+  "Ziele -leistungsindikatoren-und-servicestandards-des-kpi's.md": {
+    "mtime": 1785189005.9532106,
+    "ast_hash": "559b77ce1b48019bf8bb44c74b6401fb",
+    "semantic_hash": ""
+  },
+  "esl_live_arena_v22.js": {
+    "mtime": 1785282233.707129,
+    "ast_hash": "31b999e87ff635c6a6714988283c9b45",
+    "semantic_hash": ""
+  },
+  "test_dashboard_offline.html": {
+    "mtime": 1785189005.8773427,
+    "ast_hash": "a5cd6e9f7eb91d1445b0b1e9376e91b9",
+    "semantic_hash": ""
+  },
+  "wca_autopilot.html": {
+    "mtime": 1785189005.947212,
+    "ast_hash": "c94b160293a0cf4fe9de6be7f8335e54",
+    "semantic_hash": ""
+  },
+  "test_fixture_current_week.json": {
+    "mtime": 1785189005.887634,
+    "ast_hash": "7211932566b3fb9d10f0e9dd99f75187",
+    "semantic_hash": ""
+  },
+  "test_fixture_user_defined.json": {
+    "mtime": 1785189005.9034457,
+    "ast_hash": "c7410db6d6dcc1db97e8f02e329d6c51",
+    "semantic_hash": ""
+  },
+  "test_crawler_offline.html": {
+    "mtime": 1785189005.8630848,
+    "ast_hash": "0212af51b245d4c232870acb1fa6aa10",
+    "semantic_hash": ""
+  },
+  "Test Excels/Entwicklungsbericht_BCR_Performance_09.07.2026.pdf": {
+    "mtime": 1785189007.8879213,
+    "ast_hash": "0cfc7f6042226eeacde9c8ebe7d476a6",
+    "semantic_hash": ""
+  },
+  ".claude/launch.json": {
+    "mtime": 1785189005.9626906,
+    "ast_hash": "f15723489dd55c552443002a8ac16a8b",
+    "semantic_hash": ""
+  },
+  "league_demo_rows.js": {
+    "mtime": 1785189005.7443545,
+    "ast_hash": "59b54321c4b83e6be04bf27809bc0b91",
+    "semantic_hash": ""
+  },
+  "package.json": {
+    "mtime": 1785189005.8216627,
+    "ast_hash": "598768b730e7a4d745a94802eab4f817",
+    "semantic_hash": ""
+  },
+  "SALES_LEAGUE_PLAN.md": {
+    "mtime": 1785189005.8463502,
+    "ast_hash": "b43d4ffcf2cfed7d9673c229bc086629",
+    "semantic_hash": ""
+  },
+  "test_league_demo.html": {
+    "mtime": 1785189005.9101834,
+    "ast_hash": "bc6947868016d4150925da30f38cffca",
+    "semantic_hash": ""
+  },
+  ".claude/agents/war-engine-dev.md": {
+    "mtime": 1785189005.974465,
+    "ast_hash": "18242ba917f83f70618387c074ca9928",
+    "semantic_hash": ""
+  },
+  "Chatverlauf mit Claude Code.txt": {
+    "mtime": 1785189005.6204987,
+    "ast_hash": "da5f9a301f84745f2a2b4ff1edd83260",
+    "semantic_hash": ""
+  },
+  "VODAFONE_DESIGN.md": {
+    "mtime": 1785189005.9227247,
+    "ast_hash": "792ec68d1089b361b97327afe26f8223",
+    "semantic_hash": ""
+  },
+  ".claude/settings.local.json": {
+    "mtime": 1785189935.8352332,
+    "ast_hash": "8ee527268c5ee5da29cd9e74bd03be29",
+    "semantic_hash": ""
+  },
+  "test_crawler_v5.html": {
+    "mtime": 1785189005.8707795,
+    "ast_hash": "991596700310c081466dd59cfe56ea25",
+    "semantic_hash": ""
+  },
+  "ESL_Start.ps1": {
+    "mtime": 1785278896.758051,
+    "ast_hash": "5b9d5b0367b56d0102debb0247b02cae",
+    "semantic_hash": ""
+  },
+  "esl_autopilot.user.js": {
+    "mtime": 1785251591.2082362,
+    "ast_hash": "64732aec100d9a450f3dca1187a6e1b7",
+    "semantic_hash": ""
+  },
+  "esl_autopilot_bookmarklet.txt": {
+    "mtime": 1785189005.6505334,
+    "ast_hash": "f78428c1f8f4ecff94b0dc465643ce1e",
+    "semantic_hash": ""
+  },
+  "test_autostart.html": {
+    "mtime": 1785189005.8570824,
+    "ast_hash": "405ebc7cc0730182abbd2bc98919a061",
+    "semantic_hash": ""
+  },
+  "fixture_get_data.json": {
+    "mtime": 1785189962.6445363,
+    "ast_hash": "253f0b2ead7da5b3141daf9ebffe8c22",
+    "semantic_hash": ""
+  },
+  "fixture_gm_getdata.json": {
+    "mtime": 1785192166.7551725,
+    "ast_hash": "07d9ff542a7e82a0578848bcc4cf7568",
+    "semantic_hash": ""
+  },
+  "fixture_gm_values.json": {
+    "mtime": 1785192115.1604736,
+    "ast_hash": "f3e17fb8a2a45739d7536e816bb582a8",
+    "semantic_hash": ""
+  },
+  "genesys_monitor_crawler.js": {
+    "mtime": 1785249961.8092906,
+    "ast_hash": "8210b80ef90feeb77327521308938021",
+    "semantic_hash": ""
+  },
+  "rc_recon.js": {
+    "mtime": 1785191930.8734329,
+    "ast_hash": "84f661786e63f7c9bbb0eb5c01a1d1ab",
+    "semantic_hash": ""
+  },
+  ".claude/Skills/SKILL.md": {
+    "mtime": 1785189878.5908792,
+    "ast_hash": "e011e579ec4452562ad319eb27b7e4b0",
+    "semantic_hash": ""
+  },
+  ".claude/Skills/references/clip-path-techniques.md": {
+    "mtime": 1785189878.5318093,
+    "ast_hash": "d23104d2e13034735d1a9e429ee0ca4f",
+    "semantic_hash": ""
+  },
+  ".claude/Skills/references/component-patterns.md": {
+    "mtime": 1785189878.543806,
+    "ast_hash": "e1902925abbc78463cf00ac8162f2a3b",
+    "semantic_hash": ""
+  },
+  ".claude/Skills/references/contextual-animations.md": {
+    "mtime": 1785189878.550811,
+    "ast_hash": "73eb25d1d24f393005eebd7f746c6678",
+    "semantic_hash": ""
+  },
+  ".claude/Skills/references/decision-framework.md": {
+    "mtime": 1785189878.556812,
+    "ast_hash": "d35befe40d5dcdb269e47a6e308a203f",
+    "semantic_hash": ""
+  },
+  ".claude/Skills/references/gesture-drag.md": {
+    "mtime": 1785189878.5623195,
+    "ast_hash": "d0bf27bb40fcc6fe024b19cdcdf5cbad",
+    "semantic_hash": ""
+  },
+  ".claude/Skills/references/performance-deep-dive.md": {
+    "mtime": 1785189878.5688512,
+    "ast_hash": "0499dae6d205e727b8d8cf46ceb6f919",
+    "semantic_hash": ""
+  },
+  ".claude/Skills/references/review-format.md": {
+    "mtime": 1785189878.5748706,
+    "ast_hash": "0c768881c835a214e80f8f60a95f3b40",
+    "semantic_hash": ""
+  },
+  ".claude/Skills/references/spring-animations.md": {
+    "mtime": 1785189878.5818734,
+    "ast_hash": "5965976566dce72eeb6f55c6dc4c4630",
+    "semantic_hash": ""
+  },
+  "GenesysMonitor.txt": {
+    "mtime": 1785107600.486931,
+    "ast_hash": "9a3ab0c2a47a1f5b008596b4e4c28694",
+    "semantic_hash": ""
+  },
+  "fixture_table.html": {
+    "mtime": 1785189964.8222954,
+    "ast_hash": "536de47de7eff10bc62274483a77b966",
+    "semantic_hash": ""
+  },
+  "test_gm_offline.html": {
+    "mtime": 1785192178.9806023,
+    "ast_hash": "ce6af4667aefea74f487583e8cf9ec07",
+    "semantic_hash": ""
+  },
+  "test_recon_offline.html": {
+    "mtime": 1785189960.8341887,
+    "ast_hash": "480f9f8aabc2d9b7ebafc7295a59548d",
+    "semantic_hash": ""
+  },
+  "croco_crawler.js": {
+    "mtime": 1785193713.1543736,
+    "ast_hash": "13ec6b3011be36a1f2c7852721360e35",
+    "semantic_hash": ""
+  },
+  "croco_tuner.js": {
+    "mtime": 1785194314.2580154,
+    "ast_hash": "705935a7697ec195b0fef031bcd0071d",
+    "semantic_hash": ""
+  },
+  "fixture_croco_result.json": {
+    "mtime": 1785193730.9878404,
+    "ast_hash": "fdea874b0e2d92ae93e2152070889748",
+    "semantic_hash": ""
+  },
+  ".claude/Skills/ui-animation/SKILL.md": {
+    "mtime": 1785193413.6827548,
+    "ast_hash": "e011e579ec4452562ad319eb27b7e4b0",
+    "semantic_hash": ""
+  },
+  ".claude/Skills/ui-animation/references/clip-path-techniques.md": {
+    "mtime": 1785193413.643329,
+    "ast_hash": "d23104d2e13034735d1a9e429ee0ca4f",
+    "semantic_hash": ""
+  },
+  ".claude/Skills/ui-animation/references/component-patterns.md": {
+    "mtime": 1785193413.6486466,
+    "ast_hash": "e1902925abbc78463cf00ac8162f2a3b",
+    "semantic_hash": ""
+  },
+  ".claude/Skills/ui-animation/references/contextual-animations.md": {
+    "mtime": 1785193413.654648,
+    "ast_hash": "73eb25d1d24f393005eebd7f746c6678",
+    "semantic_hash": ""
+  },
+  ".claude/Skills/ui-animation/references/decision-framework.md": {
+    "mtime": 1785193413.6593378,
+    "ast_hash": "d35befe40d5dcdb269e47a6e308a203f",
+    "semantic_hash": ""
+  },
+  ".claude/Skills/ui-animation/references/gesture-drag.md": {
+    "mtime": 1785193413.6633465,
+    "ast_hash": "d0bf27bb40fcc6fe024b19cdcdf5cbad",
+    "semantic_hash": ""
+  },
+  ".claude/Skills/ui-animation/references/performance-deep-dive.md": {
+    "mtime": 1785193413.6680129,
+    "ast_hash": "0499dae6d205e727b8d8cf46ceb6f919",
+    "semantic_hash": ""
+  },
+  ".claude/Skills/ui-animation/references/review-format.md": {
+    "mtime": 1785193413.6720164,
+    "ast_hash": "0c768881c835a214e80f8f60a95f3b40",
+    "semantic_hash": ""
+  },
+  ".claude/Skills/ui-animation/references/spring-animations.md": {
+    "mtime": 1785193413.676023,
+    "ast_hash": "5965976566dce72eeb6f55c6dc4c4630",
+    "semantic_hash": ""
+  },
+  "test_croco_offline.html": {
+    "mtime": 1785194165.1022928,
+    "ast_hash": "689e4239c13892a4287f50102f20c924",
+    "semantic_hash": ""
+  },
+  ".claude/agents/autopilot-spezialist.md": {
+    "mtime": 1785195561.547786,
+    "ast_hash": "17d0380111b5bc7b27be9aaf8ac74d3a",
+    "semantic_hash": ""
+  },
+  ".claude/agents/daten-auditor.md": {
+    "mtime": 1785195109.8994074,
+    "ast_hash": "7b7c7a16e06b3a28fe038ab998bda7aa",
+    "semantic_hash": ""
+  },
+  ".claude/agents/excel-export-spezialist.md": {
+    "mtime": 1785195505.6752098,
+    "ast_hash": "19d3b6bfb0dec0c9fe0f61562b5b5721",
+    "semantic_hash": ""
+  },
+  ".claude/agents/league-modus-spezialist.md": {
+    "mtime": 1785195457.2930217,
+    "ast_hash": "c3fad9d04a4e5f1f4d1fbd0291f9811f",
+    "semantic_hash": ""
+  },
+  ".claude/agents/portal-recon-spezialist.md": {
+    "mtime": 1785195396.7516313,
+    "ast_hash": "88562c097bb7e170e4176a08f1d6de81",
+    "semantic_hash": ""
+  },
+  ".claude/agents/ui-design-animation.md": {
+    "mtime": 1785195619.094858,
+    "ast_hash": "4e08f51bb614941caa0e9a76aeeba371",
+    "semantic_hash": ""
+  },
+  ".claude/agents/sales-manager.md": {
+    "mtime": 1785220441.2543628,
+    "ast_hash": "babb0a11928f84c21fb5468297a9c53c",
+    "semantic_hash": ""
+  },
+  "motion_demo.html": {
+    "mtime": 1785196082.358981,
+    "ast_hash": "07585e2804babb3fdc35e880be28d67c",
+    "semantic_hash": ""
+  },
+  "bundle_bauen.js": {
+    "mtime": 1785234896.000275,
+    "ast_hash": "5722f0edac5df5a8cb513c1bed38cc2c",
+    "semantic_hash": ""
+  },
+  "veyseLL_Update_20260728_1907.txt": {
+    "mtime": 1785254831.1232548,
+    "ast_hash": "ade34b1a88541d81b803b7124d8f59f6",
+    "semantic_hash": ""
+  },
+  "esl_mail_report.ps1": {
+    "mtime": 1785279119.742318,
+    "ast_hash": "c662b0e42f7e33741264f6f4fcad81c2",
+    "semantic_hash": ""
+  },
+  "ps1_erzeugen.js": {
+    "mtime": 1785278889.6850345,
+    "ast_hash": "c6b278b9f2fe08c3cda511d803e93f96",
+    "semantic_hash": ""
+  },
+  "pruefwerkzeuge/liga_nach_crawlerformat.js": {
+    "mtime": 1785282680.1709929,
+    "ast_hash": "08bcce6500faa876ab8c888b08754e79",
+    "semantic_hash": ""
+  },
+  "pruefwerkzeuge/tdz_pruefen.js": {
+    "mtime": 1785282680.1388364,
+    "ast_hash": "6165c03e612ada5911e262da285de79f",
+    "semantic_hash": ""
+  },
+  "pruefwerkzeuge/LIESMICH.md": {
+    "mtime": 1785282696.6231778,
+    "ast_hash": "735f965a567b016e05ef8f1623483236",
+    "semantic_hash": ""
+  }
+}

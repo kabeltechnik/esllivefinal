@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>Genesys-Monitor-Crawler Offline-Test</title>
+<style>body{font:14px Segoe UI,sans-serif;margin:24px;background:#F4F4F4}h1{color:#E60000;font-size:17px}</style>
+</head>
+<body>
+<h1>Offline-Test: Genesys-Monitor-Crawler</h1>
+<p>Prueft, ob die Berechnung dieselben Zahlen liefert wie das echte Portal.</p>
+
+<!-- Bedienelemente wie auf gm2.rb, damit rcGmLerneAlle() testbar ist -->
+<select id="quality-list" size="4" multiple>
+  <option value="CCS_Category_KA_TEC_TV" selected>C VOICE TECH VKD STANDARD</option>
+  <option value="CCS_Category_DSL_03">C VOICE TECH DSL STANDARD</option>
+</select>
+<button type="button" id="ok-button">Ok</button>
+
+<pre id="ausgabe">laeuft...</pre>
+
+<script>
+  // Endpunkte auf die Fixtures umbiegen
+  window.RC_GM_BASIS = 'fixture_gm_getdata.json';
+  window.RC_GM_WERTE = 'fixture_gm_values.json';
+
+  // Katalog vorbelegen, damit der Crawler ohne Portal starten kann
+  localStorage.setItem('rcGmKatalog', JSON.stringify({
+    'CCS_Category_KA_TEC_TV': {
+      kategorie: 'CCS_Category_KA_TEC_TV',
+      name: 'C VOICE TECH VKD STANDARD',
+      nodeId: '13359',
+      statIds: ['72080','72081','72083','72084','72088','72089','72090','72092','72093'],
+      rest: '1',
+      filter: 'CCS_Category_KA_TEC_TV|C VOICE TECH VKD STANDARD|13359|72080,72081,72083,72084,72088,72089,72090,72092,72093|1',
+      provider: 'SNT'
+    }
+  }));
+
+  // Erwartungswerte aus dem echten DOM-Stand des Portals (GenesysMonitor.txt)
+  window.__erwartet = { wa: 1, wz: '3:33', eq15: 66.7, eqTag: 100, sl15: 100, slTag: 100, ist: 0 };
+</script>
+</body>
+</html>

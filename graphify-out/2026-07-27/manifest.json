@@ -1,0 +1,152 @@
+{
+  "esl_live_arena_v21.js": {
+    "mtime": 1785135663.9777265,
+    "ast_hash": "1367290ded5afe6f10d616ea7557108d",
+    "semantic_hash": ""
+  },
+  "kpi_crawler.js": {
+    "mtime": 1785139141.8076043,
+    "ast_hash": "e6a3a27e077b9fa14e8374591d9ec7d4",
+    "semantic_hash": ""
+  },
+  "CLAUDE.md": {
+    "mtime": 1785149589.3650644,
+    "ast_hash": "6d3c332fa19d474a14a6d0a651a17c9b",
+    "semantic_hash": ""
+  },
+  "CR-Berechnung.md": {
+    "mtime": 1785135663.8798487,
+    "ast_hash": "58681f88383f07b18d6de87244d5e3b0",
+    "semantic_hash": ""
+  },
+  "Chat_mit_Gemini_um_zu_verstehen.md": {
+    "mtime": 1785135663.8817265,
+    "ast_hash": "fe6e270e86afa3ebda8fb99b554feee3",
+    "semantic_hash": ""
+  },
+  "ESL_ORginal_Konsolen_Elemente_Codes.txt": {
+    "mtime": 1785135663.8817265,
+    "ast_hash": "ef9c35a4a204318b80d2a7bbe205f79b",
+    "semantic_hash": ""
+  },
+  "Inhalt_Eines_Standort_Excels_Als_Beispiel.txt": {
+    "mtime": 1785135663.9177263,
+    "ast_hash": "84b3f68f2a2779ce3a51c2d3397ac3ed",
+    "semantic_hash": ""
+  },
+  "Konsolen_Code.txt": {
+    "mtime": 1785135663.9217265,
+    "ast_hash": "48d5166e6b23ae265049e3d2adc31bd8",
+    "semantic_hash": ""
+  },
+  "LigListe_KPIS_CrawlerCodes.txt": {
+    "mtime": 1785135663.9337263,
+    "ast_hash": "cf8be774b370617ff3fc13db8c335032",
+    "semantic_hash": ""
+  },
+  "Mitarbeiternamen_Vo_Nummer_Team_Standort.txt": {
+    "mtime": 1785135663.9457264,
+    "ast_hash": "c83c96bd5e53dcb3597922e938dae76f",
+    "semantic_hash": ""
+  },
+  "SETUP_BroadcastChannel.md": {
+    "mtime": 1785135663.9497263,
+    "ast_hash": "9c85b2323b06c7394c6b110121d4fc73",
+    "semantic_hash": ""
+  },
+  "Ziele -leistungsindikatoren-und-servicestandards-des-kpi's.md": {
+    "mtime": 1785135663.9737265,
+    "ast_hash": "559b77ce1b48019bf8bb44c74b6401fb",
+    "semantic_hash": ""
+  },
+  "esl_live_arena_v22.js": {
+    "mtime": 1785149499.441059,
+    "ast_hash": "d74280f353a87384d335449af4d4ad00",
+    "semantic_hash": ""
+  },
+  "test_dashboard_offline.html": {
+    "mtime": 1785135664.1737263,
+    "ast_hash": "a5cd6e9f7eb91d1445b0b1e9376e91b9",
+    "semantic_hash": ""
+  },
+  "wca_autopilot.html": {
+    "mtime": 1785135664.2017264,
+    "ast_hash": "c94b160293a0cf4fe9de6be7f8335e54",
+    "semantic_hash": ""
+  },
+  "test_fixture_current_week.json": {
+    "mtime": 1785135664.1817265,
+    "ast_hash": "7211932566b3fb9d10f0e9dd99f75187",
+    "semantic_hash": ""
+  },
+  "test_fixture_user_defined.json": {
+    "mtime": 1785135664.2017264,
+    "ast_hash": "c7410db6d6dcc1db97e8f02e329d6c51",
+    "semantic_hash": ""
+  },
+  "LigalisteCodes.txt": {
+    "mtime": 1785135663.9337263,
+    "ast_hash": "ec6ffdbacc573aabec90d213df1a227a",
+    "semantic_hash": ""
+  },
+  "test_crawler_offline.html": {
+    "mtime": 1785135664.1737263,
+    "ast_hash": "0212af51b245d4c232870acb1fa6aa10",
+    "semantic_hash": ""
+  },
+  "Test Excels/Entwicklungsbericht_BCR_Performance_09.07.2026.pdf": {
+    "mtime": 1785135663.9497263,
+    "ast_hash": "0cfc7f6042226eeacde9c8ebe7d476a6",
+    "semantic_hash": ""
+  },
+  ".claude/launch.json": {
+    "mtime": 1785135663.8798487,
+    "ast_hash": "f15723489dd55c552443002a8ac16a8b",
+    "semantic_hash": ""
+  },
+  "league_demo_rows.js": {
+    "mtime": 1785135664.0097263,
+    "ast_hash": "59b54321c4b83e6be04bf27809bc0b91",
+    "semantic_hash": ""
+  },
+  "package.json": {
+    "mtime": 1785135664.1737263,
+    "ast_hash": "598768b730e7a4d745a94802eab4f817",
+    "semantic_hash": ""
+  },
+  "SALES_LEAGUE_PLAN.md": {
+    "mtime": 1785135663.9457264,
+    "ast_hash": "b43d4ffcf2cfed7d9673c229bc086629",
+    "semantic_hash": ""
+  },
+  "test_league_demo.html": {
+    "mtime": 1785135664.2017264,
+    "ast_hash": "bc6947868016d4150925da30f38cffca",
+    "semantic_hash": ""
+  },
+  ".claude/agents/war-engine-dev.md": {
+    "mtime": 1785135663.8798487,
+    "ast_hash": "18242ba917f83f70618387c074ca9928",
+    "semantic_hash": ""
+  },
+  "Chatverlauf mit Claude Code.txt": {
+    "mtime": 1785135663.8817265,
+    "ast_hash": "da5f9a301f84745f2a2b4ff1edd83260",
+    "semantic_hash": ""
+  },
+  "VODAFONE_DESIGN.md": {
+    "mtime": 1785135663.9657264,
+    "ast_hash": "792ec68d1089b361b97327afe26f8223",
+    "semantic_hash": ""
+  },
+  ".claude/settings.local.json": {
+    "mtime": 1785138820.8395853,
+    "ast_hash": "8379aaa5f8b622920febff1c722acecc",
+    "semantic_hash": ""
+  },
+  "test_crawler_v5.html": {
+    "mtime": 1785139405.69962,
+    "ast_hash": "991596700310c081466dd59cfe56ea25",
+    "semantic_hash": ""
+  }
+}

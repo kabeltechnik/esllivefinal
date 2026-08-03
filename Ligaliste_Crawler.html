@@ -1,0 +1,867 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ligalisten-Crawler — Konfiguration</title>
+<!--
+  ============================================================
+   Ligalisten-Crawler — Konfigurationsseite
+   ------------------------------------------------------------
+   Vorbild: "Final PIX.html". Gleiche Idee, andere Quelle:
+   hier wird get_data.rb der Ligaliste abgefragt statt
+   get_result.rb von PIX.
+
+   Bewusst OHNE CDN (kein Tailwind): die Seite muss auch auf
+   dem Citrix-Rechner ohne Netz aufgehen. Eigenes CSS im
+   Vodafone-Design, siehe VODAFONE_DESIGN.md.
+
+   Ablauf: links konfigurieren -> "Code erzeugen" -> kopieren
+   -> in der Ligaliste F12-Konsole einfuegen -> Excel kommt.
+  ============================================================
+-->
+<style>
+  :root{
+    --rot:#E60000; --dunkelrot:#BD0000;
+    --weiss:#FFFFFF; --leinwand:#F4F4F4;
+    --ink:#0D0D0D; --sek:#333333; --grau:#666666;
+    --linie:#EBEBEB; --linie2:#CCCCCC;
+    --ok:#008A00; --warn:#EB9700; --warntext:#8F5C00;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0; padding:24px;
+    font:15px/1.55 "Segoe UI",system-ui,-apple-system,sans-serif;
+    background:var(--leinwand); color:var(--ink);
+  }
+  h1{font-size:26px; margin:0 0 4px; font-weight:700}
+  h2{font-size:17px; margin:0 0 14px; font-weight:700}
+  .kopf{max-width:1500px; margin:0 auto 20px}
+  .kopf p{margin:0; color:var(--sek); font-size:14px}
+  .schritte{display:flex; gap:10px; flex-wrap:wrap; margin-top:14px}
+  .schritt{
+    background:var(--weiss); border:1px solid var(--linie); border-left:3px solid var(--rot);
+    border-radius:6px; padding:9px 13px; font-size:13px; color:var(--sek); flex:1; min-width:230px;
+  }
+  .schritt b{color:var(--ink); display:block; margin-bottom:2px}
+  .raster{max-width:1500px; margin:0 auto; display:grid; grid-template-columns:1fr 1fr; gap:20px}
+  @media(max-width:1100px){.raster{grid-template-columns:1fr}}
+  .karte{background:var(--weiss); border:1px solid var(--linie); border-radius:10px; padding:20px}
+  .feld{margin-bottom:20px}
+  .feld:last-child{margin-bottom:0}
+  label.titel{display:block; font-weight:600; font-size:14px; margin-bottom:7px}
+  .zeile{display:flex; justify-content:space-between; align-items:center; margin-bottom:7px}
+  .mini{font-size:12px; color:var(--grau); margin-top:5px; line-height:1.45}
+  .mini.warn{color:var(--warntext)}
+  select,input[type=text],input[type=date],textarea{
+    width:100%; padding:9px 10px; border:1px solid var(--linie2); border-radius:6px;
+    background:var(--weiss); color:var(--ink); font:14px inherit; font-family:inherit;
+  }
+  select:focus,input:focus,textarea:focus{outline:2px solid var(--rot); outline-offset:-1px; border-color:var(--rot)}
+  textarea{font-family:Consolas,monospace; font-size:12px; resize:vertical}
+  .kaesten{
+    display:grid; grid-template-columns:repeat(auto-fill,minmax(160px,1fr)); gap:5px;
+    background:#FAFAFA; border:1px solid var(--linie); border-radius:6px; padding:12px;
+  }
+  .kaesten.klein{grid-template-columns:repeat(auto-fill,minmax(105px,1fr)); max-height:190px; overflow-y:auto}
+  .kasten{display:flex; align-items:center; gap:7px; cursor:pointer; padding:3px; font-size:13px}
+  .kasten input{width:16px; height:16px; accent-color:var(--rot); cursor:pointer; flex:none}
+  .kasten span{overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+  button{font:inherit; cursor:pointer; border-radius:6px; transition:background .15s,border-color .15s}
+  .knopf{background:var(--rot); color:#fff; border:none; padding:12px 18px; font-weight:600; font-size:15px; width:100%}
+  .knopf:hover{background:var(--dunkelrot)}
+  .knopf.zweit{background:var(--weiss); color:var(--ink); border:1px solid var(--linie2); font-weight:500; padding:8px 14px; font-size:13px; width:auto}
+  .knopf.zweit:hover{border-color:var(--rot); color:var(--rot)}
+  .textknopf{background:none; border:none; color:var(--rot); font-size:12px; font-weight:600; padding:2px 5px}
+  .textknopf:hover{text-decoration:underline}
+  .textknopf.grau{color:var(--grau)}
+  .bereich{display:flex; gap:7px; margin-bottom:7px; align-items:center}
+  .bereich button{background:var(--weiss); border:1px solid var(--linie2); color:var(--grau); padding:8px 12px; font-weight:600; flex:none}
+  .bereich button:hover{border-color:var(--rot); color:var(--rot)}
+  #datumGruppe{background:#FFF8F8; border:1px solid #F5D6D6; border-radius:6px; padding:14px; margin-top:9px}
+  .aus{display:none}
+  .codekarte{background:#1D1D1D; border:1px solid #333; border-radius:10px; padding:20px; display:flex; flex-direction:column}
+  .codekarte h2{color:#F5F5F5}
+  .codekopf{display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #383838; padding-bottom:14px; margin-bottom:14px}
+  .codekopf h2{margin:0}
+  .codekopf button{background:#2C2C2C; color:#F5F5F5; border:1px solid #4A4A4A; padding:7px 15px; font-size:13px}
+  .codekopf button:hover{background:#3A3A3A; border-color:#666}
+  pre{
+    flex:1; margin:0; background:#0E0E0E; border:1px solid #333; border-radius:6px;
+    padding:14px; overflow:auto; max-height:calc(100vh - 260px); min-height:420px;
+  }
+  code{color:#D8D8D8; font:12px/1.6 Consolas,monospace; white-space:pre}
+  .melder{
+    position:fixed; bottom:22px; right:22px; background:var(--ok); color:#fff;
+    padding:12px 22px; border-radius:7px; box-shadow:0 5px 18px rgba(0,0,0,.22);
+    transform:translateY(90px); opacity:0; transition:all .28s ease; font-size:14px; font-weight:600;
+  }
+  .melder.da{transform:translateY(0); opacity:1}
+  .melder.fehler{background:var(--rot)}
+  .zaehler{background:#FAFAFA; border:1px solid var(--linie); border-radius:6px; padding:11px 14px; font-size:13px; color:var(--sek)}
+  .zaehler b{color:var(--ink)}
+  .zaehler .viel{color:var(--warntext)}
+</style>
+</head>
+<body>
+
+<div class="kopf">
+  <h1>Ligalisten-Crawler</h1>
+  <p>Holt die Ligalisten-Kennzahlen fuer beliebig viele Standorte und Zeitraeume in EINE Excel-Mappe — ohne jede Abfrage einzeln von Hand einzustellen.</p>
+  <div class="schritte">
+    <div class="schritt"><b>1. Hier einstellen</b>Standorte, Zeitraum und Intervall waehlen, dann „Code erzeugen“.</div>
+    <div class="schritt"><b>2. Kopieren</b>Auf „Kopieren“ druecken.</div>
+    <div class="schritt"><b>3. In der Ligaliste einfuegen</b>Dort F12 druecken, in die Konsole einfuegen, Enter. Der Rest laeuft allein.</div>
+  </div>
+</div>
+
+<div class="raster">
+
+  <div class="karte">
+    <h2>Konfiguration</h2>
+
+    <div class="feld">
+      <div class="zeile">
+        <label class="titel">Standorte</label>
+        <div>
+          <button class="textknopf" onclick="alleSetzen('std',true)">Alle</button>
+          <button class="textknopf grau" onclick="alleSetzen('std',false)">Keine</button>
+        </div>
+      </div>
+      <div class="kaesten" id="stdListe"></div>
+      <div class="mini" id="stdHinweis"></div>
+    </div>
+
+    <div class="feld">
+      <label class="titel">Abfrage-Aufteilung</label>
+      <select id="aufteilung" onchange="zaehlerNeu()">
+        <option value="einzeln">Je Standort eine eigene Abfrage (getrennt auswertbar)</option>
+        <option value="zusammen">Alle gewaehlten Standorte in einer Abfrage</option>
+      </select>
+      <div class="mini">Getrennt ist uebersichtlicher und schont den Server; zusammen ist schneller.</div>
+    </div>
+
+    <div class="feld">
+      <label class="titel">Zeitraum</label>
+      <select id="zeitraum" onchange="zeitraumGewechselt()">
+        <option value="intraday">Heute, laufend (intraday)</option>
+        <option value="yesterday">Gestern (yesterday)</option>
+        <option value="current_week">Aktuelle Woche (current_week)</option>
+        <option value="last_week">Letzte Woche (last_week)</option>
+        <option value="current_month" selected>Aktueller Monat (current_month)</option>
+        <option value="last_month">Letzter Monat (last_month)</option>
+        <option value="current_quarter">Aktuelles Quartal (current_quarter)</option>
+        <option value="last_quarter">Letztes Quartal (last_quarter)</option>
+        <option value="user_defined">Frei gewaehlt (user_defined)</option>
+      </select>
+      <div class="mini warn" id="zeitraumHinweis"></div>
+    </div>
+
+    <div class="feld aus" id="datumGruppe">
+      <label class="titel">Eigene Zeitraeume</label>
+      <div id="bereiche"></div>
+      <button class="knopf zweit" onclick="bereichHinzu()">Weiteren Zeitraum hinzufuegen</button>
+      <div class="mini">Jeder Zeitraum wird einzeln abgefragt und bekommt im Excel einen eigenen Block. Das Portal erwartet <code>YYYYMMDD</code> — die Umwandlung passiert automatisch.</div>
+    </div>
+
+    <div class="feld">
+      <label class="titel">Intervall</label>
+      <select id="intervall" onchange="zeitraumGewechselt()">
+        <option value="cumulate">Kumuliert — eine Zeile je Agent</option>
+        <option value="day">Tag — eine Zeile je Agent und Tag (mit Datum-Spalte)</option>
+        <option value="week">Woche</option>
+        <option value="month">Monat</option>
+      </select>
+      <div class="mini warn" id="intervallHinweis"></div>
+    </div>
+
+    <div class="feld">
+      <label class="titel">Zusaetzliche Parameter (optional)</label>
+      <textarea id="extra" rows="3" placeholder="team_inlist=21105082&#10;show_ccsid=1"></textarea>
+      <div class="mini">Ein <code>Name=Wert</code> je Zeile. Wird ueber den mitgeschnittenen Original-Body gelegt. Die echten Parameternamen zeigt <code>rc_lupe.js</code> auf der Ligalisten-Seite an (Panel, Zeile anklicken).</div>
+    </div>
+
+    <div class="feld">
+      <label class="titel">Excel</label>
+      <label class="kasten"><input type="checkbox" id="optBlatt" checked><span>Je Zeitraum ein eigenes Tabellenblatt</span></label>
+      <label class="kasten"><input type="checkbox" id="optGruppen" checked><span>Gruppen-Kopfzeile mitschreiben (ACW, CS, TNPS …)</span></label>
+      <label class="kasten"><input type="checkbox" id="optZahlen" checked><span>Zahlen als Zahl schreiben (statt als Text)</span></label>
+    </div>
+
+    <div class="feld">
+      <label class="titel">Schonung des Servers</label>
+      <select id="pause">
+        <option value="1200">Normal — 1,2 s Pause zwischen Abfragen</option>
+        <option value="2500">Vorsichtig — 2,5 s (bei Oracle-Fehlern)</option>
+        <option value="400">Zuegig — 0,4 s (nur bei wenigen Abfragen)</option>
+      </select>
+      <div class="mini">Zu schnelle Abfragen quittiert das Portal mit HTTP 500. Der Code wiederholt jede Abfrage bis zu dreimal.</div>
+    </div>
+
+    <div class="feld">
+      <div class="zaehler" id="zaehler"></div>
+    </div>
+
+    <button class="knopf" onclick="codeErzeugen()">Code erzeugen</button>
+  </div>
+
+  <div class="codekarte">
+    <div class="codekopf">
+      <h2>Code fuer die Konsole</h2>
+      <div>
+        <button onclick="codeKopieren()">Kopieren</button>
+        <button onclick="codeSpeichern()">Als Datei</button>
+      </div>
+    </div>
+    <pre><code id="ausgabe">Links einstellen und auf „Code erzeugen“ druecken.
+
+Der erzeugte Code ist bewusst in eine IIFE gewickelt — er laesst sich
+also beliebig oft in dieselbe Konsole einfuegen. Snippets mit
+"const ... = await ..." auf oberster Ebene brechen beim zweiten
+Einfuegen mit "Identifier has already been declared" ab.
+
+Dass die Konsole nach dem Einfuegen "undefined" anzeigt, ist normal:
+das ist der Rueckgabewert, kein Fehler. Ob es laeuft, steht in den
+Meldungen darunter und im Fortschrittsfenster unten rechts.</code></pre>
+  </div>
+
+</div>
+
+<div id="melder" class="melder">In die Zwischenablage kopiert</div>
+
+<script>
+// ============================================================
+//  Stammdaten
+// ============================================================
+// Standorte wie im Ligalisten-Dropdown (Reihenfolge dort alphabetisch).
+var STANDORTE = [
+  'Alanya', 'Alexandroupolis', 'Berlin', 'Essen', 'Neubrandenburg',
+  'Potsdam', 'regiocom_W_Home', 'Sakarya', 'Serres'
+];
+
+var stdListe = document.getElementById('stdListe');
+STANDORTE.forEach(function (s) {
+  var l = document.createElement('label');
+  l.className = 'kasten';
+  l.innerHTML = '<input type="checkbox" class="std" value="' + s + '" checked onchange="zaehlerNeu()"><span title="' + s + '">' + s + '</span>';
+  stdListe.appendChild(l);
+});
+
+function alleSetzen(klasse, an) {
+  document.querySelectorAll('.' + klasse).forEach(function (e) { e.checked = an; });
+  zaehlerNeu();
+}
+
+// ============================================================
+//  Zeitraum / Intervall — die Kombinationen, die das Portal nicht mag
+// ============================================================
+function zeitraumGewechselt() {
+  var zr = document.getElementById('zeitraum').value;
+  var iv = document.getElementById('intervall');
+  var gruppe = document.getElementById('datumGruppe');
+  var zh = document.getElementById('zeitraumHinweis');
+  var ih = document.getElementById('intervallHinweis');
+
+  gruppe.classList.toggle('aus', zr !== 'user_defined');
+  if (zr === 'user_defined' && !document.querySelectorAll('.bereichZeile').length) bereichHinzu();
+
+  // Ein einzelner Tag hat keine Tages-Aufschluesselung. Das Portal liefert
+  // dann entweder nichts Sinnvolles oder faellt auf kumuliert zurueck.
+  var einTag = (zr === 'intraday' || zr === 'yesterday');
+  if (einTag && iv.value !== 'cumulate') {
+    iv.value = 'cumulate';
+    ih.textContent = 'Auf „Kumuliert“ gestellt: ein einzelner Tag hat keine Tages-Aufschluesselung.';
+  } else {
+    ih.textContent = (iv.value === 'day' && !einTag)
+      ? 'Liefert die Datum-Spalte — dadurch wird die Antwort deutlich groesser.' : '';
+  }
+  zh.textContent = einTag ? '' : '';
+  zaehlerNeu();
+}
+
+function bereichHinzu() {
+  var c = document.getElementById('bereiche');
+  var d = document.createElement('div');
+  d.className = 'bereich bereichZeile';
+  var heute = new Date().toISOString().slice(0, 10);
+  d.innerHTML = '<input type="date" class="von" max="' + heute + '" onchange="zaehlerNeu()">'
+              + '<input type="date" class="bis" max="' + heute + '" onchange="zaehlerNeu()">'
+              + '<button onclick="this.parentElement.remove();zaehlerNeu()" title="Zeitraum entfernen">Entfernen</button>';
+  c.appendChild(d);
+  zaehlerNeu();
+}
+
+// ============================================================
+//  Zaehler — wie viele Abfragen werden das?
+// ============================================================
+function gewaehlteStandorte() {
+  return Array.prototype.map.call(document.querySelectorAll('.std:checked'), function (e) { return e.value; });
+}
+function gewaehlteBereiche() {
+  var heute = new Date().toISOString().slice(0, 10), out = [];
+  document.querySelectorAll('.bereichZeile').forEach(function (r) {
+    var v = r.querySelector('.von').value, b = r.querySelector('.bis').value;
+    if (!v || !b) return;
+    if (v > b) { var t = v; v = b; b = t; }        // vertauscht? still richten
+    if (v > heute) v = heute;
+    if (b > heute) b = heute;                       // Zukunft liefert nie Daten
+    out.push({ von: v, bis: b });
+  });
+  return out;
+}
+function zaehlerNeu() {
+  var std = gewaehlteStandorte();
+  var zr = document.getElementById('zeitraum').value;
+  var einzeln = document.getElementById('aufteilung').value === 'einzeln';
+  var zeitraeume = (zr === 'user_defined') ? Math.max(gewaehlteBereiche().length, 0) : 1;
+  var proZeit = einzeln ? std.length : (std.length ? 1 : 0);
+  var n = zeitraeume * proZeit;
+  var pause = parseInt(document.getElementById('pause').value, 10);
+  var sek = Math.round(n * (pause + 1400) / 1000);
+  var z = document.getElementById('zaehler');
+  if (!n) {
+    z.innerHTML = '<b>Keine Abfrage.</b> ' + (!std.length ? 'Mindestens einen Standort waehlen.' : 'Mindestens einen Zeitraum vollstaendig ausfuellen.');
+    return;
+  }
+  var dauer = sek < 60 ? sek + ' Sekunden' : Math.round(sek / 60) + ' Minuten';
+  z.innerHTML = '<b>' + n + ' Abfrage' + (n === 1 ? '' : 'n')
+    + '</b> — geschaetzt etwa ' + dauer + '.'
+    + (n > 30 ? ' <span class="viel">Das ist viel; bei Oracle-Fehlern die Aufteilung auf „zusammen“ stellen.</span>' : '');
+}
+
+// ============================================================
+//  Code erzeugen
+// ============================================================
+function codeErzeugen() {
+  var std = gewaehlteStandorte();
+  if (!std.length) { melden('Mindestens einen Standort waehlen.', true); return; }
+
+  var zr = document.getElementById('zeitraum').value;
+  var bereiche = (zr === 'user_defined') ? gewaehlteBereiche() : [{ von: '', bis: '' }];
+  if (zr === 'user_defined' && !bereiche.length) { melden('Mindestens einen Zeitraum vollstaendig ausfuellen.', true); return; }
+
+  var extra = {};
+  document.getElementById('extra').value.split(/\r?\n/).forEach(function (z) {
+    z = z.trim(); if (!z) return;
+    var i = z.indexOf('='); if (i < 1) return;
+    extra[z.slice(0, i).trim()] = z.slice(i + 1).trim();
+  });
+
+  var cfg = {
+    zeitraum: zr,
+    intervall: document.getElementById('intervall').value,
+    bereiche: bereiche,
+    standorte: std,
+    einzeln: document.getElementById('aufteilung').value === 'einzeln',
+    extra: extra,
+    pause: parseInt(document.getElementById('pause').value, 10),
+    blattJeZeitraum: document.getElementById('optBlatt').checked,
+    gruppenKopf: document.getElementById('optGruppen').checked,
+    zahlen: document.getElementById('optZahlen').checked
+  };
+
+  document.getElementById('ausgabe').textContent = bauCode(cfg);
+  melden('Code erzeugt — jetzt kopieren.');
+}
+
+function bauCode(cfg) {
+  var j = function (o) { return JSON.stringify(o, null, 2).split('\n').join('\n  '); };
+  return [
+'// ============================================================',
+'//  Ligalisten-Crawler — erzeugt von Ligaliste_Crawler.html',
+'//  Einfuegen in die F12-Konsole der Ligalisten-Seite.',
+'//  ------------------------------------------------------------',
+'//  Beliebig oft einfuegbar (alles in einer IIFE, kein globales',
+'//  const, kein await auf oberster Ebene). Die Anzeige "undefined"',
+'//  direkt nach dem Einfuegen ist der normale Rueckgabewert und',
+'//  KEIN Fehler — der Fortschritt steht im Fenster unten rechts.',
+'// ============================================================',
+'(function () {',
+'  "use strict";',
+'',
+'  var CFG = ' + j(cfg) + ';',
+'',
+'  // ---------- Fortschrittsfenster ----------',
+'  var alt = document.getElementById("lkFortschritt");',
+'  if (alt) alt.remove();',
+'  var box = document.createElement("div");',
+'  box.id = "lkFortschritt";',
+'  box.style.cssText = "position:fixed;bottom:18px;right:18px;z-index:2147483647;width:330px;"',
+'    + "background:#1D1D1D;color:#F5F5F5;border:1px solid #E60000;border-radius:8px;padding:13px 15px;"',
+'    + "font:13px/1.5 Consolas,monospace;box-shadow:0 8px 28px rgba(0,0,0,.45)";',
+'  box.innerHTML = \'<div style="font-weight:bold;color:#E60000;margin-bottom:7px">LIGALISTEN-CRAWLER</div>\'',
+'    + \'<div id="lkText">Starte…</div>\'',
+'    + \'<div style="background:#333;height:5px;border-radius:3px;margin-top:9px;overflow:hidden">\'',
+'    + \'<div id="lkBalken" style="background:#E60000;height:100%;width:0%;transition:width .25s"></div></div>\'',
+'    + \'<div id="lkDetail" style="color:#9A9A9A;font-size:11px;margin-top:7px"></div>\';',
+'  document.documentElement.appendChild(box);',
+'  function sagen(t, d) {',
+'    var e = document.getElementById("lkText"); if (e) e.textContent = t;',
+'    if (d != null) { var x = document.getElementById("lkDetail"); if (x) x.textContent = d; }',
+'    console.log("[Ligaliste] " + t);',
+'  }',
+'  function balken(p) { var b = document.getElementById("lkBalken"); if (b) b.style.width = Math.round(p) + "%"; }',
+'',
+'  // ---------- Original-Anfrage der Seite mitschneiden ----------',
+'  // Der Server verlangt script_id_secure. Dieses Token laesst sich NICHT',
+'  // nachbauen — nur abfangen, waehrend die Seite selbst laedt. Deshalb wird',
+'  // hier gehakt und notfalls der "Ok"-Knopf der Seite geklickt.',
+'  window.__lkOrig = window.__lkOrig || null;',
+'  function istZiel(u) { return String(u || "").indexOf("get_data.rb") !== -1; }',
+'  function alsText(b) {',
+'    try {',
+'      if (b == null) return null;',
+'      if (typeof b === "string") return b;',
+'      if (b instanceof URLSearchParams) return b.toString();',
+'      if (typeof FormData !== "undefined" && b instanceof FormData) {',
+'        var t = []; b.forEach(function (v, k) { t.push(encodeURIComponent(k) + "=" + encodeURIComponent(String(v))); });',
+'        return t.join("&");',
+'      }',
+'      return String(b);',
+'    } catch (e) { return null; }',
+'  }',
+'  if (!window.__lkHaken) {',
+'    window.__lkHaken = true;',
+'    var of = window.fetch;',
+'    window.fetch = function (i, init) {',
+'      try {',
+'        var u = (typeof i === "string") ? i : (i && i.url) || "";',
+'        var b = alsText(init && init.body);',
+'        if (istZiel(u) && b) window.__lkOrig = { url: u, body: b };',
+'      } catch (e) {}',
+'      return of.apply(this, arguments);',
+'    };',
+'    var oo = XMLHttpRequest.prototype.open, os = XMLHttpRequest.prototype.send;',
+'    XMLHttpRequest.prototype.open = function (m, u) { this.__lkU = u; return oo.apply(this, arguments); };',
+'    XMLHttpRequest.prototype.send = function (b) {',
+'      try { var s = alsText(b); if (istZiel(this.__lkU) && s) window.__lkOrig = { url: this.__lkU, body: s }; } catch (e) {}',
+'      return os.apply(this, arguments);',
+'    };',
+'  }',
+'',
+'  // "Ok"/"Aktualisieren" der Seite finden und klicken',
+'  function okKnopf() {',
+'    var kandidaten = document.querySelectorAll(\'button, input[type=button], input[type=submit], a.btn, .btn\');',
+'    for (var i = 0; i < kandidaten.length; i++) {',
+'      var e = kandidaten[i];',
+'      var t = ((e.textContent || "") + " " + (e.value || "")).replace(/\\s+/g, " ").trim().toLowerCase();',
+'      if (/^(ok|okay|aktualisieren|anzeigen|los|start|absenden)$/.test(t)) return e;',
+'    }',
+'    for (var k = 0; k < kandidaten.length; k++) {',
+'      var x = kandidaten[k];',
+'      var s = ((x.textContent || "") + " " + (x.value || "")).toLowerCase();',
+'      if (/aktualisier|anzeigen/.test(s)) return x;',
+'    }',
+'    return null;',
+'  }',
+'',
+'  function tokenSichern() {',
+'    if (window.__lkOrig && window.__lkOrig.body) return Promise.resolve(true);',
+'    var knopf = okKnopf();',
+'    if (!knopf) {',
+'      sagen("Kein \\"Ok\\"-Knopf gefunden.", "Bitte auf der Seite selbst einmal \\"Ok\\" druecken, dann diesen Code erneut einfuegen.");',
+'      return Promise.resolve(false);',
+'    }',
+'    sagen("Hole die Original-Anfrage…", "Klicke \\"" + (knopf.textContent || knopf.value || "Ok").trim() + "\\" — die Ansicht der Seite bleibt wie sie ist.");',
+'    try { knopf.click(); } catch (e) {}',
+'    return new Promise(function (fertig) {',
+'      var n = 0;',
+'      var t = setInterval(function () {',
+'        n++;',
+'        if (window.__lkOrig && window.__lkOrig.body) { clearInterval(t); fertig(true); }',
+'        else if (n > 25) { clearInterval(t); fertig(false); }   // ~15 s',
+'      }, 600);',
+'    });',
+'  }',
+'',
+'  // ---------- Eine Abfrage ----------',
+'  function hole(zeitraum, bereich, standorte) {',
+'    var o = window.__lkOrig;',
+'    var p = new URLSearchParams(o.body);',
+'    p.set("daterange", zeitraum);',
+'    // Ein einzelner Tag kennt keine Tages-Aufschluesselung.',
+'    p.set("interval", (zeitraum === "intraday" || zeitraum === "yesterday") ? "cumulate" : CFG.intervall);',
+'    // Das Portal erwartet bei allen anderen Zeitraeumen wirklich den Text',
+'    // "undefined" — ein leerer Wert fuehrt zu Oracle-Fehlern.',
+'    if (zeitraum === "user_defined" && bereich && bereich.von) {',
+'      p.set("startdate", bereich.von.replace(/-/g, ""));   // YYYYMMDD',
+'      p.set("enddate", bereich.bis.replace(/-/g, ""));',
+'    } else {',
+'      p.set("startdate", "undefined");',
+'      p.set("enddate", "undefined");',
+'    }',
+'    // Standorte: loc_inlist ist ein Mehrfach-Parameter. Erst alle alten',
+'    // Werte weg, sonst mischt sich die Auswahl der Seite dazu.',
+'    p.delete("loc_inlist"); p.delete("loc_inlist[]");',
+'    (standorte || []).forEach(function (s) { p.append("loc_inlist", s); });',
+'    Object.keys(CFG.extra).forEach(function (k) { p.set(k, CFG.extra[k]); });',
+'',
+'    return fetch(o.url, {',
+'      method: "POST", credentials: "include",',
+'      headers: {',
+'        "content-type": "application/x-www-form-urlencoded;charset=UTF-8",',
+'        "accept": "*/*", "x-requested-with": "XMLHttpRequest"',
+'      },',
+'      body: p.toString()',
+'    }).then(function (r) {',
+'      if (!r.ok) throw new Error("HTTP " + r.status);',
+'      return r.text();',
+'    });',
+'  }',
+'',
+'  // ---------- Antwort -> Tabelle ----------',
+'  // Die Antwort ist JSON, die Tabelle steckt als HTML-Text irgendwo darin.',
+'  function tabelleAus(text) {',
+'    var t = (text || "").trim();',
+'    if (!t) return null;',
+'    var html = null;',
+'    if (t.charAt(0) === "{" || t.charAt(0) === "[") {',
+'      try {',
+'        var suche = function (o, d) {',
+'          if (d > 6 || o == null) return null;',
+'          if (typeof o === "string") return /<t(able|body|r)\\b/i.test(o) ? o : null;',
+'          if (Array.isArray(o)) { for (var i = 0; i < o.length; i++) { var a = suche(o[i], d + 1); if (a) return a; } return null; }',
+'          if (typeof o === "object") { for (var k in o) { var b = suche(o[k], d + 1); if (b) return b; } return null; }',
+'          return null;',
+'        };',
+'        html = suche(JSON.parse(t), 0);',
+'      } catch (e) { html = null; }',
+'    } else if (/<t(able|body|r)\\b/i.test(t)) html = t;',
+'    if (!html) return null;',
+'',
+'    var doc = new DOMParser().parseFromString(html, "text/html");',
+'    var tab = doc.querySelector("table#result-table") || doc.querySelector("table");',
+'    if (!tab) return null;',
+'',
+'    var rein = function (e) { return (e.textContent || "").replace(/\\s+/g, " ").trim(); };',
+'    var kopfZeilen = tab.querySelectorAll("thead tr");',
+'    var gruppen = [], blatt = [];',
+'',
+'    if (kopfZeilen.length >= 2) {',
+'      // Erste Kopfzeile = Gruppen (mit colspan), letzte = eigentliche Spalten',
+'      kopfZeilen[0].querySelectorAll("th").forEach(function (th) {',
+'        var s = parseInt(th.getAttribute("colspan"), 10) || 1;',
+'        for (var i = 0; i < s; i++) gruppen.push(rein(th));',
+'      });',
+'      blatt = Array.prototype.map.call(kopfZeilen[kopfZeilen.length - 1].querySelectorAll("th"), rein);',
+'    } else {',
+'      // Nur eine Kopfzeile: die Spaltennamen stehen dort direkt.',
+'      var q = kopfZeilen.length ? kopfZeilen[0] : tab.querySelector("tr");',
+'      blatt = q ? Array.prototype.map.call(q.querySelectorAll("th,td"), rein) : [];',
+'    }',
+'',
+'    var koerper = tab.querySelectorAll("tbody tr");',
+'    if (!koerper.length) {',
+'      // Kein tbody: Datenzeilen sind alle tr ohne th',
+'      koerper = Array.prototype.filter.call(tab.querySelectorAll("tr"), function (tr) { return !tr.querySelector("th"); });',
+'    }',
+'    var zeilen = Array.prototype.map.call(koerper, function (tr) {',
+'      return Array.prototype.map.call(tr.querySelectorAll("td,th"), rein);',
+'    }).filter(function (z) { return z.length && z.join("").length; });',
+'',
+'    return { gruppen: gruppen, blatt: blatt, zeilen: zeilen };',
+'  }',
+'',
+'  // Text -> Zahl, aber nur wo es eindeutig ist.',
+'  // Die Ligaliste schreibt Kennzahlen mit PUNKT als Dezimaltrenner (78.9, 100.0).',
+'  // Wer den Punkt als Tausendertrenner wegwirft, macht daraus 789 bzw. 1000 —',
+'  // und aus dem Datum 28.07.2026 die Zahl 28072026. Deshalb: Datum und Zeit',
+'  // bleiben Text, und im Zweifel bleibt der Text stehen. Ein Text in Excel ist',
+'  // harmlos, eine um den Faktor 10 verschobene Kennzahl nicht.',
+'  function alsZahl(s) {',
+'    if (!CFG.zahlen) return s;',
+'    var t = String(s == null ? "" : s).trim();',
+'    if (!t) return s;',
+'    if (t.indexOf(":") !== -1) return s;                          // 01:23:04',
+'    if (/^\\d{1,2}\\.\\d{1,2}\\.\\d{2,4}$/.test(t)) return s;         // 28.07.2026',
+'    if (/^\\d{4}-\\d{2}-\\d{2}$/.test(t)) return s;                  // 2026-07-28',
+'    if (/^\\d{8}$/.test(t)) return s;                              // 20260728',
+'    var p = t.replace(/\\s/g, "").replace("%", "");',
+'    // deutsch: 1.234,5 oder 88,5  (Punkt nur als Tausender, wenn Komma folgt',
+'    // oder genau Dreiergruppen vorliegen)',
+'    if (/^-?\\d{1,3}(\\.\\d{3})+(,\\d+)?$/.test(p) || /^-?\\d+,\\d+$/.test(p)) {',
+'      var n = parseFloat(p.replace(/\\./g, "").replace(",", "."));',
+'      return isNaN(n) ? s : n;',
+'    }',
+'    // englisch/neutral: 1234.5, 78.9, 37',
+'    if (/^-?\\d+(\\.\\d+)?$/.test(p)) { var m = parseFloat(p); return isNaN(m) ? s : m; }',
+'    return s;',
+'  }',
+'',
+'  // CCS-ID und Team sind Bezeichner, keine Rechenwerte. Als Zahl formatiert',
+'  // scheitert spaeter jeder Abgleich mit dem Mapping (Text 199362 findet die',
+'  // Zahl 199362 nicht), und Excel kann sie in Exponentialschreibweise anzeigen.',
+'  function istBezeichner(spaltenName) {',
+'    return /ccs|team|^\\s*id\\s*$|nummer|vo[-_ ]?id/i.test(String(spaltenName || ""));',
+'  }',
+'',
+'  // ---------- Excel-Werkzeug nachladen ----------',
+'  function excelBereit() {',
+'    if (window.XLSX && window.XLSX.utils) return Promise.resolve(true);',
+'    sagen("Lade das Excel-Werkzeug…");',
+'    return fetch("https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js")',
+'      .then(function (r) { return r.text(); })',
+'      .then(function (quelle) {',
+'        // Die Seite kann ein Modul-System haben (define/require). Das bringt',
+'        // die Bibliothek dazu, sich dort statt an window zu haengen — deshalb',
+'        // waehrend des Ladens kurz zur Seite legen.',
+'        var d = window.define, r2 = window.require, e = window.exports, m = window.module;',
+'        window.define = undefined; window.require = undefined; window.exports = undefined; window.module = undefined;',
+'        var s = document.createElement("script");',
+'        s.textContent = quelle;',
+'        document.head.appendChild(s);',
+'        window.define = d; window.require = r2; window.exports = e; window.module = m;',
+'        return !!(window.XLSX && window.XLSX.utils);',
+'      }).catch(function () { return false; });',
+'  }',
+'',
+'  // ---------- Auftragsliste ----------',
+'  function auftraege() {',
+'    var liste = [];',
+'    CFG.bereiche.forEach(function (b) {',
+'      var titel = (CFG.zeitraum === "user_defined")',
+'        ? b.von.split("-").reverse().join(".") + " bis " + b.bis.split("-").reverse().join(".")',
+'        : CFG.zeitraum;',
+'      if (CFG.einzeln) CFG.standorte.forEach(function (s) { liste.push({ titel: titel, bereich: b, standorte: [s], name: s }); });',
+'      else liste.push({ titel: titel, bereich: b, standorte: CFG.standorte, name: CFG.standorte.join(", ") });',
+'    });',
+'    return liste;',
+'  }',
+'',
+'  // ---------- Ablauf ----------',
+'  function lauf() {',
+'    var jobs = auftraege(), ergebnisse = [], fehler = [];',
+'    var i = 0, abbruch = null;',
+'',
+'    function naechster() {',
+'      if (abbruch || i >= jobs.length) return Promise.resolve();',
+'      var job = jobs[i++];',
+'      var wie = i + "/" + jobs.length;',
+'      sagen("Hole " + job.name + "  (" + wie + ")", job.titel);',
+'      balken((i - 1) / jobs.length * 100);',
+'',
+'      var versuch = 0;',
+'      function einmal() {',
+'        versuch++;',
+'        return hole(CFG.zeitraum, job.bereich, job.standorte).then(function (text) {',
+'          var probe = text.slice(0, 3000);',
+'          // Das Portal antwortet auch bei fehlender Sitzung mit HTTP 200 und',
+'          // schreibt die Ablehnung in den Rumpf. Wiederholen bringt dann nichts —',
+'          // die Sitzung kommt davon nicht zurueck. Also den ganzen Lauf beenden.',
+'          if (/keine Berechtigung|nicht berechtigt/i.test(probe)) { abbruch = "sitzung"; return; }',
+'          var ora = probe.match(/ORA-\\d{4,5}/);',
+'          var tab = tabelleAus(text);',
+'          if (!tab || !tab.zeilen.length) {',
+'            // ORA-Fehler heisst meist: ein Parameter passt nicht. Auch das',
+'            // wiederholt sich identisch, deshalb kein zweiter Versuch.',
+'            if (ora) { fehler.push(job.name + " (" + job.titel + "): Datenbankfehler " + ora[0]); return; }',
+'            fehler.push(job.name + " (" + job.titel + "): keine Zeilen — vermutlich wirklich keine Daten");',
+'            return;',
+'          }',
+'          ergebnisse.push({ job: job, tab: tab });',
+'          sagen("Hole " + job.name + "  (" + wie + ")", job.titel + " — " + tab.zeilen.length + " Zeilen");',
+'        }).catch(function (e) {',
+'          // Nur echte Uebertragungsfehler wiederholen (HTTP 500 bei zu',
+'          // schnellen Abfragen, Netzaussetzer).',
+'          if (versuch < 3) {',
+'            sagen("Wiederhole " + job.name + " (Versuch " + (versuch + 1) + " von 3)", String(e.message || e));',
+'            return new Promise(function (w) { setTimeout(w, 3000); }).then(einmal);',
+'          }',
+'          fehler.push(job.name + " (" + job.titel + "): " + (e.message || e));',
+'        });',
+'      }',
+'',
+'      return einmal().then(function () {',
+'        return new Promise(function (w) { setTimeout(w, CFG.pause); });',
+'      }).then(naechster);',
+'    }',
+'',
+'    return tokenSichern().then(function (ok) {',
+'      if (!ok) {',
+'        sagen("Abgebrochen: keine Original-Anfrage.", "Auf der Seite einmal \\"Ok\\" druecken, dann erneut einfuegen.");',
+'        return null;',
+'      }',
+'      return naechster().then(function () {',
+'        balken(100);',
+'        if (abbruch === "sitzung") {',
+'          sagen("Abgebrochen: keine Berechtigung.",',
+'            "Die CCS-Sitzung besteht nicht mehr. Seite mit F5 neu laden, anmelden, einmal \\"Ok\\" druecken — dann diesen Code erneut einfuegen.");',
+'          return null;',
+'        }',
+'        if (!ergebnisse.length) {',
+'          sagen("Keine Daten erhalten.", fehler.slice(0, 3).join(" | "));',
+'          console.warn("[Ligaliste] Fehler:", fehler);',
+'          return null;',
+'        }',
+'        return excelBereit().then(function (da) {',
+'          if (!da) {',
+'            sagen("Excel-Werkzeug nicht ladbar.", "Daten liegen in window.lkDaten — von dort weiterverarbeitbar.");',
+'            window.lkDaten = ergebnisse;',
+'            return null;',
+'          }',
+'          return schreiben(ergebnisse, fehler);',
+'        });',
+'      });',
+'    }).catch(function (e) {',
+'      sagen("Fehler: " + (e.message || e));',
+'      console.error("[Ligaliste]", e);',
+'    });',
+'  }',
+'',
+'  // ---------- Excel schreiben ----------',
+'  function schreiben(ergebnisse, fehler) {',
+'    sagen("Baue die Excel-Mappe…");',
+'    var X = window.XLSX;',
+'    var wb = X.utils.book_new();',
+'',
+'    // Nach Zeitraum gruppieren (Reihenfolge bleibt erhalten)',
+'    var nachZeit = {}, folge = [];',
+'    ergebnisse.forEach(function (e) {',
+'      var k = e.job.titel;',
+'      if (!nachZeit[k]) { nachZeit[k] = []; folge.push(k); }',
+'      nachZeit[k].push(e);',
+'    });',
+'',
+'    var bloecke = CFG.blattJeZeitraum ? folge.map(function (k) { return [k]; }) : [folge];',
+'',
+'    bloecke.forEach(function (keys, nr) {',
+'      var daten = [], verbund = [];',
+'      keys.forEach(function (k) {',
+'        nachZeit[k].forEach(function (e) {',
+'          var breite = Math.max(e.tab.blatt.length, 1);',
+'          // Titelzeile ueber die ganze Breite',
+'          daten.push(["Zeitraum: " + k + "   |   Standort: " + e.job.name]);',
+'          verbund.push({ s: { r: daten.length - 1, c: 0 }, e: { r: daten.length - 1, c: breite - 1 } });',
+'          if (CFG.gruppenKopf && e.tab.gruppen.length) daten.push(e.tab.gruppen.slice());',
+'          daten.push(e.tab.blatt.slice());',
+'          var kopf = e.tab.blatt;',
+'          e.tab.zeilen.forEach(function (z) {',
+'            daten.push(z.map(function (w, ci) { return istBezeichner(kopf[ci]) ? w : alsZahl(w); }));',
+'          });',
+'          daten.push([]);',
+'        });',
+'      });',
+'',
+'      var ws = X.utils.aoa_to_sheet(daten);',
+'      ws["!merges"] = verbund;',
+'',
+'      // Kopfzeilen einfaerben. WICHTIG: je Zelle ein EIGENES Stil-Objekt —',
+'      // der Writer mutiert cell.s, geteilte Objekte verfaerben sonst fremde',
+'      // Zellen und schleppen Zahlenformate mit.',
+'      daten.forEach(function (zeile, r) {',
+'        if (!zeile || !zeile.length) return;',
+'        var istTitel = zeile.length === 1 && String(zeile[0]).indexOf("Zeitraum:") === 0;',
+'        var istKopf = !istTitel && zeile.length > 3 && /Agentenname|CCS|Zeile/i.test(zeile.join(" "));',
+'        var istGruppe = !istTitel && !istKopf && zeile.length > 3 && zeile.filter(Boolean).length < zeile.length / 2;',
+'        if (!istTitel && !istKopf && !istGruppe) return;',
+'        for (var c = 0; c < zeile.length; c++) {',
+'          var a = X.utils.encode_cell({ r: r, c: c });',
+'          if (!ws[a]) continue;',
+'          if (istTitel) ws[a].s = { font: { bold: true, sz: 13 }, alignment: { horizontal: "left", vertical: "center" } };',
+'          else if (istKopf) ws[a].s = { font: { bold: true, color: { rgb: "FFFFFF" } }, fill: { fgColor: { rgb: "E60000" } }, alignment: { horizontal: "center", vertical: "center", wrapText: true } };',
+'          else ws[a].s = { font: { bold: true, color: { rgb: "333333" } }, fill: { fgColor: { rgb: "EBEBEB" } }, alignment: { horizontal: "center" } };',
+'        }',
+'      });',
+'',
+'      // Spaltenbreiten aus dem laengsten Inhalt',
+'      var maxSp = 0;',
+'      daten.forEach(function (z) { if (z && z.length > maxSp) maxSp = z.length; });',
+'      var breiten = [];',
+'      for (var c = 0; c < maxSp; c++) {',
+'        var m = 9;',
+'        for (var r2 = 0; r2 < daten.length; r2++) {',
+'          var z = daten[r2]; if (!z || z.length === 1) continue;',
+'          var v = z[c] == null ? "" : String(z[c]);',
+'          if (v.length > m) m = v.length;',
+'        }',
+'        breiten.push({ wch: Math.min(m + 2, 42) });',
+'      }',
+'      ws["!cols"] = breiten;',
+'',
+'      var name = CFG.blattJeZeitraum ? String(keys[0]) : "Ligaliste";',
+'      name = name.replace(/[\\\\\\/\\?\\*\\[\\]:]/g, "-").slice(0, 31) || ("Blatt" + (nr + 1));',
+'      X.utils.book_append_sheet(wb, ws, name);',
+'    });',
+'',
+'    if (fehler.length) {',
+'      var f = [["Nicht geladen"], []].concat(fehler.map(function (x) { return [x]; }));',
+'      X.utils.book_append_sheet(wb, X.utils.aoa_to_sheet(f), "Hinweise");',
+'    }',
+'',
+'    var d = new Date(), p = function (n) { return String(n).padStart(2, "0"); };',
+'    var datei = "Ligaliste_" + (CFG.zeitraum === "user_defined" ? "Zeitraum" : CFG.zeitraum) + "_"',
+'      + d.getFullYear() + p(d.getMonth() + 1) + p(d.getDate()) + "_" + p(d.getHours()) + p(d.getMinutes()) + ".xlsx";',
+'    X.writeFile(wb, datei);',
+'',
+'    var zeilen = 0;',
+'    ergebnisse.forEach(function (e) { zeilen += e.tab.zeilen.length; });',
+'    sagen("Fertig: " + datei, zeilen + " Datenzeilen aus " + ergebnisse.length + " Abfrage(n)"',
+'      + (fehler.length ? " — " + fehler.length + " Abfrage(n) ohne Daten, siehe Blatt „Hinweise“." : ""));',
+'    window.lkDaten = ergebnisse;',
+'    setTimeout(function () { var b = document.getElementById("lkFortschritt"); if (b) b.remove(); }, 15000);',
+'    return datei;',
+'  }',
+'',
+'  window.lkLauf = lauf;',
+'  lauf();',
+'  console.log("[Ligaliste] laeuft. Nochmal starten: lkLauf()");',
+'})();'
+  ].join('\n');
+}
+
+// ============================================================
+//  Kopieren / Speichern
+// ============================================================
+function melden(text, fehler) {
+  var m = document.getElementById('melder');
+  m.textContent = text;
+  m.classList.toggle('fehler', !!fehler);
+  m.classList.add('da');
+  setTimeout(function () { m.classList.remove('da'); }, 2600);
+}
+
+function holeCode() {
+  var t = document.getElementById('ausgabe').textContent;
+  return t.indexOf('Links einstellen') === 0 ? null : t;
+}
+
+function codeKopieren() {
+  var t = holeCode();
+  if (!t) { melden('Erst „Code erzeugen“ druecken.', true); return; }
+  // Erst der moderne Weg; ohne HTTPS/Freigabe faellt er aus, dann der alte.
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(t).then(function () { melden('In die Zwischenablage kopiert'); }, function () { altKopieren(t); });
+  } else altKopieren(t);
+}
+
+function altKopieren(t) {
+  var f = document.createElement('textarea');
+  f.value = t;
+  f.style.cssText = 'position:fixed;top:0;left:0;opacity:0';
+  document.body.appendChild(f);
+  f.focus(); f.select();
+  var ok = false;
+  try { ok = document.execCommand('copy'); } catch (e) {}
+  f.remove();
+  melden(ok ? 'In die Zwischenablage kopiert' : 'Kopieren nicht moeglich — Text von Hand markieren.', !ok);
+}
+
+function codeSpeichern() {
+  var t = holeCode();
+  if (!t) { melden('Erst „Code erzeugen“ druecken.', true); return; }
+  var d = new Date(), p = function (n) { return String(n).padStart(2, '0'); };
+  var b = new Blob([t], { type: 'text/javascript;charset=utf-8' });
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(b);
+  a.download = 'ligaliste_abfrage_' + d.getFullYear() + p(d.getMonth() + 1) + p(d.getDate()) + '_' + p(d.getHours()) + p(d.getMinutes()) + '.js';
+  document.body.appendChild(a); a.click();
+  setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 800);
+  melden('Als Datei gespeichert');
+}
+
+// Startzustand
+zeitraumGewechselt();
+zaehlerNeu();
+</script>
+</body>
+</html>

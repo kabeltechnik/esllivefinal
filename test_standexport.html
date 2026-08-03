@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>Stand-Export — Offline-Pruefung mit echten Daten</title>
+</head>
+<body>
+<h3 style="font:600 15px Segoe UI,Arial">Stand-Export Offline-Pruefung</h3>
+<pre id="log" style="font:12px Consolas,monospace; white-space:pre-wrap"></pre>
+
+<!-- Fake-Portal-Formular, damit das Dashboard eine Umgebung vorfindet -->
+<form id="filterForm" action="/fake-export" onsubmit="return false;">
+    <input class="hasDatepicker" name="filterForm:von_input" value="">
+    <input class="hasDatepicker" name="filterForm:bis_input" value="">
+    <button type="submit">Suchen</button>
+    <button type="submit">Excel Export</button>
+    <input type="hidden" name="javax.faces.ViewState" value="test">
+</form>
+
+<script>
+window.__log = [];
+function L(s){ window.__log.push(s); document.getElementById('log').textContent = window.__log.join('\n'); }
+(function(){
+    const d = new Date(); const p = n => String(n).padStart(2,'0');
+    const val = p(d.getDate()) + '.' + p(d.getMonth()+1) + '.' + d.getFullYear();
+    document.querySelectorAll('.hasDatepicker').forEach(i => i.value = val);
+    localStorage.removeItem('rcEslHistory');
+})();
+</script>
+
+<!-- Zwei Instanzen wie im Echtbetrieb:
+     - xlsx (Original) fuer den Mapping-Import -> window.XLSX
+     - xlsx-js-style (Fork) fuer den Export     -> window.rcXLSXS
+     Der Fork MUSS es sein: das Original schreibt cell.s gar nicht in styles.xml,
+     und ohne Fills findet der Verlaufs-Patch seinen Marker nicht. -->
+<script src="node_modules/xlsx/dist/xlsx.full.min.js"></script>
+<script>window.__XLSX_ORIG = window.XLSX;</script>
+<script src="node_modules/xlsx-js-style/dist/xlsx.bundle.js"></script>
+<script>
+    window.rcXLSXS = window.XLSX;          // der Fork
+    window.rcXLSXS.__styled = (window.XLSX !== window.__XLSX_ORIG);
+    window.XLSX = window.__XLSX_ORIG;      // Original fuer den Import zurueckstellen
+    L('xlsx ' + window.XLSX.version + ' + xlsx-js-style geladen, Styling: ' + window.rcXLSXS.__styled);
+</script>
+
+<script>document.write('<scr'+'ipt src="esl_live_arena_v22.js?t='+Date.now()+'"></scr'+'ipt>');</script>
+
+<script>
+async function los(){
+    if (!window.processDataStream || !window.rcStandRowsDebug) { setTimeout(los, 400); return; }
+
+    // ---- 1) 520 echte Liga-Agenten ----
+    const liga = await (await fetch('liga_echt.json')).json();
+
+    // ---- 2) Mapping aufbauen. verarbeiteMappingExcel ist nicht exponiert, deshalb
+    //    wird ccsMap/stackMap direkt gesetzt — mit Team-NAMEN im echten Format
+    //    ("VKD-TECH-83"), damit rcTeamKurz und der Team-Scope realistisch laufen.
+    //    Die Ligaliste selbst liefert nur Team-NUMMERN. ----
+    (function(){
+        const ccsMap = {}, stackMap = {}, voMap = {};
+        const STACKS = ['VKD_Tech','MF_Care','VUM_Tech'];
+        liga.forEach(function(k, i){
+            if (!k.ccsId) return;
+            const nr = (k.team || '').toString().slice(-2) || String(80 + (i % 12));
+            const stk = STACKS[i % 3];
+            const team = (stk === 'MF_Care' ? 'MF-CARE-' : stk === 'VUM_Tech' ? 'VUM-TECH-' : 'VKD-TECH-') + nr;
+            ccsMap[String(k.ccsId)] = { name: k.agentName, team: team, standort: k.standort || 'Alanya' };
+            stackMap[team] = stk;
+        });
+        window.rcWcaMapping = { voMap:voMap, ccsMap:ccsMap, standortMap:{}, stackMap:stackMap };
+        L('Mapping gesetzt: ccsMap=' + Object.keys(ccsMap).length + ' Teams=' + Object.keys(stackMap).length);
+    })();
+
+    window.postMessage({ type:'KPI_BATCH', payload: liga }, '*');
+    L('Liga-Agenten eingespeist: ' + liga.length);
+
+    // ---- 3) ECHTER ESL-Tagesexport als Vertriebsquelle.
+    //    Die Datei enthaelt alle 14 realen Produktgruppen in realer Verteilung —
+    //    nur so laesst sich das Vertriebs-Blatt ehrlich pruefen.
+    //    Zwei Anpassungen sind noetig:
+    //      - Datum auf HEUTE, sonst verwirft processDataStream die Zeilen (Mehrtages-Schutz)
+    //      - vo_nummer auf die CCS-IDs der Liga-Agenten, sonst greift der Join nicht
+    setTimeout(async function(){
+        const p = n => String(n).padStart(2,'0');
+        const d = new Date();
+        const heute = p(d.getDate())+'.'+p(d.getMonth()+1)+'.'+d.getFullYear();
+        let rows;
+        try {
+            const buf = await (await fetch('Test%20Excels/Export_20260714_205722.xlsx')).arrayBuffer();
+            const wb = window.XLSX.read(new Uint8Array(buf), { type:'array' });
+            rows = window.XLSX.utils.sheet_to_json(wb.Sheets['dataTable'], { header:1, defval:'' });
+        } catch(e){ L('ESL-Export nicht ladbar: ' + e.message); return; }
+        const kopf = rows[0].map(x => String(x).toLowerCase().trim());
+        const iD = kopf.indexOf('datum'), iV = kopf.indexOf('vo_nummer'), iS = kopf.indexOf('standort');
+        const ccsListe = liga.map(k => k.ccsId).filter(Boolean);
+        const proAgent = {};
+        for (let i = 1; i < rows.length; i++) {
+            const alt = String(rows[i][iV] || '');
+            if (!(alt in proAgent)) proAgent[alt] = ccsListe[Object.keys(proAgent).length % ccsListe.length];
+            rows[i][iV] = proAgent[alt];
+            const zeit = String(rows[i][iD] || '').split(' ')[1] || '09:00';
+            rows[i][iD] = heute + ' ' + zeit;
+            const meta = (window.rcWcaMapping.ccsMap || {})[String(rows[i][iV])];
+            if (meta && iS >= 0) rows[i][iS] = meta.standort || rows[i][iS];
+        }
+        window.processDataStream(rows);
+        const pg = window.rcProdGruppen || {};
+        L('ECHTER ESL-Export: ' + (rows.length-1) + ' Zeilen, ' + Object.keys(proAgent).length + ' Agenten umgeschrieben');
+        L('Produktgruppen erkannt: ' + Object.keys(pg).length + ' -> ' + Object.entries(pg).sort((a,b)=>b[1]-a[1]).map(x=>x[0]+':'+x[1]).join(', '));
+        setTimeout(pruefen, 1500);
+    }, 1200);
+}
+
+function pruefen(){
+    // Beide Wege abfangen: das Workbook-Objekt (Zellen pruefen) UND die fertigen
+    // Bytes nach der Veredelung (Verlauf/Logo pruefen). Nichts wird gespeichert.
+    window.__wb = null; window.__bytes = null; window.__bericht = null;
+    window.rcXLSXS.writeFile = function(wb, fn){ window.__wb = wb; window.__fn = fn; };
+    const echtesWrite = window.rcXLSXS.write;
+    window.rcXLSXS.write = function(wb, o){ window.__wb = wb; return echtesWrite.call(this, wb, o); };
+    window.rcXlsxAbfangen = function(bytes, fn, bericht){
+        window.__bytes = bytes; window.__fn = fn; window.__bericht = bericht;
+        L('Datei abgefangen: ' + fn + '  (' + Math.round(bytes.length/1024) + ' KB)');
+        L('Veredelung: ' + JSON.stringify(bericht));
+    };
+    const data = window.rcStandRowsDebug(null);
+    L('rcStandRows: ' + data.rows.length + ' Zeilen, label=' + data.label + ', eslFehlt=' + data.eslFehlt);
+    window.__data = data;
+    try { window.rcExportStandTag(null); } catch(e){ L('EXPORT-FEHLER: ' + e.message + '\n' + e.stack); return; }
+    let n = 0;
+    const warte = setInterval(function(){
+        if (window.__bytes || ++n > 60) {
+            clearInterval(warte);
+            if (!window.__bytes) { L('KEINE Bytes erzeugt'); return; }
+            L('Blaetter: ' + (window.__wb ? window.__wb.SheetNames.join(' | ') : '?'));
+            window.__fertig = true;
+        }
+    }, 300);
+}
+// Fertige Mappe an den Testserver schicken (zuverlaessiger als der Browser-Download,
+// der bei mehreren Dateien hintereinander stumm blockiert wird).
+window.__ablegen = async function(name){
+    const b = window.__bytes;
+    if (!b) return 'keine Bytes';
+    const r = await fetch('/ablegen/' + encodeURIComponent(name || 'pruefung.xlsx'), { method:'POST', body: b });
+    return name + ': ' + (await r.text());
+};
+setTimeout(los, 1200);
+</script>
+</body>
+</html>

@@ -1,0 +1,17 @@
+{
+  "name": "esl_live",
+  "version": "1.0.0",
+  "description": "",
+  "main": "esl_live_arena_v21.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "xlsx": "^0.18.5",
+    "xlsx-js-style": "^1.2.0"
+  }
+}

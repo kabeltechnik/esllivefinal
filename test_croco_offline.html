@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>CroCo Offline-Test</title>
+<style>body{font:14px Segoe UI,sans-serif;margin:24px;background:#F4F4F4}h1{color:#E60000;font-size:17px}</style>
+</head>
+<body>
+<h1>Offline-Test: CroCo-Crawler + Tuner</h1>
+<p>Prueft Header-Erkennung, Zeilen-Parsing, Summenzeilen-Trennung, Aggregation und Export.</p>
+
+<!-- Bedienelemente wie auf crocorep.rb, damit die Uebernahme aus der Seite testbar ist -->
+<select id="daterange-list"><option value="current_month" selected>Aktueller Monat</option></select>
+<select id="report-list"><option value="takes" selected>Takes</option></select>
+<select id="timegroup-list"><option value="0" selected>Kumuliert</option></select>
+<select id="location-list" multiple><option value="Alanya" selected>Alanya</option><option value="Berlin">Berlin</option></select>
+
+<script>
+  window.RC_CROCO_ERG = 'fixture_croco_result.json';
+  window.RC_CROCO_STAMM = 'fixture_croco_result.json';
+  window.RC_CROCO_EXCEL = 'fixture_croco_result.json';
+</script>
+</body>
+</html>

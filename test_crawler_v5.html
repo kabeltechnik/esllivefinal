@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>KPI-Crawler v5 Offline-Test — Monats-Harvest + Live-Takt</title>
+<style>
+  body { font-family: Consolas, monospace; background:#111; color:#ddd; padding:16px; }
+  h1 { font-size:16px; } .ok{color:#4caf50} .warn{color:#ffb300} .err{color:#f44336}
+  #log div { border-bottom:1px solid #222; padding:2px 0; white-space:pre-wrap; }
+</style>
+</head>
+<body>
+<h1>KPI-Crawler v5 — Start: EIN Monats-Harvest (Tag) · danach Intraday</h1>
+<div id="status">Lade Fixtures...</div>
+<div id="log"></div>
+
+<!-- Nachbau der ECHTEN Ligaliste-UI: interval-list hat anfangs NUR "kumuliert".
+     "Tag" haengt die Seite erst nach, wenn ein mehrtaegiger Zeitraum gewaehlt ist. -->
+<div style="display:none">
+  <select id="daterange-list">
+    <option value="user_defined">Benutzerdefiniert</option>
+    <option value="intraday" selected>Intraday</option>
+    <option value="yesterday">Gestern</option>
+    <option value="current_week">Aktuelle Woche</option>
+    <option value="current_month">Aktueller Monat</option>
+    <option value="current_quarter">Aktuelles Quartal</option>
+    <option value="last_week">Letzte Woche</option>
+    <option value="last_month">Letzter Monat</option>
+  </select>
+  <input type="text" id="userdef-date" value="">
+  <select id="interval-list"><option value="cumulate">kumuliert</option></select>
+  <button type="button" id="ok-button">Ok</button>
+  <div id="live-table-slot"></div>
+</div>
+
+<script>
+(async function(){
+  const log = (m, cls) => { const d = document.createElement('div'); if (cls) d.className = cls; d.textContent = m; document.getElementById('log').appendChild(d); };
+  const status = m => document.getElementById('status').textContent = m;
+
+  const fixCW = await (await fetch('test_fixture_current_week.json')).text();   // 1 Tag  (13.07.)
+  const fixUD = await (await fetch('test_fixture_user_defined.json')).text();   // 5 Tage (10.-15.07.)
+
+  // Live-Tabelle im DOM (wie die sichtbare Intraday-Ansicht)
+  const doc = new DOMParser().parseFromString(JSON.parse(fixCW)[0].data, 'text/html');
+  const t = doc.querySelector('table');
+  Array.from(t.querySelectorAll('tbody tr')).slice(30).forEach(tr => tr.remove());
+  document.getElementById('live-table-slot').appendChild(t);
+
+  // ---------- UI-Protokoll: JEDE Interaktion des Crawlers mit der Seite ----------
+  window.__rcUiOps = [];
+  const dSel = document.getElementById('daterange-list');
+  const iSel = document.getElementById('interval-list');
+  const okBtn = document.getElementById('ok-button');
+  // Ok-Klick baut die sichtbare Tabelle neu — passend zum eingestellten Zeitraum,
+  // genau wie die echte Ligaliste (Monat+Tag -> Mehrtages-Tabelle mit Datum-Spalte).
+  const slot = document.getElementById('live-table-slot');
+  const tabelleAus = (json, limit) => {
+    const d2 = new DOMParser().parseFromString(JSON.parse(json)[0].data, 'text/html');
+    const tt = d2.querySelector('table');
+    if (limit) Array.from(tt.querySelectorAll('tbody tr')).slice(limit).forEach(tr => tr.remove());
+    return tt;
+  };
+  okBtn.addEventListener('click', () => {
+    window.__rcUiOps.push({ op:'ok' }); log('UI: Ok-Klick');
+    setTimeout(() => {
+      const mehrtags = dSel.value === 'current_month' && iSel.value === 'day';
+      slot.innerHTML = '';
+      slot.appendChild(mehrtags ? tabelleAus(fixUD) : tabelleAus(fixCW, 30));
+      log('   (Tabelle neu gebaut: ' + (mehrtags ? 'Monat/Tag' : 'Intraday') + ')');
+    }, 500);
+  });
+
+  // ECHTES Verhalten der Ligaliste nachbauen: das Intervall-Angebot haengt vom
+  // Zeitraum ab und wird ASYNCHRON nachgeladen (~800 ms).
+  dSel.addEventListener('change', () => {
+    const v = dSel.value;
+    window.__rcUiOps.push({ op:'daterange', value:v });
+    log('UI: Zeitraum -> ' + v);
+    if (v === 'intraday' || v === 'yesterday') {
+      iSel.innerHTML = '<option value="cumulate">kumuliert</option>';
+      log('   (Intervall-Auswahl auf "kumuliert" reduziert)');
+    } else {
+      setTimeout(() => {
+        iSel.innerHTML = '<option value="cumulate">kumuliert</option><option value="day">Tag</option>'
+                       + '<option value="week">Kalenderwoche</option><option value="month">Monat</option>';
+        log('   (Intervall-Auswahl nach 800 ms um "Tag" erweitert)');
+      }, 800);
+    }
+  });
+  iSel.addEventListener('change', () => { window.__rcUiOps.push({ op:'interval', value:iSel.value }); log('UI: Intervall -> ' + iSel.value); });
+
+  // ---------- get_data.rb-Mock ----------
+  window.__rcTestRequests = [];
+  const realFetch = window.fetch.bind(window);
+  window.fetch = function(input, init){
+    const url = (typeof input === 'string') ? input : (input && input.url) || '';
+    if (url.indexOf('get_data.rb') !== -1) {
+      const p = new URLSearchParams((init && init.body) || '');
+      const dr = p.get('daterange'), iv = p.get('interval');
+      window.__rcTestRequests.push({ daterange: dr, interval: iv });
+      log('MOCK get_data.rb <- daterange=' + dr + ' interval=' + iv);
+      // current_month + interval=day -> Mehrtages-Antwort MIT Datum-Spalte
+      let body = (dr === 'current_month' && iv === 'day') ? fixUD : fixCW;
+      return Promise.resolve(new Response(body, { status: 200, headers: { 'content-type':'application/json' } }));
+    }
+    return realFetch(input, init);
+  };
+
+  const MODE = new URLSearchParams(location.search).get('mode') || 'token';
+  if (MODE === 'token') {
+    window.__rcLastGetData = {
+      url: 'https://ccs.vodafone.de/prime/dist/scripts/get_data.rb',
+      body: 'type=get-result&script_id=11035&script_id_secure=TESTTOKEN&user_id=99999&loc_inlist=AL%2CB&figure_list=1%2C2&daterange=intraday&interval=cumulate&startdate=undefined&enddate=undefined&show_ccsid=1&table_type=2'
+    };
+    log('MODUS: MIT Token (get_data.rb-Weg)', 'ok');
+  } else {
+    log('MODUS: OHNE Token (UI-Durchklick-Weg)', 'warn');
+  }
+
+  const bc = new BroadcastChannel('regiocom_live_arena');
+  window.__rcSent = [];
+  bc.onmessage = ev => { const d = ev.data || {};
+    if (d.type === 'KPI_BATCH') { const days = d.history ? Object.keys(d.history).sort() : [];
+      window.__rcSent.push({ n:(d.payload||[]).length, dr:d.liveDaterange, days });
+      log('AN DASHBOARD: ' + (d.payload||[]).length + ' Zeilen (liveDaterange=' + d.liveDaterange + ') · Historie [' + days.join(', ') + ']'); } };
+
+  localStorage.removeItem('rcLigaHistory');
+  status('Crawler wird injiziert...');
+
+  const s = document.createElement('script');
+  s.src = 'kpi_crawler.js?' + Date.now();
+  document.body.appendChild(s);
+
+  const WARTE = MODE === 'token' ? 14000 : 46000;
+  setTimeout(() => {
+    const h = JSON.parse(localStorage.getItem('rcLigaHistory') || '{}');
+    window.__rcTestDone = {
+      mode: MODE,
+      days: Object.keys(h).sort(),
+      requests: window.__rcTestRequests,
+      uiOps: window.__rcUiOps,
+      sent: window.__rcSent,
+      intervalValue: iSel.value,
+      daterangeValue: dSel.value
+    };
+    log('================= FERTIG =================');
+    status('TEST FERTIG');
+  }, WARTE);
+})();
+</script>
+</body>
+</html>
