@@ -99,10 +99,19 @@ Ziel: Ansprache-Quote von 18 % auf 30 % in zwei Wochen" ist eine.
 ## Wo die Zahlen herkommen
 
 - **Live im Dashboard**: die aggregierten Objekte im laufenden `esl_live_arena_v22.js`
-  (`rcAllSales`, `rcEslHistory`, `rcLigaHistory`, `rcLigaAgg()`). Für Live-Analysen kannst du
-  diese über die Browser-Tools auslesen (offline via `test_dashboard_offline.html`).
-- **Export-Dateien**: `regiocom_ESL_Report_*.xlsx` (9 Blätter: Aktueller Stand, Bewertungslogik,
-  Struktur, Liga Standorte, Liga Teams, Standorte, Stacks, Teams, Agenten).
+  (`rcAllSales`, `rcEslHistory`, `rcLigaHistory`, `rcLigaAgg()`). Für Live-Analysen über den Skill
+  **`run-esl-live-arena`** auslesen (headless Chrome, Harness `test_reportbilder.html` mit 520
+  echten Liga-Agenten und echtem ESL-Tagesexport). **`test_dashboard_offline.html` gibt es NICHT
+  mehr.**
+  **Achtung:** `window.rcLetzteStats` ist NICHT der ungefilterte Vollbestand — der Dashboard-Filter
+  wirkt schon beim Parsen. Ungefiltert sind nur `rcAllSales`, `rcWarStdFull` und `rcWarBoteCands`.
+  Wenn du eine Aussage über "alle Standorte" machst, prüfe vorher, welcher Filter gesetzt ist.
+- **Export-Dateien**: `regiocom_ESL_Report_*.xlsx` (bis zu 14 Blätter, per Häkchen im Export-Dialog
+  abwählbar; die Ebenen-Kaskade lässt Blätter weg, wenn ein Standort-/Stack-/Team-Filter sie auf
+  eine Zeile reduzieren würde). Dazu die schlanke `regiocom_ESL_Reporting`-Mappe (nur Block-Ansicht)
+  und die Alle-Projekte-Mappe mit Deckblatt "Projekte im Vergleich".
+  **Das Blatt `Abdeckung` zuerst lesen** — es sagt, wie viele Tage des Zeitraums wirklich Daten
+  hatten. Ohne das läse sich ein Export mit 4 von 12 Tagen wie ein vollständiger Zeitraum.
 - **Rohdaten zum Gegenrechnen**: ESL-Export (`Export_*.xlsx`, Blatt `dataTable`) und Ligaliste
   (`ligalisten.xls`). Für Excel-Analyse SheetJS im Scratchpad nutzen.
 - **Historie**: `rcEslHistory[tag]` und `rcLigaHistory[tag].byAgent[ccsId]` — die Basis für jede

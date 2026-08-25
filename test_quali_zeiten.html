@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>Qualitaets-Seite — ACW/ACHT + Optik, Offline-Pruefung</title>
+</head>
+<body style="margin:0;background:#EDEFF2;font:13px Segoe UI,Arial">
+<pre id="log" style="font:12px Consolas,monospace; white-space:pre-wrap; margin:8px"></pre>
+
+<!-- Fake-Portal-Formular, damit das Dashboard eine Umgebung vorfindet -->
+<form id="filterForm" action="/fake-export" onsubmit="return false;">
+    <input class="hasDatepicker" name="filterForm:von_input" value="">
+    <input class="hasDatepicker" name="filterForm:bis_input" value="">
+    <input type="hidden" name="javax.faces.ViewState" value="test">
+</form>
+
+<script>
+window.__log = [];
+function L(s){ window.__log.push(s); var e=document.getElementById('log'); if(e) e.textContent = window.__log.join('\n'); }
+(function(){
+    const d = new Date(); const p = n => String(n).padStart(2,'0');
+    const val = p(d.getDate()) + '.' + p(d.getMonth()+1) + '.' + d.getFullYear();
+    document.querySelectorAll('.hasDatepicker').forEach(i => i.value = val);
+    localStorage.clear();
+})();
+// ?zeiten=1 -> ACW/ACHT werden in die Fixture gerechnet (Portal haette sie angehakt)
+// ohne Parameter -> Fixture wie sie wirklich ist: OHNE die beiden Spalten
+window.__mitZeiten = /[?&]zeiten=1/.test(location.search);
+</script>
+
+<script src="node_modules/xlsx/dist/xlsx.full.min.js"></script>
+<script>document.write('<scr'+'ipt src="esl_live_arena_v22.js?t='+Date.now()+'"></scr'+'ipt>');</script>
+
+<script>
+async function los(){
+    if (!window.processDataStream || !window.renderQualitaet) { setTimeout(los, 400); return; }
+    const liga = await (await fetch('liga_echt.json')).json();
+
+    // Mapping wie im Report-Harness: Team-NAMEN, damit rcLigaMeta greift.
+    const ccsMap = {}, stackMap = {}, voMap = {};
+    const STACKS = ['VKD_Tech','MF_Care','VUM_Tech'];
+    liga.forEach(function(k, i){
+        if (!k.ccsId) return;
+        const nr = (k.team || '').toString().slice(-2) || String(80 + (i % 12));
+        const stk = STACKS[i % 3];
+        const team = (stk === 'MF_Care' ? 'MF-CARE-' : stk === 'VUM_Tech' ? 'VUM-TECH-' : 'VKD-TECH-') + nr;
+        ccsMap[String(k.ccsId)] = { name: k.agentName, team: team, standort: k.standort || 'Alanya' };
+        stackMap[team] = stk;
+    });
+    window.rcWcaMapping = { voMap:voMap, ccsMap:ccsMap, standortMap:{}, stackMap:stackMap };
+
+    // AHT hat die Fixture auch nicht — ohne sie faerbt die AHT-Spalte nichts.
+    liga.forEach(function(k, i){
+        if (k.ahtSec == null) k.ahtSec = 420 + (i % 900);
+        if (window.__mitZeiten) {
+            // Streuung mit Absicht ueber die 60-s-Grenze, damit gruen/amber/rot
+            // alle drei vorkommen und die Ampel sichtbar wird.
+            k.acwSec  = 12 + (i * 7) % 130;
+            k.achtSec = 8  + (i * 11) % 120;
+        }
+    });
+    window.postMessage({ type:'KPI_BATCH', payload: liga }, '*');
+    L('Liga-Agenten eingespeist: ' + liga.length + (window.__mitZeiten ? '  MIT ACW/ACHT' : '  OHNE ACW/ACHT (Fixture-Original)'));
+
+    setTimeout(function(){
+        window.switchPage && window.switchPage('quali');
+        window.renderQualitaet();
+        setTimeout(function(){
+            const g = id => { const e = document.getElementById(id); return e ? e.textContent.trim() : '(fehlt)'; };
+            const kachel = id => { const e = document.getElementById(id); const k = e && e.parentElement;
+                return g(id) + ' | Farbe ' + (e ? e.style.color : '-') + ' | Kante ' + (k ? (k.style.getPropertyValue('--rc-kpi-state') || 'keine') : '-'); };
+            L('ACW-Kachel : ' + kachel('qKpiAcw'));
+            L('ACHT-Kachel: ' + kachel('qKpiAcht'));
+            L('CS-Kachel  : ' + kachel('qKpiCs'));
+            L('AQ-Kachel  : ' + kachel('qKpiAufleger'));
+            const kopf = document.querySelectorAll('#rcPageQualiContent .rc-table thead th').length;
+            const spalten = document.querySelectorAll('#rcQualiBody tr:first-child td').length;
+            L('Tabelle: ' + kopf + ' Kopfspalten / ' + spalten + ' Datenspalten' + (kopf===spalten ? '  OK' : '  ABWEICHUNG!'));
+            const tz = document.getElementById('rcQualiTeamZeiten');
+            L('Team-Karte: ' + (tz ? tz.children.length + ' Zeilen' : '(fehlt)'));
+            if (tz && tz.children.length) L('  erste Zeile: ' + tz.children[0].textContent.replace(/\s+/g,' ').trim());
+            // Passt die Seite auf den Bildschirm?
+            const host = document.getElementById('rcPageQualiContent');
+            L('Quali-Seite: Inhalt ' + host.scrollHeight + ' px bei ' + host.clientHeight + ' px sichtbar'
+              + '  | Raster: ' + host.classList.contains('rc-lay') + '  | Skala ' + (host.style.getPropertyValue('--rc-lay-hskala') || '-'));
+            window.__fertig = true;
+        }, 1200);
+    }, 900);
+}
+los();
+</script>
+</body>
+</html>

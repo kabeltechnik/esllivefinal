@@ -83,9 +83,21 @@ console.log('4) Das Dashboard benutzt die Schluessel-Funktion');
 const dash = fs.readFileSync(path.join(ORDNER, 'esl_live_arena_v22.js'), 'utf8');
 pruefe('rcKey ist definiert', /function rcKey\(basis\)/.test(dash));
 pruefe('rcProjektKuerzel wird gesetzt', /window\.rcProjektKuerzel\s*=/.test(dash));
-const roh = (dash.match(/\.(get|set|remove)Item\('rcEslHist/g) || []).length;
-pruefe('KEIN Speicherzugriff mehr am rcKey vorbei', roh === 0,
-  roh + ' Zugriffe benutzen noch den festen Schluessel');
+// EINE bewusste Ausnahme (06.08. spaetabends): rcExportReportingAlle MUSS die
+// fremden Projekt-Schluessel lesen — rcKey liefert immer nur das eigene. Sie
+// ist daran erkennbar, dass das Suffix der Projekt-Schleife angehaengt wird
+// ('rcEslHistory' + p.sfx). Jeder ANDERE feste Zugriff bleibt verboten: genau
+// so entstand die Vermischung der drei Projekte im Juli.
+const alleRoh  = (dash.match(/\.(get|set|remove)Item\('rcEslHist[^)]*\)/g) || []);
+const erlaubt  = alleRoh.filter(t => /\+\s*p\.sfx/.test(t));
+const verboten = alleRoh.filter(t => !/\+\s*p\.sfx/.test(t));
+pruefe('KEIN Speicherzugriff mehr am rcKey vorbei (ausser der Projekt-Schleife)',
+  verboten.length === 0, verboten.join(' | '));
+pruefe('die Ausnahme ist genau EINE Stelle (der Alle-Projekte-Export)',
+  erlaubt.length === 1, erlaubt.join(' | '));
+pruefe('GEGENPROBE: ein fester Zugriff OHNE Suffix wuerde auffliegen',
+  (("x.getItem('rcEslHistory')").match(/\.(get|set|remove)Item\('rcEslHist[^)]*\)/g) || [])
+    .filter(t => !/\+\s*p\.sfx/.test(t)).length === 1);
 const ueber = (dash.match(/rcKey\('rcEslHistory'\)/g) || []).length;
 pruefe('rcEslHistory laeuft ueber rcKey', ueber >= 8, ueber + ' Stellen');
 
@@ -113,9 +125,15 @@ VAR.forEach(v => {
 console.log('');
 console.log('6) Der Autopilot bleibt nicht auf dem falschen Projekt stehen');
 const ap = fs.readFileSync(path.join(ORDNER, 'esl_autopilot.user.js'), 'utf8');
-pruefe('filterForm wird gegen das Projekt geprueft', /if \(id\('filterForm'\) && aufRichtigemProjekt\(\)\)/.test(ap),
-  'Ohne diese Pruefung arbeitet die Mobile-Fassung auf der Kabel-Seite weiter.');
-pruefe('Menue-Eintrag wird EXAKT verglichen', /byText\([^)]*CFG\.PROJEKT,\s*true\)/.test(ap),
+// v6 (06.08. abends): Die Handwahl des Nutzers entscheidet — der Autopilot
+// FESTGENAGELT (06.08. spaetabends): jeder PC faehrt EIN Projekt, das Soll
+// kommt aus der Starter-Marke. Der Dashboard-Start verlangt die RICHTIGE
+// Seite; eine falsche geht ins Menue zurueck (geteilte Server-Sitzung warf
+// Tabs sonst still auf das Projekt des Nachbar-PCs).
+pruefe('Dashboard-Start nur auf der Soll-Projektseite (aufSollProjekt)',
+  /if \(id\('filterForm'\) && aufSollProjekt\(\)\) \{[\s\S]{0,80}?pickExportView\(\);/.test(ap),
+  'Sonst arbeitete das Dashboard auf dem Projekt des Nachbar-PCs weiter.');
+pruefe('Menue-Eintrag wird EXAKT verglichen (Ziel aus sollProjekt)', /byText\([^)]*sollP\.name,\s*true\)/.test(ap),
   'Ein "enthaelt"-Vergleich koennte ein kuenftiges "Vodafone UM Care" faelschlich treffen.');
 pruefe('Menue-Knopf hat einen Textfallback', /byText\('button, \.ui-button', 'projekte'\)/.test(ap));
 

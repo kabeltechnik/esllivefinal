@@ -1,0 +1,563 @@
+{
+  "communities": {
+    "0": [
+      "esl_live_arena_v21",
+      "esl_live_arena_v21_addticker",
+      "esl_live_arena_v21_agentmailhref",
+      "esl_live_arena_v21_animatecount",
+      "esl_live_arena_v21_bindtab",
+      "esl_live_arena_v21_blanknation",
+      "esl_live_arena_v21_builddynamicmoti",
+      "esl_live_arena_v21_buildradar",
+      "esl_live_arena_v21_classify",
+      "esl_live_arena_v21_collectcritical",
+      "esl_live_arena_v21_decorate",
+      "esl_live_arena_v21_detectdataissues",
+      "esl_live_arena_v21_ensureagent",
+      "esl_live_arena_v21_ensurestd",
+      "esl_live_arena_v21_ensureteam",
+      "esl_live_arena_v21_flatsheet",
+      "esl_live_arena_v21_getflagsvg",
+      "esl_live_arena_v21_getportaldaterange",
+      "esl_live_arena_v21_handlekpimessage",
+      "esl_live_arena_v21_holeexcelvomserver",
+      "esl_live_arena_v21_hourof",
+      "esl_live_arena_v21_ingestkpi",
+      "esl_live_arena_v21_ladebibliothek",
+      "esl_live_arena_v21_normalizestandort",
+      "esl_live_arena_v21_parsedatetime",
+      "esl_live_arena_v21_processcelebrationqueue",
+      "esl_live_arena_v21_queuecelebration",
+      "esl_live_arena_v21_rankclass",
+      "esl_live_arena_v21_rcloadstyledxlsx",
+      "esl_live_arena_v21_renderliga",
+      "esl_live_arena_v21_rendermarquee",
+      "esl_live_arena_v21_renderproducts",
+      "esl_live_arena_v21_renderside",
+      "esl_live_arena_v21_renderstandortbattle",
+      "esl_live_arena_v21_renderstandorte",
+      "esl_live_arena_v21_renderteambattle",
+      "esl_live_arena_v21_rendertrend",
+      "esl_live_arena_v21_setnum",
+      "esl_live_arena_v21_showgoal",
+      "esl_live_arena_v21_showwarn",
+      "esl_live_arena_v21_summarymailhref",
+      "esl_live_arena_v21_switchpage",
+      "esl_live_arena_v21_tickclock",
+      "esl_live_arena_v21_updatefetchstatus",
+      "esl_live_arena_v21_updatestackfilteroptions",
+      "esl_live_arena_v21_updateteamfilter",
+      "esl_live_arena_v21_verarbeiteexcelbuffer",
+      "esl_live_arena_v21_verarbeitemappingexcel",
+      "esl_live_arena_v21_zielcolor"
+    ],
+    "1": [
+      "esl_live_chat_gemini_broadcastchannel_multimonitor",
+      "esl_live_chat_gemini_citrix_persistence",
+      "esl_live_chat_gemini_virtual_scrolling",
+      "esl_live_konsolen_code_esl_live_arena_v20",
+      "esl_live_konsolen_code_normalize_standort",
+      "esl_live_konsolen_code_standort_metadata",
+      "esl_live_ligliste_ligalisten_portal",
+      "esl_live_ligliste_referenzbaum",
+      "esl_live_ligliste_result_table",
+      "esl_live_mitarbeiternamen_ccs_id",
+      "esl_live_mitarbeiternamen_schema",
+      "esl_live_mitarbeiternamen_vo_nummer",
+      "esl_live_setup_broadcastchannel_broadcastchannel",
+      "esl_live_setup_broadcastchannel_citrix_sandbox",
+      "esl_live_setup_broadcastchannel_esl_portal",
+      "esl_live_setup_broadcastchannel_ligaliste",
+      "esl_live_setup_broadcastchannel_master_tab",
+      "esl_live_setup_broadcastchannel_satellite_tab",
+      "esl_live_standort_alanya",
+      "esl_live_standort_alexandroupolis",
+      "esl_live_standort_berlin",
+      "esl_live_standort_essen",
+      "esl_live_standort_neubrandenburg",
+      "esl_live_standort_potsdam",
+      "esl_live_standort_sakarya",
+      "esl_live_standort_serres",
+      "esl_live_standort_zeitwert"
+    ],
+    "2": [
+      "esl_live_arena_v22",
+      "esl_live_arena_v22_agentmailhref",
+      "esl_live_arena_v22_animatecount",
+      "esl_live_arena_v22_bindtab",
+      "esl_live_arena_v22_blanknation",
+      "esl_live_arena_v22_builddynamicmoti",
+      "esl_live_arena_v22_buildradar",
+      "esl_live_arena_v22_collectcritical",
+      "esl_live_arena_v22_decorate",
+      "esl_live_arena_v22_detectdataissues",
+      "esl_live_arena_v22_ensureagent",
+      "esl_live_arena_v22_ensurestd",
+      "esl_live_arena_v22_ensureteam",
+      "esl_live_arena_v22_ensurewarstd",
+      "esl_live_arena_v22_flatsheet",
+      "esl_live_arena_v22_getportaldaterange",
+      "esl_live_arena_v22_hourof",
+      "esl_live_arena_v22_ladebibliothek",
+      "esl_live_arena_v22_rcbuildstandsheets",
+      "esl_live_arena_v22_rcclosedetail",
+      "esl_live_arena_v22_rcdetaildays",
+      "esl_live_arena_v22_rchandledataclick",
+      "esl_live_arena_v22_rcherocallel",
+      "esl_live_arena_v22_rckpiscopetxt",
+      "esl_live_arena_v22_rclgqueue",
+      "esl_live_arena_v22_rcloadstyledxlsx",
+      "esl_live_arena_v22_rcmarkfilters",
+      "esl_live_arena_v22_rcshowdetail",
+      "esl_live_arena_v22_rcteamqualiagg",
+      "esl_live_arena_v22_rcwarensurecanvas",
+      "esl_live_arena_v22_rcwarsyncworkers",
+      "esl_live_arena_v22_renderproducts",
+      "esl_live_arena_v22_rendertrend",
+      "esl_live_arena_v22_setnum",
+      "esl_live_arena_v22_sheet",
+      "esl_live_arena_v22_showwarn",
+      "esl_live_arena_v22_summarymailhref",
+      "esl_live_arena_v22_switchpage",
+      "esl_live_arena_v22_tickclock",
+      "esl_live_arena_v22_updatefetchstatus",
+      "esl_live_arena_v22_updateteamfilter",
+      "esl_live_arena_v22_zielcolor"
+    ],
+    "3": [
+      "kpi_crawler",
+      "kpi_crawler_buildcolumnmap",
+      "kpi_crawler_cellnum",
+      "kpi_crawler_celltext",
+      "kpi_crawler_cleantext",
+      "kpi_crawler_currentdaterange",
+      "kpi_crawler_datumkey",
+      "kpi_crawler_daykey",
+      "kpi_crawler_ensurecapture",
+      "kpi_crawler_extracttablehtml",
+      "kpi_crawler_fetchdaterangekpis",
+      "kpi_crawler_findkpi",
+      "kpi_crawler_findleaf",
+      "kpi_crawler_findokbutton",
+      "kpi_crawler_handlecommand",
+      "kpi_crawler_harvestrange",
+      "kpi_crawler_harvestrangeapi",
+      "kpi_crawler_harvestrangedom",
+      "kpi_crawler_harvestweekdaily",
+      "kpi_crawler_harvestweekdailydom",
+      "kpi_crawler_loadhistory",
+      "kpi_crawler_pad2",
+      "kpi_crawler_parsekpitable",
+      "kpi_crawler_pollkpis",
+      "kpi_crawler_rcbodytostring",
+      "kpi_crawler_savehistory",
+      "kpi_crawler_sendkpis",
+      "kpi_crawler_setselect",
+      "kpi_crawler_snapshotof",
+      "kpi_crawler_storebydate",
+      "kpi_crawler_storesnapshot",
+      "kpi_crawler_timetosec",
+      "kpi_crawler_triggerpagerefresh",
+      "kpi_crawler_xmlhttprequest_send"
+    ],
+    "4": [
+      "esl_live_arena_v22_rclgambient",
+      "esl_live_arena_v22_rclgball",
+      "esl_live_arena_v22_rclgbanner",
+      "esl_live_arena_v22_rclgbigball",
+      "esl_live_arena_v22_rclgbigman",
+      "esl_live_arena_v22_rclgcinebg",
+      "esl_live_arena_v22_rclgcinedraw",
+      "esl_live_arena_v22_rclgcinegoal",
+      "esl_live_arena_v22_rclgconfetti",
+      "esl_live_arena_v22_rclgcrowd",
+      "esl_live_arena_v22_rclgfeed",
+      "esl_live_arena_v22_rclgflag",
+      "esl_live_arena_v22_rclggoal",
+      "esl_live_arena_v22_rclghash",
+      "esl_live_arena_v22_rclgimpact",
+      "esl_live_arena_v22_rclgman",
+      "esl_live_arena_v22_rclgp",
+      "esl_live_arena_v22_rclgphase",
+      "esl_live_arena_v22_rclgrng",
+      "esl_live_arena_v22_rclgscenedraw",
+      "esl_live_arena_v22_rclgscenetick",
+      "esl_live_arena_v22_rclgstadium",
+      "esl_live_arena_v22_rclgstart",
+      "esl_live_arena_v22_rclgtag",
+      "esl_live_arena_v22_rclgtickerbuild",
+      "esl_live_arena_v22_rclgtrail"
+    ],
+    "5": [
+      "claude",
+      "claude_agents_war_engine_dev",
+      "claude_agents_war_engine_dev_harte_leitplanken_für_dieses_modul",
+      "claude_agents_war_engine_dev_wie_du_arbeitest",
+      "claude_agents_war_engine_dev_wo_der_code_sitzt_esl_live_arena_v22_js_aktuelle_zeilen_bei_änderungen_mit_grep_neu_verifizieren",
+      "claude_agents_war_engine_dev_zwingende_reihenfolge_erst_kritisch_prüfen_dann_kreativ_werden",
+      "claude_aktueller_stand_v22_juli_2026",
+      "claude_architektur_cross_origin",
+      "claude_datenformate_aus_echten_exporten_verifiziert",
+      "claude_esl_live_arena_projektanweisungen",
+      "claude_funktions_landkarte_grep_anker_in_v22_js",
+      "claude_kernkonzepte",
+      "claude_kritische_fallstricke_hart_erarbeitet_nicht_erneut_hineinlaufen",
+      "claude_token_spar_regeln_zuerst_lesen",
+      "claude_überblick",
+      "vodafone_design",
+      "vodafone_design_1_kern_token_css_custom_properties_in_v22_js_root",
+      "vodafone_design_2_semantik_kpi_zustände_nicht_mehr_monochrom",
+      "vodafone_design_3_kategoriale_daten_palette_standort_gebunden_validiert",
+      "vodafone_design_4_komponenten",
+      "vodafone_design_5_radar_rc_war_zwei_skins",
+      "vodafone_design_6_harte_regeln",
+      "vodafone_design_vodafone_classic_design_spezifikation_esl_live_arena_v22"
+    ],
+    "6": [
+      "esl_live_arena_v22_classify",
+      "esl_live_arena_v22_holeexcelvomserver",
+      "esl_live_arena_v22_normalizestandort",
+      "esl_live_arena_v22_parsedatetime",
+      "esl_live_arena_v22_rcaccumrow",
+      "esl_live_arena_v22_rcaggregatedaybuffer",
+      "esl_live_arena_v22_rcaggregatemultidaybuffer",
+      "esl_live_arena_v22_rcfetchdaybuffer",
+      "esl_live_arena_v22_rcfetchrangebuffer",
+      "esl_live_arena_v22_rcfetchrangeviaui",
+      "esl_live_arena_v22_rcfinalizeagg",
+      "esl_live_arena_v22_rcharvesteslhistory",
+      "esl_live_arena_v22_rcnewagg",
+      "esl_live_arena_v22_rcrangeload",
+      "esl_live_arena_v22_rcreadsheet",
+      "esl_live_arena_v22_rcrowdaykey",
+      "esl_live_arena_v22_updatestackfilteroptions",
+      "esl_live_arena_v22_verarbeiteexcelbuffer",
+      "esl_live_arena_v22_verarbeitemappingexcel",
+      "package_dependencies",
+      "package_dependencies_xlsx",
+      "xlsx"
+    ],
+    "7": [
+      "sales_league_plan",
+      "sales_league_plan_0_die_fünf_grundgesetze_nicht_verhandelbar",
+      "sales_league_plan_1_liga_struktur",
+      "sales_league_plan_2_tor_und_punktregeln_40_20_20_20_übersetzt",
+      "sales_league_plan_3_tagesdramaturgie_vier_akte_statt_eliminierung",
+      "sales_league_plan_4_1_architektur_rebuild_statt_speicherstand_citrix_fest",
+      "sales_league_plan_4_2_determinismus_regel_für_paarungen_und_underdog",
+      "sales_league_plan_4_3_spielplan_der_woche",
+      "sales_league_plan_4_wochenmodus_stufe_2_champions_week",
+      "sales_league_plan_5_1_bühnenbild",
+      "sales_league_plan_5_2_figuren",
+      "sales_league_plan_5_3_event_regie_die_wichtigste_regel",
+      "sales_league_plan_5_4_disziplin",
+      "sales_league_plan_5_visualität_der_broadcast_look_anti_billig_spezifikation",
+      "sales_league_plan_6_warum_die_survival_league_eliminierung_nicht_umgesetzt_wird",
+      "sales_league_plan_7_technische_verankerung_stufe_1",
+      "sales_league_plan_8_ausbaustufen",
+      "sales_league_plan_elfmeter_user_regel_präzisiert",
+      "sales_league_plan_regiocom_sales_league_finaler_plan_v1_1_16_07_2026",
+      "sales_league_plan_scorerpunkte_der_agenten_einzelwertung_spiegelt_die_gewichtung",
+      "sales_league_plan_spielstand_im_duell_nur_echte_ereignisse_monoton_steigend"
+    ],
+    "8": [
+      "esl_live_cr_berechnung_cr_bnt",
+      "esl_live_cr_berechnung_cr_vvl",
+      "esl_live_cr_berechnung_neuvertrag",
+      "esl_live_cr_berechnung_vvl_potenzial",
+      "esl_live_inhalt_excel_bcr_relevant",
+      "esl_live_inhalt_excel_ergebnis_schema",
+      "esl_live_inhalt_excel_produktgruppe",
+      "esl_live_inhalt_excel_sis_angesprochen",
+      "esl_live_kpis_aht",
+      "esl_live_kpis_cs",
+      "esl_live_kpis_tnps",
+      "esl_live_setup_broadcastchannel_alarm_logic",
+      "esl_live_setup_broadcastchannel_ansprache_quote",
+      "esl_live_setup_broadcastchannel_kpi_update_message"
+    ],
+    "9": [
+      "esl_live_arena_v22_rcwaraddfeed",
+      "esl_live_arena_v22_rcwaraddfx",
+      "esl_live_arena_v22_rcwarcinema",
+      "esl_live_arena_v22_rcwarclang",
+      "esl_live_arena_v22_rcwardust",
+      "esl_live_arena_v22_rcwarensurebases",
+      "esl_live_arena_v22_rcwarfloat",
+      "esl_live_arena_v22_rcwarlaunch",
+      "esl_live_arena_v22_rcwarpicktarget",
+      "esl_live_arena_v22_rcwarreplaynext",
+      "esl_live_arena_v22_rcwarspawnbote",
+      "esl_live_arena_v22_rcwarupdate"
+    ],
+    "10": [
+      "esl_live_arena_v22_addticker",
+      "esl_live_arena_v22_getflagsvg",
+      "esl_live_arena_v22_processcelebrationqueue",
+      "esl_live_arena_v22_queuecelebration",
+      "esl_live_arena_v22_rankclass",
+      "esl_live_arena_v22_renderliga",
+      "esl_live_arena_v22_renderside",
+      "esl_live_arena_v22_renderstandortbattle",
+      "esl_live_arena_v22_renderstandorte",
+      "esl_live_arena_v22_renderteambattle",
+      "esl_live_arena_v22_showgoal"
+    ],
+    "11": [
+      "esl_live_cr_berechnung_dokument"
+    ],
+    "12": [
+      "esl_live_kpis_aq"
+    ],
+    "13": [
+      "esl_live_kpis_call_volumen"
+    ],
+    "14": [
+      "esl_live_kpis_dds"
+    ],
+    "15": [
+      "esl_live_kpis_ff7"
+    ],
+    "16": [
+      "esl_live_kpis_fq"
+    ],
+    "17": [
+      "package",
+      "package_author",
+      "package_description",
+      "package_keywords",
+      "package_license",
+      "package_main",
+      "package_name",
+      "package_scripts",
+      "package_scripts_test",
+      "package_type",
+      "package_version"
+    ],
+    "18": [
+      "esl_live_arena_v22_eslof",
+      "esl_live_arena_v22_eslofday",
+      "esl_live_arena_v22_ligaof",
+      "esl_live_arena_v22_ligaofday",
+      "esl_live_arena_v22_rcdetchart",
+      "esl_live_arena_v22_rcloadeslhistory",
+      "esl_live_arena_v22_rcstandrowhasdata",
+      "esl_live_arena_v22_rcstandrows",
+      "esl_live_arena_v22_rendercmp",
+      "esl_live_arena_v22_renderrangetable"
+    ],
+    "19": [
+      "esl_live_arena_v22_rcwardrawbarrow",
+      "esl_live_arena_v22_rcwardrawbase",
+      "esl_live_arena_v22_rcwardrawcart",
+      "esl_live_arena_v22_rcwardrawcatapult",
+      "esl_live_arena_v22_rcwardrawflag",
+      "esl_live_arena_v22_rcwardrawgoldaura",
+      "esl_live_arena_v22_rcwardrawhorse",
+      "esl_live_arena_v22_rcwardrawman",
+      "esl_live_arena_v22_rcwardrawtag",
+      "esl_live_arena_v22_rcwardrawunit"
+    ],
+    "20": [
+      "esl_live_arena_v22_rcherocalllist",
+      "esl_live_arena_v22_rcwarbrieflines",
+      "esl_live_arena_v22_rcwardraw",
+      "esl_live_arena_v22_rcwardrawfx",
+      "esl_live_arena_v22_rcwardrawhud",
+      "esl_live_arena_v22_rcwarkrieger",
+      "esl_live_arena_v22_rcwarloop",
+      "esl_live_arena_v22_rcwarresize"
+    ],
+    "21": [
+      "esl_live_arena_v22_handlekpimessage",
+      "esl_live_arena_v22_ingestkpi",
+      "esl_live_arena_v22_rcmergeligahistory",
+      "esl_live_arena_v22_rendermarquee"
+    ],
+    "22": [
+      "esl_live_arena_v22_rclgagentgoals",
+      "esl_live_arena_v22_rclgframe",
+      "esl_live_arena_v22_rclgpanel",
+      "esl_live_arena_v22_rclgweek"
+    ],
+    "23": [
+      "kpi_crawler_xmlhttprequest_open"
+    ],
+    "24": [
+      "league_demo_rows"
+    ]
+  },
+  "cohesion": {
+    "0": 0.058673469387755105,
+    "1": 0.07977207977207977,
+    "2": 0.053426248548199766,
+    "3": 0.18538324420677363,
+    "4": 0.11692307692307692,
+    "5": 0.08695652173913043,
+    "6": 0.14285714285714285,
+    "7": 0.09523809523809523,
+    "8": 0.15384615384615385,
+    "9": 0.2727272727272727,
+    "10": 0.21818181818181817,
+    "11": 1.0,
+    "12": 1.0,
+    "13": 1.0,
+    "14": 1.0,
+    "15": 1.0,
+    "16": 1.0,
+    "17": 0.18181818181818182,
+    "18": 0.2,
+    "19": 0.24444444444444444,
+    "20": 0.25,
+    "21": 0.5,
+    "22": 0.5,
+    "23": 1.0,
+    "24": 1.0
+  },
+  "gods": [
+    {
+      "id": "kpi_crawler_parsekpitable",
+      "label": "parseKpiTable()",
+      "degree": 13
+    },
+    {
+      "id": "kpi_crawler_harvestweekdaily",
+      "label": "harvestWeekDaily()",
+      "degree": 12
+    },
+    {
+      "id": "esl_live_arena_v22_rcaggregatedaybuffer",
+      "label": "rcAggregateDayBuffer()",
+      "degree": 11
+    },
+    {
+      "id": "esl_live_arena_v22_rcwarupdate",
+      "label": "rcWarUpdate()",
+      "degree": 10
+    },
+    {
+      "id": "kpi_crawler_pad2",
+      "label": "pad2()",
+      "degree": 10
+    },
+    {
+      "id": "kpi_crawler_harvestweekdailydom",
+      "label": "harvestWeekDailyDom()",
+      "degree": 10
+    },
+    {
+      "id": "sales_league_plan_regiocom_sales_league_finaler_plan_v1_1_16_07_2026",
+      "label": "REGIOCOM SALES LEAGUE — Finaler Plan (v1.1, 16.07.2026)",
+      "degree": 10
+    },
+    {
+      "id": "esl_live_konsolen_code_standort_metadata",
+      "label": "STANDORT_METADATA Mapping (Code→Name/Nation/Color)",
+      "degree": 10
+    },
+    {
+      "id": "esl_live_arena_v22_normalizestandort",
+      "label": "normalizeStandort()",
+      "degree": 9
+    },
+    {
+      "id": "esl_live_arena_v22_rcharvesteslhistory",
+      "label": "rcHarvestEslHistory()",
+      "degree": 9
+    }
+  ],
+  "surprises": [
+    {
+      "source": "tickClock()",
+      "target": "pad2()",
+      "source_files": [
+        "esl_live_arena_v22.js",
+        "kpi_crawler.js"
+      ],
+      "confidence": "INFERRED",
+      "relation": "calls",
+      "why": "inferred connection - not explicitly stated in source; connects across different repos/directories; bridges separate communities; peripheral node `tickClock()` unexpectedly reaches hub `pad2()`"
+    },
+    {
+      "source": "rcDetailDays()",
+      "target": "pad2()",
+      "source_files": [
+        "esl_live_arena_v22.js",
+        "kpi_crawler.js"
+      ],
+      "confidence": "INFERRED",
+      "relation": "calls",
+      "why": "inferred connection - not explicitly stated in source; connects across different repos/directories; bridges separate communities; peripheral node `rcDetailDays()` unexpectedly reaches hub `pad2()`"
+    },
+    {
+      "source": "rcRowDayKey()",
+      "target": "pad2()",
+      "source_files": [
+        "esl_live_arena_v22.js",
+        "kpi_crawler.js"
+      ],
+      "confidence": "INFERRED",
+      "relation": "calls",
+      "why": "inferred connection - not explicitly stated in source; connects across different repos/directories; bridges separate communities"
+    },
+    {
+      "source": "rcAggregateDayBuffer()",
+      "target": "pad2()",
+      "source_files": [
+        "esl_live_arena_v22.js",
+        "kpi_crawler.js"
+      ],
+      "confidence": "INFERRED",
+      "relation": "calls",
+      "why": "inferred connection - not explicitly stated in source; connects across different repos/directories; bridges separate communities"
+    },
+    {
+      "source": "rcHarvestEslHistory()",
+      "target": "pad2()",
+      "source_files": [
+        "esl_live_arena_v22.js",
+        "kpi_crawler.js"
+      ],
+      "confidence": "INFERRED",
+      "relation": "calls",
+      "why": "inferred connection - not explicitly stated in source; connects across different repos/directories; bridges separate communities"
+    }
+  ],
+  "questions": [
+    {
+      "type": "bridge_node",
+      "question": "Why does `xlsx` connect `rcAggregateDayBuffer` to `esl_live_arena_v21.js`?",
+      "why": "High betweenness centrality (0.211) - this node is a cross-community bridge."
+    },
+    {
+      "type": "bridge_node",
+      "question": "Why does `pad2()` connect `kpi_crawler.js` to `esl_live_arena_v22.js`, `rcAggregateDayBuffer`?",
+      "why": "High betweenness centrality (0.123) - this node is a cross-community bridge."
+    },
+    {
+      "type": "bridge_node",
+      "question": "Why does `rcReadSheet()` connect `rcAggregateDayBuffer` to `esl_live_arena_v22.js`?",
+      "why": "High betweenness centrality (0.094) - this node is a cross-community bridge."
+    },
+    {
+      "type": "verify_inferred",
+      "question": "Are the 5 inferred relationships involving `pad2()` (e.g. with `rcAggregateDayBuffer()` and `rcDetailDays()`) actually correct?",
+      "why": "`pad2()` has 5 INFERRED edges - model-reasoned connections that need verification."
+    },
+    {
+      "type": "isolated_nodes",
+      "question": "What connects `name`, `version`, `description` to the rest of the system?",
+      "why": "71 weakly-connected nodes found - possible documentation gaps or missing edges."
+    },
+    {
+      "type": "low_cohesion",
+      "question": "Should `esl_live_arena_v21.js` be split into smaller, more focused modules?",
+      "why": "Cohesion score 0.058673469387755105 - nodes in this community are weakly interconnected."
+    },
+    {
+      "type": "low_cohesion",
+      "question": "Should `STANDORT_METADATA Mapping (Code→Name/Nation/Color)` be split into smaller, more focused modules?",
+      "why": "Cohesion score 0.07977207977207977 - nodes in this community are weakly interconnected."
+    }
+  ]
+}

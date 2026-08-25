@@ -1,0 +1,107 @@
+**nach auswahl Zeitraum und intervall auf OK klicken:**
+
+
+<button type="button" class="ccsgc-btn btn-primary" id="ok-button" data-loading-text="&lt;i class='fa fa-refresh fa-spin'&gt;&lt;/i&gt; Laden...">
+
+                  <i class="fa fa-check"></i> Ok 
+
+                </button>
+
+---
+
+**ergebniss:**
+
+
+get-result
+script_id
+11035
+script_id_secure
+0ZkwbCzeTfTmQ0VbI46V-fvPRVfHqXe87wDwTWsuaaJJnAVzkEknc7v-dyVZ7cRc
+user_id
+32595
+tree_template
+null
+ffr_template
+nodeid_inlist
+11405
+spid_inlist_c
+10026
+loc_inlist_c
+Alanya,Alexandroupolis,Berlin,Essen,Neubrandenburg,Potsdam,regiocom_W_Home,Sakarya,Serres
+cumulate_provider
+0
+spid_inlist
+10026
+cumulate_locations
+0
+loc_inlist
+Alanya,Alexandroupolis,Berlin,Essen,Neubrandenburg,Potsdam,regiocom_W_Home,Sakarya,Serres
+cumulate_teams
+0
+teamid_inlist
+daterange
+current_week
+interval
+day
+startdate
+undefined
+enddate
+undefined
+show_more_settings
+1
+figure_list
+10004,10005,10006,10014,10082,10062,10339,10075,10355,10340,10080,10081,10063,10064,10065,10076,10077,10078,10067,10060,10061,10357,10358
+figure_group_list
+show_hms
+1
+show_nodes
+0
+show_employeeid
+0
+show_ccsid
+1
+show_notready_durations
+0
+show_ffr_templates
+0
+show_excel_pivot_header
+0
+agent_select
+-1
+ccsid
+table_type
+2
+all_provider_selected
+false
+all_locations_selected
+false
+all_teams_selected
+true
+description_settings_list
+32595;11035;Vodafone_Kabel
+nodeid_inlist_c
+11405
+setting_type
+personal
+
+---
+
+fetch("https://ccs.vodafone.de/cgi-bin/AGENTEN_KENNZAHLEN_2/LIGA_LISTEN_NEW/dist/scripts/get_data.rb", {
+  "headers": {
+    "accept": "*/*",
+    "accept-language": "de,de-DE;q=0.9,en;q=0.8,en-GB;q=0.7,en-US;q=0.6",
+    "cache-control": "max-age=0",
+    "content-type": "application/x-www-form-urlencoded;charset=UTF-8",
+    "sec-ch-ua": "\"Not;A=Brand\";v=\"8\", \"Chromium\";v=\"150\", \"Microsoft Edge\";v=\"150\"",
+    "sec-ch-ua-mobile": "?0",
+    "sec-ch-ua-platform": "\"Windows\"",
+    "sec-fetch-dest": "empty",
+    "sec-fetch-mode": "cors",
+    "sec-fetch-site": "same-origin"
+  },
+  "referrer": "https://ccs.vodafone.de/cgi-bin/AGENTEN_KENNZAHLEN_2/LIGA_LISTEN_NEW/dist/liga_listen.rb?script_id=11035",
+  "body": "type=get-result&script_id=11035&script_id_secure=0ZkwbCzeTfTmQ0VbI46V-fvPRVfHqXe87wDwTWsuaaJJnAVzkEknc7v-dyVZ7cRc&user_id=32595&tree_template=null&ffr_template=&nodeid_inlist=11405&spid_inlist_c=10026&loc_inlist_c=Alanya%2CAlexandroupolis%2CBerlin%2CEssen%2CNeubrandenburg%2CPotsdam%2Cregiocom_W_Home%2CSakarya%2CSerres&cumulate_provider=0&spid_inlist=10026&cumulate_locations=0&loc_inlist=Alanya%2CAlexandroupolis%2CBerlin%2CEssen%2CNeubrandenburg%2CPotsdam%2Cregiocom_W_Home%2CSakarya%2CSerres&cumulate_teams=0&teamid_inlist=&daterange=current_week&interval=day&startdate=undefined&enddate=undefined&show_more_settings=1&figure_list=10004%2C10005%2C10006%2C10014%2C10082%2C10062%2C10339%2C10075%2C10355%2C10340%2C10080%2C10081%2C10063%2C10064%2C10065%2C10076%2C10077%2C10078%2C10067%2C10060%2C10061%2C10357%2C10358&figure_group_list=&show_hms=1&show_nodes=0&show_employeeid=0&show_ccsid=1&show_notready_durations=0&show_ffr_templates=0&show_excel_pivot_header=0&agent_select=-1&ccsid=&table_type=2&all_provider_selected=false&all_locations_selected=false&all_teams_selected=true&description_settings_list=32595%3B11035%3BVodafone_Kabel&nodeid_inlist_c=11405&setting_type=personal",
+  "method": "POST",
+  "mode": "cors",
+  "credentials": "include"
+});

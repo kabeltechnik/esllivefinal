@@ -99,14 +99,27 @@ Spezialwissen:
 6. **`dt`-Clamping beachten** (`Math.min(0.05, ...)` in `rcWarLoop`) — verhindert Physik-Explosion nach
    Tab-Wechsel/Lag-Spike. Jede neue zeitbasierte Bewegung muss mit `dt` skalieren, nie mit fixen
    Pro-Frame-Konstanten.
-7. **Nach jeder Änderung**: `node --check esl_live_arena_v22.js`, dann offline testen via
-   `test_dashboard_offline.html` (`python -m http.server 8412 --bind 127.0.0.1`) und im Browser
-   `window.rcWarStep(dt)` mehrfach aufrufen um die Animation ohne echten RAF zu verifizieren.
-8. **Vor dem Lesen von Code**: `graphify query "<Frage>"` nutzen statt v22.js komplett zu lesen;
-   gezielt mit obigen Zeilen-Ankern per `grep -n` nachschlagen und dann `Read` mit offset/limit.
-9. Farbpalette einhalten: Blue `#2C57D2`, Orange `#FF4C02`, Green `#009864`, Red `#E2241A`,
-   Dark `#1F2D3D`, Pink `#FF679B` — Einheiten-/Effektfarben sollen sich daran orientieren bzw. an
-   `m.color`/`b.color` aus dem Standort-Mapping.
+7. **Nach jeder Änderung**: `node --check esl_live_arena_v22.js` und
+   `node pruefwerkzeuge/tdz_pruefen.js` (Sollwert 0). Dann offline testen über den Skill
+   **`run-esl-live-arena`** (`.claude/skills/run-esl-live-arena/driver.mjs`, headless Chrome per
+   CDP) mit **`test_reportbilder.html`** — es speist 520 echte Liga-Agenten plus einen echten
+   ESL-Tagesexport ein und trägt das ganze Dashboard.
+   **`test_dashboard_offline.html` gibt es NICHT mehr** (nur noch im Commit).
+   Im Browser `window.rcWarStep(dt)` mehrfach aufrufen, um die Animation ohne echten RAF zu
+   verifizieren — **rAF feuert in Hintergrund-Tabs nicht**, gemessen 1 Frame in 504 Sekunden bei
+   verborgener Seite. Ein Wandmonitor mit mehreren Fenstern ist genau dieser Fall.
+8. **Vor dem Lesen von Code**: `graphify query "<Frage>"` statt v22.js komplett zu lesen (die Datei
+   hat **25106 Zeilen** und wächst). Anker über **Funktionsnamen** per `grep -n` setzen, nicht über
+   notierte Zeilennummern — die altern innerhalb von Tagen.
+9. **Farbpalette: `VODAFONE_DESIGN.md` ist verbindlich.** Zustände dreistufig — ok `#008A00`,
+   warn `#EB9700`, breach `#E60000`; Marke Rot `#E60000` / Dunkelrot `#BD0000`. Standortfarben
+   ausschließlich über `rcChartFarbe(code, i)` bzw. `STANDORT_METADATA` (EINE Farbwahrheit, dieselbe
+   Standortfarbe in jedem Diagramm) — nicht aus `m.color`/`b.color` neu erfinden.
+   **Die alten regiocom-Farben `#2C57D2` / `#FF4C02` / `#009864` / `#1F2D3D` / `#FF679B` sind
+   Legacy und dürfen NICHT neu eingesetzt werden.** Restvorkommen an Detail-Modal-Kacheln beim
+   nächsten Touch auf Zustands-/Standort-Token umstellen.
+   Die dunkle Kampfbühne bleibt bewusst dunkel (Nutzer-Vorgabe "TV-Bild"-Kontrast) — nicht
+   versehentlich aufhellen.
 
 ## Wie du arbeitest
 - Halte dich strikt an die Reihenfolge oben: erst Befunde (Phase 1), dann Ideen (Phase 2), erst

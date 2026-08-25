@@ -1,0 +1,112 @@
+(function () {
+  // ============================================================
+  //  KPI-Crawler (Gerüst) — erzeugt von rc_lupe v1.0
+  //  Quelle: https://esl.regiocom.net/Agents/secure/sis_vodafone_mobile.xhtml
+  //  ------------------------------------------------------------
+  //  WICHTIG: Die Zeichenfolge "KPI-Crawler" oben muss stehen bleiben.
+  //  ESL_Start.cmd prüft die ersten 4000 Zeichen auf diesen Marker und
+  //  lehnt die Datei sonst als "vermutlich die FALSCHE Datei" ab.
+  //  Für die Warteschleife heißt der Marker "Warteschleifen-Crawler".
+  // ============================================================
+  'use strict';
+  var TAKT_MS = 600000;            // 10 Minuten
+  var ZIEL    = "sis_vodafone_mobile.xhtml";
+
+  // Die Seite schickt einen Wert mit, der wie ein Token aussieht
+  //   javax.faces.source
+  // Solche Werte laufen ab und dürfen NICHT hart eingetragen werden.
+  // Deshalb wird die Original-Anfrage der Seite mitgeschnitten und
+  // nur das ersetzt, was wir steuern wollen.
+  window.__rcOrig = window.__rcOrig || null;
+  (function haken() {
+    if (window.__rcHaken) return; window.__rcHaken = true;
+    var of = window.fetch;
+    window.fetch = function (i, init) {
+      try {
+        var u = (typeof i === "string") ? i : (i && i.url) || "";
+        if (u.indexOf(ZIEL) !== -1) window.__rcOrig = {
+          url: u, method: ((init && init.method) || (i && i.method) || "GET").toUpperCase(),
+          body: (init && init.body != null) ? String(init.body) : null
+        };
+      } catch (e) {}
+      return of.apply(this, arguments);
+    };
+    var oo = XMLHttpRequest.prototype.open, os = XMLHttpRequest.prototype.send;
+    XMLHttpRequest.prototype.open = function (m, u) { this.__m = String(m || "GET").toUpperCase(); this.__u = u; return oo.apply(this, arguments); };
+    XMLHttpRequest.prototype.send = function (b) {
+      try {
+        if (String(this.__u || "").indexOf(ZIEL) !== -1) window.__rcOrig = {
+          url: this.__u, method: this.__m, body: (b != null) ? String(b) : null
+        };
+      } catch (e) {}
+      return os.apply(this, arguments);
+    };
+  })();
+
+  // Anfrage nachstellen. Session-Cookie geht über credentials automatisch mit,
+  // ein eigener Cookie-Header wäre wirkungslos.
+  function hole(ueberschreiben) {
+    var o = window.__rcOrig;
+    if (!o) { console.warn("[Crawler] Noch keine Original-Anfrage — Seite einmal bedienen."); return Promise.resolve(null); }
+    var u = new URL(o.url, location.href);
+    var opt = { method: o.method, credentials: "include", headers: {"content-type":"application/x-www-form-urlencoded; charset=UTF-8","accept":"application/xml, text/xml, */*; q=0.01","faces-request":"partial/ajax","x-requested-with":"XMLHttpRequest"} };
+    var ue = ueberschreiben || {};
+    if (o.method === "GET" || o.body == null) {
+      Object.keys(ue).forEach(function (k) { u.searchParams.set(k, ue[k]); });
+      if (u.searchParams.has("_")) u.searchParams.set("_", Date.now());
+    } else {
+      var p = new URLSearchParams(o.body);
+      Object.keys(ue).forEach(function (k) { p.set(k, ue[k]); });
+      opt.headers["Content-Type"] = "application/x-www-form-urlencoded; charset=UTF-8";
+      opt.body = p;
+    }
+    return fetch(u.href, opt).then(function (res) {
+      if (!res.ok) console.warn("[Crawler] HTTP", res.status, u.pathname);
+      return res.text();
+    });
+  }
+
+  // HIER anpassen: Antwort in Datensätze umwandeln.
+  // Erkannte Antwortform: HTML
+  function auswerten(text) {
+    var t = (text || "").trim();
+    if (!t) return [];
+    if (t.charAt(0) === "{" || t.charAt(0) === "[") return JSON.parse(t);
+    var doc = new DOMParser().parseFromString(t, "text/html");
+    var tab = doc.querySelector("table");
+    if (!tab) return [];
+    var kopf = Array.prototype.map.call(tab.querySelectorAll("tr th"), function (th) { return th.textContent.trim(); });
+    return Array.prototype.map.call(tab.querySelectorAll("tbody tr"), function (tr) {
+      var z = Array.prototype.map.call(tr.children, function (td) { return td.textContent.trim(); });
+      var o = {}; kopf.forEach(function (k, i) { o[k] = z[i]; }); return o;
+    });
+  }
+
+  // Weitergabe ans Dashboard. Cross-Origin ist window.opener der EINZIGE
+  // Rückkanal — BroadcastChannel wirkt nur innerhalb eines Origins und
+  // meldet Erfolg auch dann, wenn niemand zuhört. Taugt nicht als Nachweis.
+  function senden(daten) {
+    var ziele = [];
+    var last = { typ: "crawler_daten", ts: Date.now(), daten: daten };
+    try { if (window.opener && !window.opener.closed) { window.opener.postMessage(last, "*"); ziele.push("opener"); } } catch (e) {}
+    try { if (window.rcDashWin && !window.rcDashWin.closed) { window.rcDashWin.postMessage(last, "*"); ziele.push("rcDashWin"); } } catch (e) {}
+    if (!ziele.length) console.warn("[Crawler] Kein Empfänger! Diese Seite muss AUS dem Dashboard geöffnet werden (window.open), sonst ist opener null.");
+    return ziele;
+  }
+
+  function lauf() {
+    return hole({}).then(function (text) {
+      if (text == null) return;
+      var daten = auswerten(text);
+      var n = (daten && daten.length) || 0;
+      console.log("[Crawler]", n, "Datensätze ->", senden(daten).join(", ") || "niemand");
+      return daten;
+    }).catch(function (e) { console.error("[Crawler] Fehler:", e); });
+  }
+
+  if (window.__rcCrawlerTakt) clearInterval(window.__rcCrawlerTakt);
+  setTimeout(lauf, 5000);
+  window.__rcCrawlerTakt = setInterval(lauf, TAKT_MS);
+  window.rcCrawlerLauf = lauf; window.rcCrawlerHole = hole;
+  console.log("[Crawler] bereit — rcCrawlerLauf() für einen Sofort-Lauf");
+})();

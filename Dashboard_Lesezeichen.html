@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>ESL Live-Arena — Startknopf als Lesezeichen</title>
+<style>
+  body { font: 15px/1.6 Arial, sans-serif; color: #0D0D0D; background: #F4F4F4;
+         margin: 0; padding: 32px; }
+  .karte { max-width: 780px; margin: 0 auto; background: #FFFFFF; border: 1px solid #EBEBEB;
+           border-radius: 12px; padding: 28px 32px; }
+  h1 { font-size: 22px; margin: 0 0 4px; color: #E60000; }
+  h2 { font-size: 16px; margin: 26px 0 8px; }
+  p, li { color: #333333; }
+  .knopf { display: inline-block; background: #E60000; color: #FFFFFF; text-decoration: none;
+           padding: 13px 22px; border-radius: 8px; font-weight: bold; font-size: 15px;
+           cursor: move; }
+  .zieh { background: #FFF6F6; border: 1px dashed #E60000; border-radius: 10px;
+          padding: 20px; text-align: center; margin: 14px 0 6px; }
+  textarea { width: 100%; height: 96px; font: 12px/1.5 Consolas, monospace; color: #333333;
+             border: 1px solid #CCCCCC; border-radius: 6px; padding: 10px; box-sizing: border-box; }
+  .hinweis { background: #FFF8E8; border-left: 4px solid #EB9700; padding: 12px 16px;
+             margin: 16px 0; color: #8F5C00; }
+  code { background: #F4F4F4; padding: 1px 5px; border-radius: 4px; font-size: 13px; }
+  ol { padding-left: 22px; }
+</style>
+</head>
+<body>
+<div class="karte">
+
+<h1>Dashboard starten — ohne Starter</h1>
+<p>Dieses Lesezeichen startet die Live-Arena auf der ESL-Seite. Es braucht
+<strong>keinen laufenden <code>ESL_Start.cmd</code></strong> und keine Fernsteuerung —
+nur den Klick. Gedacht fuer den Handbetrieb: Du gehst selbst bis
+Projekte &rarr; Stack &rarr; <em>Export Projektergebnisse</em>, dann klickst Du hier.</p>
+
+<h2>1. Einrichten (einmalig)</h2>
+<div class="zieh">
+  <a class="knopf" id="bm" href="#">Dashboard starten</a>
+  <div style="margin-top:10px;color:#666666;font-size:13px;">
+    diesen Knopf in die Favoritenleiste ziehen
+  </div>
+</div>
+<p>Ist die Favoritenleiste nicht sichtbar: <code>Strg</code>+<code>Umschalt</code>+<code>B</code>.</p>
+
+<div class="hinweis">
+  <strong>Ziehen geht nicht?</strong> Dann von Hand: Favoritenleiste rechtsklicken &rarr;
+  „Link hinzufuegen“. Als Name <em>Dashboard starten</em> eintragen, und als Adresse
+  den kompletten Text aus dem Feld unten einfuegen.
+</div>
+
+<textarea id="src" readonly>javascript:(function(){var W=window;if(W.rcLiveInterval){alert('Das Dashboard laeuft bereits.');return;}if(!document.getElementById('filterForm')){alert('Diese Seite ist nicht die Export-Ansicht.\n\nBitte erst waehlen:\nProjekte -> Projektergebnisse -> Statistik "Export Projektergebnisse".');return;}var s=null;try{s=(W.__rcFiles&&W.__rcFiles.dash)||localStorage.getItem('rcDashboardCode');}catch(e){}if(s){(0,eval)(s);return;}var i=document.createElement('input');i.type='file';i.accept='.js';i.onchange=function(){var f=i.files[0];if(!f){return;}var r=new FileReader();r.onload=function(){var t=String(r.result||'');if(t.indexOf('live-arena')===-1&&t.indexOf('rcLiveDashboard')===-1){alert('Das sieht nicht nach esl_live_arena_v22.js aus.');return;}try{localStorage.setItem('rcDashboardCode',t);}catch(e){}(0,eval)(t);};r.readAsText(f);};i.click();})()</textarea>
+
+<h2>2. Benutzen</h2>
+<ol>
+  <li>Im ESL anmelden und selbst bis <em>Export Projektergebnisse</em> klicken.</li>
+  <li>Auf das Lesezeichen <strong>Dashboard starten</strong> klicken.</li>
+</ol>
+<p>Beim allerersten Mal fragt es nach der Datei <code>esl_live_arena_v22.js</code> —
+einmal auswaehlen, danach merkt es sich den Quelltext im Browser. Leert Citrix den
+Browser-Speicher, fragt es einfach wieder.</p>
+
+<div class="hinweis">
+  Das Lesezeichen laeuft nur auf der Seite <em>Export Projektergebnisse</em>. Auf jeder
+  anderen Seite sagt es das und tut nichts — es kann also nichts kaputtmachen.
+</div>
+
+<h2>3. Die beiden Crawler — genauso als Lesezeichen</h2>
+<p>Gleiche Bauart, andere Seite. Nutzen, wenn in der Ligaliste bzw. im
+Genesys-Monitor <strong>gar nichts in der Konsole steht</strong>: dann ist der Autopilot
+nicht in der Seite, und ohne ihn startet dort auch kein Crawler.</p>
+
+<div class="zieh">
+  <a class="knopf" id="bmKpi" href="#">KPI-Crawler starten</a>
+  <div style="margin-top:10px;color:#666666;font-size:13px;">
+    fuer die <em>Ligaliste</em> (liga_listen.rb) — ebenfalls in die Favoritenleiste ziehen
+  </div>
+</div>
+<textarea id="srcKpi" readonly>javascript:(function(){var W=window;if(W.kpiCrawlerInterval){alert('Der KPI-Crawler laeuft bereits in dieser Seite.');return;}if(location.href.indexOf('liga_listen')===-1){alert('Diese Seite ist nicht die Ligaliste.\n\nBitte zuerst die Ligaliste oeffnen (liga_listen.rb).');return;}var s=null;try{s=(W.__rcFiles&&W.__rcFiles.kpi)||localStorage.getItem('rcWcaCrawlerSrc');}catch(e){}if(s){(0,eval)(s);return;}var i=document.createElement('input');i.type='file';i.accept='.js';i.onchange=function(){var f=i.files[0];if(!f){return;}var r=new FileReader();r.onload=function(){var t=String(r.result||'');if(t.slice(0,4000).indexOf('KPI-Crawler')===-1){alert('Das sieht nicht nach kpi_crawler.js aus.');return;}try{localStorage.setItem('rcWcaCrawlerSrc',t);}catch(e){}(0,eval)(t);};r.readAsText(f);};i.click();})()</textarea>
+
+<div class="zieh">
+  <a class="knopf" id="bmGm" href="#">Warteschleifen-Crawler starten</a>
+  <div style="margin-top:10px;color:#666666;font-size:13px;">
+    fuer den <em>Genesys-Monitor</em> (gm2.rb)
+  </div>
+</div>
+<textarea id="srcGm" readonly>javascript:(function(){var W=window;if(W.RC_GM){alert('Der Warteschleifen-Crawler laeuft bereits in dieser Seite.');return;}if(location.href.indexOf('gm2.rb')===-1&&location.href.indexOf('MONITOR_2')===-1){alert('Diese Seite ist nicht der Genesys-Monitor.\n\nBitte zuerst gm2.rb oeffnen.');return;}var s=null;try{s=(W.__rcFiles&&W.__rcFiles.gm)||localStorage.getItem('rcGmCrawlerSrc');}catch(e){}if(s){(0,eval)(s);return;}var i=document.createElement('input');i.type='file';i.accept='.js';i.onchange=function(){var f=i.files[0];if(!f){return;}var r=new FileReader();r.onload=function(){var t=String(r.result||'');if(t.slice(0,4000).indexOf('Warteschleifen-Crawler')===-1){alert('Das sieht nicht nach genesys_monitor_crawler.js aus.');return;}try{localStorage.setItem('rcGmCrawlerSrc',t);}catch(e){}(0,eval)(t);};r.readAsText(f);};i.click();})()</textarea>
+
+<div class="hinweis">
+  <strong>Wichtig — Reihenfolge:</strong> Beide Crawler schicken ihre Daten ueber
+  <code>window.opener</code> ans Dashboard. Diesen Rueckkanal gibt es nur, wenn das
+  Fenster <em>aus dem Dashboard heraus</em> geoeffnet wurde (Knopf „KPI-Quelle oeffnen“
+  bzw. „Quelle oeffnen“ auf der Warteschleifen-Seite). Ein von Hand in einem neuen Tab
+  aufgerufenes <code>liga_listen.rb</code> hat keinen opener — der Crawler laeuft dann,
+  sammelt Daten und findet niemanden, dem er sie geben kann. Die Seiten liegen auf
+  <code>ccs.vodafone.de</code>, das Dashboard auf <code>esl.regiocom.net</code>: ein
+  BroadcastChannel wirkt dort nicht.
+</div>
+
+<h2>Was es NICHT ersetzt</h2>
+<p>Ohne laufenden <code>ESL_Start.cmd</code> gibt es keine automatische
+Neuanmeldung nach Sitzungsablauf (nach 2–3 Stunden) und keine Stundenmail.
+Fuer den Wandmonitor-Dauerbetrieb bleibt der Starter der richtige Weg — diese
+Lesezeichen sind fuer den Handbetrieb und als Notnagel.</p>
+
+</div>
+<script>
+  // Den Bookmarklet-Text aus dem Feld in den Link haengen. So steht er nur EINMAL
+  // in der Datei und muss nicht zusaetzlich HTML-escaped werden.
+  [['bm', 'src'], ['bmKpi', 'srcKpi'], ['bmGm', 'srcGm']].forEach(function (p) {
+    var a = document.getElementById(p[0]), t = document.getElementById(p[1]);
+    if (a && t) a.setAttribute('href', t.value.trim());
+  });
+</script>
+</body>
+</html>

@@ -50,14 +50,43 @@ const DATEIEN = [
   { name: 'kpi_crawler.js',                   zweck: 'Ligalisten-Crawler',                     pflicht: true },
   { name: 'genesys_monitor_crawler.js',       zweck: 'Warteschleifen-Crawler (Genesys)',       pflicht: true },
   { name: 'ESL_Start.cmd',                    zweck: 'Starter (Doppelklick)',                  pflicht: true },
+  // Schaltet Mobile und UM dazu. Setzt einen laufenden ESL_Start.cmd voraus -
+  // nur dessen Waechter haelt die beiden Tabs dauerhaft am Leben.
+  { name: 'ESL_Start_Mobile_UM.cmd',          zweck: 'Mobilfunk + UM dazuschalten',            pflicht: false },
+  // Duenne Wrapper fuer den Ein-Stack-Start (rufen die Datei darueber mit
+  // Parameter mobile bzw. um). Keine eigene Logik - Kopien laufen auseinander.
+  { name: 'ESL_Start_Mobile.cmd',             zweck: 'NUR Mobilfunk dazuschalten',             pflicht: false },
+  { name: 'ESL_Start_UM.cmd',                 zweck: 'NUR UM dazuschalten',                    pflicht: false },
   // Ohne diese Datei bleibt der Stundenreport im Download-Ordner liegen: das
   // Dashboard kann ihn nur schreiben, verschicken muss ihn Outlook.
   { name: 'esl_mail_report.ps1',              zweck: 'Stundenreport per Outlook verschicken',  pflicht: false },
-  { name: 'Mitarbeiter_IDS_Final_komplett.xlsx', zweck: 'Mitarbeiter-Mapping',                 pflicht: false },
-  { name: 'croco_crawler.js',                 zweck: 'CroCo-Crawler (derzeit abgeschaltet)',   pflicht: false },
+  // Mitarbeiter_IDS_Final_komplett.xlsx ist hier ABSICHTLICH NICHT MEHR gelistet
+  // (12.08., Nutzer-Vorgabe: "hoer auf mir bei updates jedes mal mitarbeiter ids
+  // mit zu generieren - die aktualisierst du eh nicht").
+  // Sie liegt auf dem Zielrechner neben ESL_Start.cmd und wird von dort als
+  // __rcFiles.mapping eingelesen; der Starter braucht sie also weiterhin, nur
+  // das PAKET muss sie nicht jedes Mal mitschleppen. Sie war mit rund 745 KB
+  // Base64 der zweitgroesste Brocken und enthaelt zudem Klarnamen und CCS-IDs
+  // echter Mitarbeiter - was nicht mitreisen muss, gehoert nicht in jeden
+  // Mailanhang. Aendert sich die Mitarbeiterliste wirklich einmal, wird die
+  // Datei einzeln verschickt, nicht ueber das Update-Paket.
+  // Das ECHTE regiocom-Logo fuer Excel-Kopf und Report-Bilder. Optional, weil es
+  // im Entwicklungsordner nicht liegt — auf dem Citrix-Rechner steht es neben
+  // ESL_Start.cmd und wird von dort gelesen. Liegt es hier, reist es mit.
+  { name: 'regiocom.png',                     zweck: 'Logo fuer Excel/Report-Bilder',          pflicht: false },
+  // Startknopf als Lesezeichen — der einzige Weg ins Dashboard, der OHNE
+  // laufenden ESL_Start.cmd auskommt. Gebraucht, weil der Starter sich auf
+  // Citrix regelmaessig an ein schon laufendes Edge haengt; dann greift
+  // Page.addScriptToEvaluateOnNewDocument nicht, der Autopilot fehlt in der
+  // Seite, und es gibt gar keinen Knopf mehr zum Druecken.
+  { name: 'Dashboard_Lesezeichen.html',       zweck: 'Startknopf fuer die Favoritenleiste',    pflicht: false },
   // Recon-Werkzeug. Muss mit aufs Zielsystem, denn dort stehen die Portale, die
   // man aufklaeren will — nicht im Entwicklungsordner.
   { name: 'rc_lupe.js',                       zweck: 'Request-Lupe (Crawler-Bau)',             pflicht: false },
+  // Stufentest gegen get_data.rb: schaltet die vier Aenderungen des Crawlers
+  // einzeln dazu und sagt, welche der Server ablehnt. Hat am 05.08. die
+  // ORA-00936-Ursache in 10 Sekunden gefunden.
+  { name: 'liga_diagnose.js',                 zweck: 'Ligaliste: welcher Parameter kippt?',    pflicht: false },
   { name: 'Ligaliste_Crawler.html',           zweck: 'Abfrage-Baukasten Ligaliste',            pflicht: false }
 ];
 

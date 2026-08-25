@@ -118,17 +118,25 @@ selbst ein Befund für Phase 1, nicht stillschweigend zu ignorieren.
 5. **Zwei nicht synchrone Renderer.** RC_LG und RC_WAR teilen sich NICHTS außer allgemeinen
    Konventionen (window.rc*-Exponierung, IIFE-Stil). Portiere nie stillschweigend eine Änderung
    vom einen ins andere Modul — das ist laut CLAUDE.md eine bewusste Trennung, kein Zufall.
-6. **RAF pausiert in Hintergrund-Tabs.** Test-/Debug-Sessions rufen die Tick-Funktion manuell auf,
-   nicht über echten RAF-Tick warten.
-7. **Nach jeder Änderung**: `node --check esl_live_arena_v22.js`, dann offline testen via
-   `test_dashboard_offline.html` bzw. `test_league_demo.html` (falls vorhanden/aktuell —
-   Fixture-Aktualität selbst prüfen, nicht annehmen).
-8. **Vor dem Lesen von Code**: `graphify query "<Frage>"` nutzen statt `esl_live_arena_v22.js`
-   komplett zu lesen; mit den obigen Zeilen-Ankern per `grep -n` gezielt nachschlagen.
-9. Farbpalette: an `VODAFONE_DESIGN.md` orientieren, wenn das Liga-Rendering vom hellen
-   Vodafone-Design erfasst ist — prüfe das aktuell tatsächlich (das Dokument nennt für RC_WAR
-   explizit dunkel als gewollten TV-Bild-Kontrast; ob RC_LG denselben Ausnahmestatus hat oder dem
-   hellen Standard folgt, ist am Code zu verifizieren, nicht anzunehmen).
+6. **RAF pausiert in Hintergrund-Tabs.** Gemessen: **1 Frame in 504 Sekunden** bei verborgener
+   Seite. Test-/Debug-Sessions rufen die Tick-Funktion manuell auf, nie auf einen echten RAF-Tick
+   warten. Auf einem Wandmonitor mit mehreren Fenstern ist das der Normalfall, nicht der Sonderfall.
+7. **Nach jeder Änderung**: `node --check esl_live_arena_v22.js` und
+   `node pruefwerkzeuge/tdz_pruefen.js` (Sollwert 0). Dann offline testen über den Skill
+   **`run-esl-live-arena`** (`.claude/skills/run-esl-live-arena/driver.mjs`, headless Chrome per
+   CDP) mit **`test_reportbilder.html`** — 520 echte Liga-Agenten plus echter ESL-Tagesexport.
+   **`test_dashboard_offline.html` und `test_league_demo.html` gibt es NICHT mehr** (nur noch im
+   Commit; `git checkout HEAD -- <datei>` holt sie zurück, falls jemand sie wirklich braucht).
+8. **Vor dem Lesen von Code**: `graphify query "<Frage>"` statt `esl_live_arena_v22.js` komplett zu
+   lesen (die Datei hat **25106 Zeilen** und wächst). Anker über **Funktionsnamen** per `grep -n`
+   setzen, nicht über notierte Zeilennummern — die altern innerhalb von Tagen.
+9. **Farbpalette: `VODAFONE_DESIGN.md` ist verbindlich.** Zustände dreistufig — ok `#008A00`,
+   warn `#EB9700`, breach `#E60000`. Standortfarben ausschließlich über `rcChartFarbe(code, i)`
+   bzw. `STANDORT_METADATA` (EINE Farbwahrheit). Die alten regiocom-Farben (`#2C57D2`, `#FF4C02`,
+   `#009864`, `#1F2D3D`, `#FF679B`) sind Legacy und dürfen nicht neu eingesetzt werden.
+   **Das aktive Dashboard-Design ist DUNKEL** (Karten `#1D1D1D` auf `#121212`) — die frühere Frage
+   "hell oder dunkel" ist entschieden; das helle Vodafone-Classic-Theme liegt nur in der
+   Branch-Historie. Das League-"TV-Bild" bleibt ebenfalls bewusst dunkel. Nicht ungefragt aufhellen.
 
 ## Wie du arbeitest
 

@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>Report-Bilder — Offline-Pruefung mit echten Daten</title>
+</head>
+<body style="margin:0;background:#EDEFF2;font:13px Segoe UI,Arial">
+<h3 style="font:600 15px Segoe UI,Arial;margin:12px">Report-Bilder (Stundenmail) — Offline-Pruefung</h3>
+<pre id="log" style="font:12px Consolas,monospace; white-space:pre-wrap; margin:12px"></pre>
+<div id="bilder" style="padding:12px"></div>
+
+<!-- Fake-Portal-Formular, damit das Dashboard eine Umgebung vorfindet -->
+<form id="filterForm" action="/fake-export" onsubmit="return false;">
+    <input class="hasDatepicker" name="filterForm:von_input" value="">
+    <input class="hasDatepicker" name="filterForm:bis_input" value="">
+    <input type="hidden" name="javax.faces.ViewState" value="test">
+</form>
+
+<script>
+window.__log = [];
+function L(s){ window.__log.push(s); document.getElementById('log').textContent = window.__log.join('\n'); }
+(function(){
+    const d = new Date(); const p = n => String(n).padStart(2,'0');
+    const val = p(d.getDate()) + '.' + p(d.getMonth()+1) + '.' + d.getFullYear();
+    document.querySelectorAll('.hasDatepicker').forEach(i => i.value = val);
+    localStorage.removeItem('rcEslHistory');
+})();
+// Download abfangen: das Dashboard legt die PNGs per <a download>.click() ab.
+// Hier sollen sie stattdessen SICHTBAR werden — genau das ist die Pruefung.
+(function(){
+    const echt = HTMLAnchorElement.prototype.click;
+    HTMLAnchorElement.prototype.click = function(){
+        if (this.download && /\.png$/i.test(this.download)) {
+            const box = document.createElement('div');
+            box.style.cssText = 'margin:0 0 22px 0';
+            box.innerHTML = '<div style="font:600 13px Segoe UI,Arial;margin:0 0 6px">' + this.download + '</div>';
+            // Blob sofort sichern: dl() ruft 1,5 s spaeter revokeObjectURL auf,
+            // danach laesst sich die URL nicht mehr lesen.
+            const nm = this.download;
+            fetch(this.href).then(r => r.blob()).then(b => { (window.__blobs = window.__blobs || {})[nm] = b; });
+            const im = new Image(); im.src = this.href;
+            im.style.cssText = 'max-width:100%;border:1px solid #ccc;background:#fff';
+            im.onload = function(){ L('Bild fertig: ' + box.firstChild.textContent + '  ' + im.naturalWidth + ' x ' + im.naturalHeight + ' px'); window.__bilder = (window.__bilder||0) + 1; };
+            box.appendChild(im);
+            document.getElementById('bilder').appendChild(box);
+            return;                                  // NICHT herunterladen
+        }
+        return echt.call(this);
+    };
+})();
+</script>
+
+<script src="node_modules/xlsx/dist/xlsx.full.min.js"></script>
+<script>document.write('<scr'+'ipt src="esl_live_arena_v22.js?t='+Date.now()+'"></scr'+'ipt>');</script>
+
+<script>
+async function los(){
+    if (!window.processDataStream || !window.rcReport) { setTimeout(los, 400); return; }
+
+    const liga = await (await fetch('liga_echt.json')).json();
+    (function(){
+        const ccsMap = {}, stackMap = {}, voMap = {};
+        const STACKS = ['VKD_Tech','MF_Care','VUM_Tech'];
+        liga.forEach(function(k, i){
+            if (!k.ccsId) return;
+            const nr = (k.team || '').toString().slice(-2) || String(80 + (i % 12));
+            const stk = STACKS[i % 3];
+            const team = (stk === 'MF_Care' ? 'MF-CARE-' : stk === 'VUM_Tech' ? 'VUM-TECH-' : 'VKD-TECH-') + nr;
+            ccsMap[String(k.ccsId)] = { name: k.agentName, team: team, standort: k.standort || 'Alanya' };
+            stackMap[team] = stk;
+        });
+        window.rcWcaMapping = { voMap:voMap, ccsMap:ccsMap, standortMap:{}, stackMap:stackMap };
+        L('Mapping gesetzt: ccsMap=' + Object.keys(ccsMap).length);
+    })();
+    window.postMessage({ type:'KPI_BATCH', payload: liga }, '*');
+    L('Liga-Agenten eingespeist: ' + liga.length);
+
+    setTimeout(async function(){
+        const p = n => String(n).padStart(2,'0');
+        const d = new Date();
+        const heute = p(d.getDate())+'.'+p(d.getMonth()+1)+'.'+d.getFullYear();
+        let rows;
+        try {
+            const buf = await (await fetch('Test%20Excels/Export_20260714_205722.xlsx')).arrayBuffer();
+            const wb = window.XLSX.read(new Uint8Array(buf), { type:'array' });
+            rows = window.XLSX.utils.sheet_to_json(wb.Sheets['dataTable'], { header:1, defval:'' });
+        } catch(e){ L('ESL-Export nicht ladbar: ' + e.message); return; }
+        const kopf = rows[0].map(x => String(x).toLowerCase().trim());
+        const iD = kopf.indexOf('datum'), iV = kopf.indexOf('vo_nummer'), iS = kopf.indexOf('standort');
+        const ccsListe = liga.map(k => k.ccsId).filter(Boolean);
+        const proAgent = {};
+        for (let i = 1; i < rows.length; i++) {
+            const alt = String(rows[i][iV] || '');
+            if (!(alt in proAgent)) proAgent[alt] = ccsListe[Object.keys(proAgent).length % ccsListe.length];
+            rows[i][iV] = proAgent[alt];
+            const zeit = String(rows[i][iD] || '').split(' ')[1] || '09:00';
+            rows[i][iD] = heute + ' ' + zeit;
+            const meta = (window.rcWcaMapping.ccsMap || {})[String(rows[i][iV])];
+            if (meta && iS >= 0) rows[i][iS] = meta.standort || rows[i][iS];
+        }
+        window.processDataStream(rows);
+        L('ESL-Export eingespeist: ' + (rows.length-1) + ' Zeilen');
+        setTimeout(malen, 1200);
+    }, 1200);
+}
+
+function malen(){
+    const data = window.rcReport.daten();
+    if (!data || !data.rows) { L('KEINE Report-Daten'); return; }
+    L('Report-Daten: ' + data.rows.length + ' Zeilen, label=' + data.label + ', today=' + data.today);
+    window.rcReport.buildPng('PRUEF-stand', function(n){ L('buildPng -> ' + n); }, data);
+    window.rcReport.buildPngVertrieb('PRUEF', function(n){ L('buildPngVertrieb -> ' + n); }, data);
+}
+setTimeout(los, 1200);
+</script>
+</body>
+</html>

@@ -1,13 +1,18 @@
-# Graph Report - LIVE ARENA  (2026-07-31)
+# Graph Report - LIVE ARENA  (2026-08-22)
 
 ## Corpus Check
-- 69 files · ~1,459,436 words
+- 126 files · ~663,078 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 1345 nodes · 2547 edges · 88 communities (81 shown, 7 thin omitted)
-- Extraction: 99% EXTRACTED · 1% INFERRED · 0% AMBIGUOUS · INFERRED: 38 edges (avg confidence: 0.69)
+- 2462 nodes · 4001 edges · 155 communities (146 shown, 9 thin omitted)
+- Extraction: 98% EXTRACTED · 2% INFERRED · 0% AMBIGUOUS · INFERRED: 67 edges (avg confidence: 0.74)
 - Token cost: 0 input · 0 output
+
+## Graph Freshness
+- Built from commit: `883a4c05`
+- Run `git rev-parse HEAD` and compare to check if the graph is stale.
+- Run `graphify update .` after code changes (no API cost).
 
 ## Community Hubs (Navigation)
 - [[_COMMUNITY_esl_live_arena_v21.js|esl_live_arena_v21.js]]
@@ -16,7 +21,7 @@
 - [[_COMMUNITY_kpi_crawler.js|kpi_crawler.js]]
 - [[_COMMUNITY_ESL_Start.ps1|ESL_Start.ps1]]
 - [[_COMMUNITY_ESL Live-Arena — Projektanweisungen|ESL Live-Arena — Projektanweisungen]]
-- [[_COMMUNITY_rcHarvestEslHistory|rcHarvestEslHistory]]
+- [[_COMMUNITY_Community 6|Community 6]]
 - [[_COMMUNITY_REGIOCOM SALES LEAGUE — Finaler Plan (v1.1, 16.07.2026)|REGIOCOM SALES LEAGUE — Finaler Plan (v1.1, 16.07.2026)]]
 - [[_COMMUNITY_holeExcelVomServer|holeExcelVomServer]]
 - [[_COMMUNITY_rcWarUpdate|rcWarUpdate]]
@@ -62,6 +67,7 @@
 - [[_COMMUNITY_Community 52|Community 52]]
 - [[_COMMUNITY_Community 53|Community 53]]
 - [[_COMMUNITY_Community 54|Community 54]]
+- [[_COMMUNITY_Community 55|Community 55]]
 - [[_COMMUNITY_Community 56|Community 56]]
 - [[_COMMUNITY_Community 57|Community 57]]
 - [[_COMMUNITY_Community 58|Community 58]]
@@ -71,6 +77,7 @@
 - [[_COMMUNITY_Community 62|Community 62]]
 - [[_COMMUNITY_Community 63|Community 63]]
 - [[_COMMUNITY_Community 64|Community 64]]
+- [[_COMMUNITY_Community 65|Community 65]]
 - [[_COMMUNITY_Community 66|Community 66]]
 - [[_COMMUNITY_Community 67|Community 67]]
 - [[_COMMUNITY_Community 70|Community 70]]
@@ -91,30 +98,96 @@
 - [[_COMMUNITY_Community 85|Community 85]]
 - [[_COMMUNITY_Community 86|Community 86]]
 - [[_COMMUNITY_Community 87|Community 87]]
+- [[_COMMUNITY_Community 88|Community 88]]
+- [[_COMMUNITY_Community 89|Community 89]]
+- [[_COMMUNITY_Community 90|Community 90]]
+- [[_COMMUNITY_Community 91|Community 91]]
+- [[_COMMUNITY_Community 92|Community 92]]
+- [[_COMMUNITY_Community 93|Community 93]]
+- [[_COMMUNITY_Community 94|Community 94]]
+- [[_COMMUNITY_Community 95|Community 95]]
+- [[_COMMUNITY_Community 96|Community 96]]
+- [[_COMMUNITY_Community 97|Community 97]]
+- [[_COMMUNITY_Community 98|Community 98]]
+- [[_COMMUNITY_Community 99|Community 99]]
+- [[_COMMUNITY_Community 100|Community 100]]
+- [[_COMMUNITY_Community 101|Community 101]]
+- [[_COMMUNITY_Community 102|Community 102]]
+- [[_COMMUNITY_Community 103|Community 103]]
+- [[_COMMUNITY_Community 104|Community 104]]
+- [[_COMMUNITY_Community 106|Community 106]]
+- [[_COMMUNITY_Community 107|Community 107]]
+- [[_COMMUNITY_Community 108|Community 108]]
+- [[_COMMUNITY_Community 109|Community 109]]
+- [[_COMMUNITY_Community 110|Community 110]]
+- [[_COMMUNITY_Community 111|Community 111]]
+- [[_COMMUNITY_Community 112|Community 112]]
+- [[_COMMUNITY_Community 113|Community 113]]
+- [[_COMMUNITY_Community 114|Community 114]]
+- [[_COMMUNITY_Community 115|Community 115]]
+- [[_COMMUNITY_Community 116|Community 116]]
+- [[_COMMUNITY_Community 117|Community 117]]
+- [[_COMMUNITY_Community 118|Community 118]]
+- [[_COMMUNITY_Community 119|Community 119]]
+- [[_COMMUNITY_Community 120|Community 120]]
+- [[_COMMUNITY_Community 121|Community 121]]
+- [[_COMMUNITY_Community 122|Community 122]]
+- [[_COMMUNITY_Community 123|Community 123]]
+- [[_COMMUNITY_Community 124|Community 124]]
+- [[_COMMUNITY_Community 125|Community 125]]
+- [[_COMMUNITY_Community 126|Community 126]]
+- [[_COMMUNITY_Community 127|Community 127]]
+- [[_COMMUNITY_Community 128|Community 128]]
+- [[_COMMUNITY_Community 129|Community 129]]
+- [[_COMMUNITY_Community 130|Community 130]]
+- [[_COMMUNITY_Community 131|Community 131]]
+- [[_COMMUNITY_Community 132|Community 132]]
+- [[_COMMUNITY_Community 133|Community 133]]
+- [[_COMMUNITY_Community 134|Community 134]]
+- [[_COMMUNITY_Community 135|Community 135]]
+- [[_COMMUNITY_Community 136|Community 136]]
+- [[_COMMUNITY_Community 137|Community 137]]
+- [[_COMMUNITY_Community 138|Community 138]]
+- [[_COMMUNITY_Community 139|Community 139]]
+- [[_COMMUNITY_Community 140|Community 140]]
+- [[_COMMUNITY_Community 141|Community 141]]
+- [[_COMMUNITY_Community 142|Community 142]]
+- [[_COMMUNITY_Community 143|Community 143]]
+- [[_COMMUNITY_Community 144|Community 144]]
+- [[_COMMUNITY_Community 145|Community 145]]
+- [[_COMMUNITY_Community 146|Community 146]]
+- [[_COMMUNITY_Community 147|Community 147]]
+- [[_COMMUNITY_Community 148|Community 148]]
+- [[_COMMUNITY_Community 149|Community 149]]
+- [[_COMMUNITY_Community 150|Community 150]]
+- [[_COMMUNITY_Community 151|Community 151]]
+- [[_COMMUNITY_Community 152|Community 152]]
+- [[_COMMUNITY_Community 153|Community 153]]
+- [[_COMMUNITY_Community 154|Community 154]]
 
 ## God Nodes (most connected - your core abstractions)
-1. `el()` - 44 edges
+1. `el()` - 42 edges
 2. `Wie dein Arbeitsalltag ab jetzt aussieht:` - 38 edges
 3. `3\. Der Native Notification-Trigger (Audio- & Visual-Alert bei Sales)` - 30 edges
-4. `esc()` - 25 edges
-5. `save()` - 23 edges
-6. `restore()` - 23 edges
-7. `Branch • Enterprise Offline Dashboard Tricks` - 23 edges
-8. `wireBody()` - 20 edges
-9. `fuelle()` - 18 edges
-10. `paint()` - 18 edges
+4. `save()` - 27 edges
+5. `esc()` - 27 edges
+6. `wireBody()` - 25 edges
+7. `Sende()` - 23 edges
+8. `Branch • Enterprise Offline Dashboard Tricks` - 23 edges
+9. `Empfange()` - 21 edges
+10. `pad2()` - 21 edges
 
 ## Surprising Connections (you probably didn't know these)
-- `spalte()` --calls--> `norm()`  [INFERRED]
-  croco_crawler.js → esl_autopilot.user.js
-- `findeSpalte()` --calls--> `norm()`  [INFERRED]
-  croco_tuner.js → esl_autopilot.user.js
-- `rcRangeLoad()` --calls--> `setStatus()`  [INFERRED]
-  esl_live_arena_v22.js → croco_tuner.js
+- `bannerAction()` --calls--> `fn`  [INFERRED]
+  esl_autopilot.user.js → pruefwerkzeuge/starter_einstellungen_pruefen.js
 - `renderBody()` --indirect_call--> `vis()`  [INFERRED]
   esl_live_arena_v22.js → esl_autopilot.user.js
 - `pickExportView()` --indirect_call--> `el()`  [INFERRED]
   esl_autopilot.user.js → esl_live_arena_v22.js
+- `bannerAction()` --calls--> `fn`  [INFERRED]
+  esl_autopilot_mobile.user.js → pruefwerkzeuge/starter_einstellungen_pruefen.js
+- `bannerAction()` --calls--> `fn`  [INFERRED]
+  esl_autopilot_um.user.js → pruefwerkzeuge/starter_einstellungen_pruefen.js
 
 ## Import Cycles
 - None detected.
@@ -125,7 +198,7 @@
 - **Alle Regiocom Standorte** — esl_live_standort_alanya, esl_live_standort_serres, esl_live_standort_alexandroupolis, esl_live_standort_berlin, esl_live_standort_potsdam, esl_live_standort_essen, esl_live_standort_zeitwert, esl_live_standort_neubrandenburg, esl_live_standort_sakarya [EXTRACTED 1.00]
 - **Agent Identity Mapping (CCS-ID → VO-Nummer → Standort)** — esl_live_mitarbeiternamen_ccs_id, esl_live_mitarbeiternamen_vo_nummer, esl_live_mitarbeiternamen_schema [EXTRACTED 1.00]
 
-## Communities (88 total, 7 thin omitted)
+## Communities (155 total, 9 thin omitted)
 
 ### Community 0 - "esl_live_arena_v21.js"
 Cohesion: 0.12
@@ -137,23 +210,23 @@ Nodes (41): Multi-Monitor BroadcastChannel Pattern (Offline Dashboard), Citrix P
 
 ### Community 2 - "esl_live_arena_v22.js"
 Cohesion: 0.03
-Nodes (43): ageDaysOf(), animateCount(), baseDate(), classifyOrder(), D(), decorate(), findHeaderRow(), flatSheet() (+35 more)
+Nodes (58): animateCount(), ckAgenten(), einheiten(), keyOf(), layMigrieren(), load(), loadCfg(), mbBalken() (+50 more)
 
 ### Community 3 - "kpi_crawler.js"
-Cohesion: 0.11
-Nodes (48): alleStandorte(), alleStandorteAn(), buildColumnMap(), cellNum(), cellText(), cleanText(), currentDaterange(), datumKey() (+40 more)
+Cohesion: 0.08
+Nodes (70): alleStandorte(), alleStandorteAn(), autoKlickAn(), autoKlickJetzt(), autoKlickPlanen(), autoWochenlaufAn(), baueAbfrage(), baumAusBody() (+62 more)
 
 ### Community 4 - "ESL_Start.ps1"
-Cohesion: 0.20
-Nodes (27): BegleiteZweitenTab(), EinAnmeldeVersuch(), Empfange(), EslAnmeldungAbschicken(), Fehler(), Gut(), HilfMsAnmeldung(), KlickAuf() (+19 more)
+Cohesion: 0.13
+Nodes (52): AlsJsText(), AmDashboard(), AnkerAntwort(), AnkerDialogPruefen(), AnkerLoesen(), AnkerSaugen(), AnkerSetzen(), BegleiteZweitenTab() (+44 more)
 
 ### Community 5 - "ESL Live-Arena — Projektanweisungen"
-Cohesion: 0.06
-Nodes (27): Harte Leitplanken für dieses Modul, Wie du arbeitest, Wo der Code sitzt (esl_live_arena_v22.js, aktuelle Zeilen — bei Änderungen mit grep neu verifizieren), Zwingende Reihenfolge: Erst kritisch prüfen, dann kreativ werden, Aktueller Stand (v22, Juli 2026), Architektur / Cross-Origin, Automatische Neuanmeldung nach Sitzungsablauf (31.07.), Datenformate (aus echten Exporten verifiziert) (+19 more)
+Cohesion: 0.11
+Nodes (18): Aktueller Stand (Kurzfassung, v22, August 2026), Architektur / Cross-Origin, Automatische Neuanmeldung nach Sitzungsablauf (31.07.), Datenformate (aus echten Exporten verifiziert), Drei ESL-Projekte (Kabel / Mobile / UM, 31.07.), Ein-Klick-Abruf nach Datum (Liga + ESL, 04.08.), ESL Live-Arena — Projektanweisungen, Funktions-Landkarte (grep-Anker in v22.js) (+10 more)
 
-### Community 6 - "rcHarvestEslHistory"
-Cohesion: 0.08
-Nodes (38): classify(), eslOf(), eslOfDay(), handleKpiMessage(), ingestKpi(), ligaOf(), ligaOfDay(), normalizeStandort() (+30 more)
+### Community 6 - "Community 6"
+Cohesion: 0.15
+Nodes (16): abschnitt(), baueAutoKlick(), baueVerwerter(), fs, KABEL_WOCHE, konst(), log(), MOBILE_WOCHE (+8 more)
 
 ### Community 7 - "REGIOCOM SALES LEAGUE — Finaler Plan (v1.1, 16.07.2026)"
 Cohesion: 0.10
@@ -164,40 +237,40 @@ Cohesion: 0.15
 Nodes (11): baueUmgebung(), ctx, DATEI, ergebnis, fs, halterAlt, macheSelect(), path (+3 more)
 
 ### Community 9 - "rcWarUpdate"
-Cohesion: 0.14
-Nodes (27): end(), _pickPair(), rcWarAddFeed(), rcWarAddFx(), rcWarApplyDayState(), rcWarBoteChip(), rcWarChronik(), rcWarCinema() (+19 more)
+Cohesion: 0.08
+Nodes (26): auto, bannerBlock, bauen, CFG_KABEL, cmd, cmdMU, dash, definierteNamen() (+18 more)
 
 ### Community 10 - "getFlagSvg"
 Cohesion: 0.13
 Nodes (20): addTicker(), getFlagSvg(), processCelebrationQueue(), queueCelebration(), rankClass(), rcCkBntSum(), rcCkFilters(), rcCkGesamt() (+12 more)
 
 ### Community 17 - "package.json"
-Cohesion: 0.12
-Nodes (38): aggregiere(), aktualisiereExportInfo(), aktuelleParams(), bauePanel(), baueUrl(), dateiDownload(), dateiName(), datumKey() (+30 more)
+Cohesion: 0.29
+Nodes (5): CMD, dash, fs, path, s
 
 ### Community 18 - "setOrders"
-Cohesion: 0.20
-Nodes (9): block, CMD, fs, i, kopf, path, PS1, roh (+1 more)
+Cohesion: 0.08
+Nodes (35): handleKpiMessage(), holeExcelVomServer(), ingestKpi(), rcDriftNachholen(), rcEigenesProjekt(), rcEslErfolg(), rcEslFehlschlag(), rcExportAnsichtSicherstellen() (+27 more)
 
 ### Community 19 - "restore"
-Cohesion: 0.12
-Nodes (38): classifyStatus(), rcLgAgentGoals(), rcLgAmbient(), rcLgBall(), rcLgBanner(), rcLgBigBall(), rcLgBigMan(), rcLgCineDraw() (+30 more)
+Cohesion: 0.10
+Nodes (19): abw, alleKeys, anders, bauen, fs, GEMESSEN, i, ist (+11 more)
 
 ### Community 20 - "esl_autopilot.user.js"
-Cohesion: 0.22
-Nodes (26): aufRichtigemProjekt(), banner(), bannerAction(), bannerEl(), byText(), ccsFlow(), click(), eslFlow() (+18 more)
+Cohesion: 0.17
+Nodes (33): aufSollProjekt(), banner(), bannerAction(), bannerEl(), byText(), ccsFlow(), click(), eslFlow() (+25 more)
 
 ### Community 21 - "wireBody"
-Cohesion: 0.09
-Nodes (37): applyAllCustom(), applyCustomStructure(), applyLayout(), applyRadar(), boot(), customFields(), discover(), enforceOrder() (+29 more)
+Cohesion: 0.07
+Nodes (55): applyAllCustom(), applyCustomStructure(), applyRadar(), boot(), breiteNative(), custHoehe(), discover(), dockAnwenden() (+47 more)
 
 ### Community 22 - "buildHtml"
 Cohesion: 0.12
 Nodes (38): absolut(), alleZeigen(), aufAktion(), bauen(), beimVerlassen(), bodyText(), codeFuer(), codeZeigen() (+30 more)
 
 ### Community 25 - "rcCarouselShow"
-Cohesion: 0.22
-Nodes (26): aufRichtigemProjekt(), banner(), bannerAction(), bannerEl(), byText(), ccsFlow(), click(), eslFlow() (+18 more)
+Cohesion: 0.17
+Nodes (33): aufSollProjekt(), banner(), bannerAction(), bannerEl(), byText(), ccsFlow(), click(), eslFlow() (+25 more)
 
 ### Community 26 - "makeOrder"
 Cohesion: 0.13
@@ -208,8 +281,8 @@ Cohesion: 0.05
 Nodes (38): 1\. `contenteditable` (Der Text-Editor), 1\. Das Prinzip: Der Tab muss existieren, darf aber im Hintergrund sein, 1\. DOM-Parsing / Scraping (Der Datensauger), 1\. Sie nutzen denselben Browser-Prozess (Same-Origin-Policy), 1\. YouTube (Video-Tutorials & Live-Coding), 2\. DOM-Overwriting / Page Hijacking (Deine Dashboard-Methode), 2\. DOM-Overwriting / Page Hijacking (Die Verwandlung), 2\. Entwickler-Blogs & Plattformen (Code-Beispiele) (+30 more)
 
 ### Community 28 - "rcCkGesamt"
-Cohesion: 0.13
-Nodes (34): aktiveFilter(), alleStatIds(), archiviere(), auswahlLesen(), baueStand(), baueUrl(), bucketKey(), fcFuer() (+26 more)
+Cohesion: 0.12
+Nodes (37): aktiveFilter(), alleStatIds(), archiviere(), auswahlLesen(), auswahlSchreiben(), baueStand(), baueUrl(), bucketKey() (+29 more)
 
 ### Community 29 - "Community 29"
 Cohesion: 0.07
@@ -220,24 +293,24 @@ Cohesion: 0.11
 Nodes (18): **Ansprache-Quote (berechnet):**, Architektur, **Bookmarklet 1: ESL-Dashboard**, **Bookmarklet 2: KPI-Crawler**, Bookmarklets (optional), Einsatz-Anleitung, 🚀 ESL Live-Arena v21 + KPI-Website Integration via BroadcastChannel, Fragen? (+10 more)
 
 ### Community 31 - "Community 31"
-Cohesion: 0.08
-Nodes (50): abfrageListe(), auswahlAbgleichen(), baueAnsageLeiste(), beobachteSeite(), buildShell(), closeCfg(), el(), ensureCrocoPage() (+42 more)
+Cohesion: 0.06
+Nodes (30): agg, aggFn, bntTeile, bSt, code, fnPT, fs, koerperAccum (+22 more)
 
 ### Community 32 - "Community 32"
-Cohesion: 0.12
-Nodes (28): ansageAus(), baueGeruest(), bewerte(), delta(), einblenden(), ensureGlobalBanner(), fmt(), fuelle() (+20 more)
+Cohesion: 0.06
+Nodes (29): API, arten, blockDoppelt, ECHT, ECHT_CR, env, ersteKern, erstesNichtKern (+21 more)
 
 ### Community 33 - "Community 33"
 Cohesion: 0.15
 Nodes (12): Accessibility, Anti-patterns, Core rules, Easing defaults, Motion design principles, Performance, Reference files, Spatial and sequencing (+4 more)
 
 ### Community 34 - "Community 34"
-Cohesion: 0.22
-Nodes (11): detectDataIssues(), holeExcelVomServer(), rcDlgVisible(), rcJq(), rcKeepAliveTick(), rcNowStamp(), rcSessionBanner(), rcSessionLost() (+3 more)
+Cohesion: 0.06
+Nodes (29): buildHtmlSrc, buildRepSrc, buildXlsxSrc, c1, c2, c3, c4, CFG (+21 more)
 
 ### Community 35 - "Community 35"
-Cohesion: 0.17
-Nodes (18): aggregat(), archiviere(), baueUrl(), datumKey(), hole(), isoTag(), jetzt(), lade() (+10 more)
+Cohesion: 0.09
+Nodes (22): abschnitt(), agg, al, baue(), baueXLStub(), colName(), DATA, enc() (+14 more)
 
 ### Community 36 - "Community 36"
 Cohesion: 0.15
@@ -311,9 +384,13 @@ Nodes (5): Contents, Contextual Animations, Contextual icon swaps, Subtle exit a
 Cohesion: 0.33
 Nodes (5): Animation Review Format, Before/After/Why table, Component design principles, Debugging animations, Review checklist
 
+### Community 55 - "Community 55"
+Cohesion: 0.07
+Nodes (48): heroName(), rcLgAmbient(), rcLgBall(), rcLgBanner(), rcLgBigBall(), rcLgBigMan(), rcLgCineBg(), rcLgCineDraw() (+40 more)
+
 ### Community 56 - "Community 56"
-Cohesion: 0.29
-Nodes (6): Berichtsformat, Leitplanken, Prüfkatalog — was hier erfahrungsgemäß schiefgeht, Schweregrade, Warum dieses Projekt besondere Prüfung braucht, Zwingende Reihenfolge
+Cohesion: 0.22
+Nodes (8): Berichtsformat, Die Methodik, die sich bewährt hat: Vollabgleich gegen die Originalquellen, Leitplanken, Prüfkatalog — was hier erfahrungsgemäß schiefgeht, Schweregrade, Verhältnis zu den 48 Prüfwerkzeugen, Warum dieses Projekt besondere Prüfung braucht, Zwingende Reihenfolge
 
 ### Community 57 - "Community 57"
 Cohesion: 0.33
@@ -324,20 +401,20 @@ Cohesion: 0.33
 Nodes (5): Design-System als Quelle der Wahrheit, Harte Leitplanken, Verfügbare Skills nutzen, Wie du arbeitest, Zwingende Reihenfolge
 
 ### Community 59 - "Community 59"
-Cohesion: 0.40
-Nodes (4): Harte Leitplanken, Wie du arbeitest, Wo der Code sitzt, Zwingende Reihenfolge
+Cohesion: 0.12
+Nodes (22): agentMailHref(), fmtAht(), fmtSekKurz(), rcAggTeams(), rcB64ZuBytes(), rcBuildAbdeckungSheet(), rcBuildAnalyseSheets(), rcBuildProdukteSheet() (+14 more)
 
 ### Community 60 - "Community 60"
-Cohesion: 0.40
-Nodes (4): Harte Leitplanken, Wie du arbeitest, Wo der Code sitzt (esl_live_arena_v22.js, bei Änderungen mit grep neu verifizieren), Zwingende Reihenfolge
+Cohesion: 0.20
+Nodes (9): Arbeitsweise, Das Ehrlichkeits-Blatt (nicht wegoptimieren), Die harte Regel dieses Moduls, die über allem steht, Die Mailkette, Die vier Rechenfehler, die hier schon einmal drin waren, Die zwei Report-Bilder (gemalt, nicht fotografiert), Leitplanken, Was ausgeliefert wird (Stand heute) (+1 more)
 
 ### Community 61 - "Community 61"
-Cohesion: 0.14
-Nodes (12): ALLE_STANDORTE, baueUmgebung(), ctx, DATEI, ECHTER_RUMPF, fs, macheSelect(), mitschnitt (+4 more)
+Cohesion: 0.13
+Nodes (15): ALLE_STANDORTE, baueUmgebung(), ctx, DATEI, ECHTER_RUMPF, frisch(), fs, macheSelect() (+7 more)
 
 ### Community 62 - "Community 62"
-Cohesion: 0.50
-Nodes (3): Bekannte Fallstricke dieses Feldes (nicht erneut hineinlaufen), Leitplanken, Zwingender Arbeitsablauf
+Cohesion: 0.21
+Nodes (17): esc(), fmt(), fuelle(), kachel(), lead(), mbHeat(), mbTabelle(), mmss() (+9 more)
 
 ### Community 63 - "Community 63"
 Cohesion: 0.33
@@ -348,8 +425,8 @@ Cohesion: 0.15
 Nodes (9): crypto, DATEIEN, fs, geladen, gesamt, jetzt, nutzdaten, path (+1 more)
 
 ### Community 66 - "Community 66"
-Cohesion: 0.15
-Nodes (18): pad2(), rcAggTeams(), rcBandBreiten(), rcBuildAbdeckungSheet(), rcBuildAnalyseSheets(), rcBuildSalesSheet(), rcBuildStandSheets(), rcDatumKurz() (+10 more)
+Cohesion: 0.05
+Nodes (37): agg, aggFalsch, AL, ALfalsch, ALnba, API, APIall, APIfalsch (+29 more)
 
 ### Community 67 - "Community 67"
 Cohesion: 0.17
@@ -364,12 +441,12 @@ Cohesion: 0.40
 Nodes (4): dekl, fs, treffer, zeilen
 
 ### Community 72 - "Community 72"
-Cohesion: 0.22
-Nodes (26): aufRichtigemProjekt(), banner(), bannerAction(), bannerEl(), byText(), ccsFlow(), click(), eslFlow() (+18 more)
+Cohesion: 0.17
+Nodes (33): aufSollProjekt(), banner(), bannerAction(), bannerEl(), byText(), ccsFlow(), click(), eslFlow() (+25 more)
 
 ### Community 73 - "Community 73"
-Cohesion: 0.10
-Nodes (17): dets, fs, gruppe, I, kpis, leaf, mitBasis, neuts (+9 more)
+Cohesion: 0.20
+Nodes (8): dash, fs, helferTxt, heute, lade(), path, schneide(), WURZEL
 
 ### Community 74 - "Community 74"
 Cohesion: 0.40
@@ -392,8 +469,8 @@ Cohesion: 0.67
 Nodes (3): Weg A: Der "Master-Tab" auf dem Netzlaufwerk (Lokale HTML), Weg B: Das "Couch-Potato"-Widget im CCS-Tab, Wie bringst du die Daten auf einem einzigen Dashboard zusammen?
 
 ### Community 79 - "Community 79"
-Cohesion: 0.27
-Nodes (10): computeStats(), crocoToast(), normK(), onNewStornoConflict(), persist(), recompute(), reconcile(), setOrders() (+2 more)
+Cohesion: 0.12
+Nodes (13): auto, benutzt, BLOCK, cmd, dash, erlaubt, ERWARTET, fremd (+5 more)
 
 ### Community 80 - "Community 80"
 Cohesion: 0.33
@@ -404,43 +481,303 @@ Cohesion: 0.14
 Nodes (11): agenten, byAgent, d, EXPORT, fs, gruppen, ix, path (+3 more)
 
 ### Community 82 - "Community 82"
-Cohesion: 0.18
-Nodes (10): author, description, keywords, license, main, name, scripts, test (+2 more)
+Cohesion: 0.06
+Nodes (57): ampZelle(), band(), bereichText(), buildHtml(), buildPng(), buildPngVertrieb(), buildReportingXlsx(), buildXlsx() (+49 more)
 
 ### Community 83 - "Community 83"
-Cohesion: 0.10
-Nodes (26): buildHtml(), buildPng(), buildXlsx(), collect(), dl(), download(), pad(), rcB64ZuBytes() (+18 more)
+Cohesion: 0.18
+Nodes (9): AUS_DEM_LOG, cmd, ECHTE_PORTALE, fs, neuErlaubt(), path, psLike(), SONSTIGE_INTERNE (+1 more)
 
 ### Community 84 - "Community 84"
-Cohesion: 0.20
-Nodes (9): alle, ap, dash, fs, keyFuer(), kuerzelFuer(), ORDNER, path (+1 more)
+Cohesion: 0.17
+Nodes (11): alle, ap, dash, erlaubt, fs, keyFuer(), kuerzelFuer(), ORDNER (+3 more)
 
 ### Community 86 - "Community 86"
 Cohesion: 0.40
 Nodes (4): fs, MASTER, path, VARIANTEN
 
 ### Community 87 - "Community 87"
+Cohesion: 0.18
+Nodes (8): craw, dash, fs, handleCmd, jetzt, ORD, path, poll
+
+### Community 88 - "Community 88"
+Cohesion: 0.14
+Nodes (26): end(), _pickPair(), rcWarAddFeed(), rcWarAddFx(), rcWarApplyDayState(), rcWarBoteChip(), rcWarChronik(), rcWarCinema() (+18 more)
+
+### Community 89 - "Community 89"
+Cohesion: 0.11
+Nodes (16): ALLE_TEXTE, bcBis, bcVon, bis, crawler, ERLAUBT, fs, mqBis (+8 more)
+
+### Community 90 - "Community 90"
+Cohesion: 0.15
+Nodes (13): 1. Start — ein PC, ein Projekt, 2. Ligaliste — läuft seit 16.08. von selbst an, 3. Dashboard-Takt, 4. Excel-Export, 5. Reporting über alle drei Projekte — Achtung, Praxis-Hinweis, 6. Mail-Automatik — ab Werk AUS, 7. Kurz-Referenz Konsole, 8. Wenn etwas nicht stimmt (+5 more)
+
+### Community 91 - "Community 91"
+Cohesion: 0.09
+Nodes (16): API, figMatch, fs, GRUPPEN, gruppenKopf, kpis, leafKopf, NAMEN (+8 more)
+
+### Community 92 - "Community 92"
+Cohesion: 0.17
+Nodes (9): ap, bundle, code, fs, path, src, starter, WURZEL (+1 more)
+
+### Community 93 - "Community 93"
+Cohesion: 0.15
+Nodes (14): AP, bauAutopilotSeite(), bauSeite(), dashSrc, El(), fehlschlagSrc, fs, kind() (+6 more)
+
+### Community 94 - "Community 94"
+Cohesion: 0.06
+Nodes (28): behandelt, daneben, EXCELDIR, fensterStub, fs, geladen, idxBis, idxBlock (+20 more)
+
+### Community 95 - "Community 95"
+Cohesion: 0.12
+Nodes (9): args, block, blockStart, cmd, dash, fs, kaputt, path (+1 more)
+
+### Community 97 - "Community 97"
+Cohesion: 0.10
+Nodes (16): API, B, ctx, fs, heuteKey, konst, path, r (+8 more)
+
+### Community 98 - "Community 98"
+Cohesion: 0.11
+Nodes (15): ank2, anker, ANM, CMD, DASH, dt, fs, gm (+7 more)
+
+### Community 99 - "Community 99"
+Cohesion: 0.10
+Nodes (17): bauer, craw, dash, fnAlter, fnTick, fs, gesternK, heuteK (+9 more)
+
+### Community 100 - "Community 100"
+Cohesion: 0.20
+Nodes (6): dash, fs, kpi, liga, path, W
+
+### Community 101 - "Community 101"
+Cohesion: 0.11
+Nodes (10): baueBuehne(), baueEngine(), dragBlock, El(), fs, groesseBlock, karte(), path (+2 more)
+
+### Community 102 - "Community 102"
+Cohesion: 0.14
+Nodes (7): echteHelfer, fs, ix, path, rcAccumRow, src, WURZEL
+
+### Community 103 - "Community 103"
+Cohesion: 0.11
+Nodes (13): auto, cmd, cmdMU, dash, erkennen, fs, gleich(), gm (+5 more)
+
+### Community 104 - "Community 104"
+Cohesion: 0.12
+Nodes (15): Checklist, Game Assets Enhancement, Manifest order that works, Parallax rules, Phase 0 — Audit (existing codebase only), Phase 1 — Style guide, Phase 2 — Asset generation pipeline (fal.ai MCP), Phase 3 — Scene construction & parallax (+7 more)
+
+### Community 106 - "Community 106"
+Cohesion: 0.14
+Nodes (9): cmd, fs, iBlock, iPruef, iSenden, iSetzen, kpi, path (+1 more)
+
+### Community 107 - "Community 107"
+Cohesion: 0.15
+Nodes (6): auto, AUTOS, dash, fs, path, WURZEL
+
+### Community 108 - "Community 108"
+Cohesion: 0.11
+Nodes (17): f, baueUmgebung(), baueUmgebung(), baueLogbuch(), baueMitternacht(), baueWaechter(), BEREICH, fs (+9 more)
+
+### Community 109 - "Community 109"
+Cohesion: 0.17
+Nodes (9): EDGE, http, kind, os, path, probe(), PROFIL, sende() (+1 more)
+
+### Community 110 - "Community 110"
+Cohesion: 0.11
+Nodes (8): cmd, craw, fs, mail, nackt, path, src, WURZEL
+
+### Community 111 - "Community 111"
 Cohesion: 0.29
-Nodes (8): on(), rcAutoScrollArm(), rcCarouselAdvance(), rcCarouselShow(), rcCarouselSyncTitle(), rcMarkFilters(), updateStackFilterOptions(), updateTeamFilter()
+Nodes (3): `liga_nach_crawlerformat.js` — echte Ligalisten-Daten zum Testen, Prüfwerkzeuge, `tdz_pruefen.js` — findet Helfer, die zu früh benutzt werden
+
+### Community 112 - "Community 112"
+Cohesion: 0.17
+Nodes (11): ANHANG: ANFRAGEFORMAT FÜR DEN NUTZER, ANTWORTFORMAT, ARBEITSMODUS: DREI PHASEN, STRIKTE REIHENFOLGE, BETRIEBSUMGEBUNG (nicht verhandelbar), BOOKMARKLET-REGELN, DASHBOARD-STANDARD, DATENHYGIENE, DATENKONTRAKT (+3 more)
+
+### Community 113 - "Community 113"
+Cohesion: 0.24
+Nodes (12): DATEIEN, el(), fs, path, pruef(), sandkasten(), schneide(), SOLL (+4 more)
+
+### Community 114 - "Community 114"
+Cohesion: 0.29
+Nodes (7): 1. Kern-Token (CSS Custom Properties in v22.js, `:root`), 2. Semantik (KPI-Zustände) — NICHT mehr monochrom, 3. Kategoriale Daten-Palette (Standort-gebunden, validiert), 4. Komponenten, 5. Radar / RC_WAR — zwei Skins, 6. Harte Regeln, Vodafone Classic — Design-Spezifikation (ESL Live-Arena v22)
+
+### Community 115 - "Community 115"
+Cohesion: 0.40
+Nodes (4): Harte Leitplanken für dieses Modul, Wie du arbeitest, Wo der Code sitzt (esl_live_arena_v22.js, aktuelle Zeilen — bei Änderungen mit grep neu verifizieren), Zwingende Reihenfolge: Erst kritisch prüfen, dann kreativ werden
+
+### Community 116 - "Community 116"
+Cohesion: 0.40
+Nodes (5): 1. Erst denken, dann coden, 2. Einfachheit zuerst, 3. Chirurgische Änderungen, 4. Zielgetriebene Umsetzung, Karpathy-Guidelines (Verhaltensregeln gegen typische LLM-Coding-Fehler)
+
+### Community 117 - "Community 117"
+Cohesion: 0.40
+Nodes (4): Aktueller Stand — vollständiges Protokoll (v22, August 2026), ESL Live-Arena — Historie (Detailprotokoll), Kritische Fallstricke — ausführliche Begründungen, ⚠ PRÜFSTAND: alles vom 06.08. ist NUR OFFLINE geprüft, NICHT am Portal
+
+### Community 118 - "Community 118"
+Cohesion: 0.22
+Nodes (8): Bewegungs-Regeln (Juice), Call-Center-Arena — Style-Guide (nach Game-Assets-Enhancer-Skill), Ebenen-Stapel (hinten nach vorn, Parallaxe-Faktor bei Kamera-Schwenk), Fokus-Hierarchie, Licht, Palette (mit Aufgabe), Sprite-Manifest (jedes Teil einzeln gezeichnet), Stilsatz
+
+### Community 119 - "Community 119"
+Cohesion: 0.25
+Nodes (7): 🎨 Game Assets Enhancer — a Claude Code skill, Installation, License, Notes & limitations, Requirements, Usage, What it actually does
+
+### Community 120 - "Community 120"
+Cohesion: 0.12
+Nodes (13): bis, CMD, CRAWLER, fetchZweig, fs, ladenFn, ligaI, path (+5 more)
+
+### Community 121 - "Community 121"
+Cohesion: 0.17
+Nodes (9): AUTO, CMD, fs, kern, maskeEnde, maskeI, path, PS1 (+1 more)
+
+### Community 122 - "Community 122"
+Cohesion: 0.12
+Nodes (21): pad2(), rcDatumKurz(), rcDetailDays(), rcDrift(), rcDriftJetzt(), rcDriftLageNeu(), rcDriftNachholenAnmelden(), rcDriftPruefen() (+13 more)
+
+### Community 123 - "Community 123"
+Cohesion: 0.18
+Nodes (7): aggFn, anspE, fs, funnelE, path, SRC, trendE
+
+### Community 124 - "Community 124"
+Cohesion: 0.11
+Nodes (22): customFields(), D(), mbAgenten(), mbAgentenFrei(), mbAgentIn(), mbEinheiten(), mbKennListe(), mbKopf() (+14 more)
+
+### Community 125 - "Community 125"
+Cohesion: 0.18
+Nodes (8): applyFn, farbeFn, fs, numZoom, path, SRC, zoomM, zoomP
+
+### Community 126 - "Community 126"
+Cohesion: 0.20
+Nodes (8): baueUmgebung(), bis, fs, path, plainM, rckeyM, SRC, von
+
+### Community 127 - "Community 127"
+Cohesion: 0.14
+Nodes (10): FELDTYPEN, fs, mbWert, mitVerbot, modScope, NEUE, ohne, path (+2 more)
+
+### Community 128 - "Community 128"
+Cohesion: 0.29
+Nodes (5): bis, fs, path, SRC, von
+
+### Community 129 - "Community 129"
+Cohesion: 0.33
+Nodes (7): abfrageListe(), auswahlAbgleichen(), leseCfg(), sendeAbfrage(), setRotation(), zeilenZuText(), lies()
+
+### Community 130 - "Community 130"
+Cohesion: 0.22
+Nodes (14): ensureQueuePage(), faerbe(), hoechsteSchwelle(), hoechsteWzSchwelle(), naechsteStufe(), num1(), paint(), reduced() (+6 more)
+
+### Community 131 - "Community 131"
+Cohesion: 0.18
+Nodes (10): author, description, keywords, license, main, name, scripts, test (+2 more)
+
+### Community 132 - "Community 132"
+Cohesion: 0.18
+Nodes (18): closeCfg(), el(), enforceOrder(), ensureModal(), fuelleCfg(), openCfg(), queueAbraeumen(), rangSelect() (+10 more)
+
+### Community 133 - "Community 133"
+Cohesion: 0.05
+Nodes (40): baueUmgebung(), codeNurs, ECHT, fs, gleich(), h1, h2, hFrei (+32 more)
+
+### Community 134 - "Community 134"
+Cohesion: 0.17
+Nodes (6): cmd, fs, lese, path, src, WURZEL
+
+### Community 135 - "Community 135"
+Cohesion: 0.12
+Nodes (17): detectDataIssues(), getPortalDateRange(), rcAutoRotSyncBtns(), rcAutoRotToggleQuali(), rcDlgVisible(), rcIstLeitungsSeite(), rcJq(), rcKeepAliveTick() (+9 more)
+
+### Community 136 - "Community 136"
+Cohesion: 0.14
+Nodes (15): baueGeruest(), beobachteSeite(), bewerte(), ensureGlobalBanner(), ensureMgmtPage(), figurBauen(), globalBanner(), pruefeAlarmStill() (+7 more)
+
+### Community 137 - "Community 137"
+Cohesion: 0.15
+Nodes (10): aggFn, CRAWLER, fmtFn, fs, kopfZeile, mittelFn, path, renderFn (+2 more)
+
+### Community 138 - "Community 138"
+Cohesion: 0.20
+Nodes (8): bomOk, bund, cmd, dash, fs, mail, path, ps1
+
+### Community 139 - "Community 139"
+Cohesion: 0.27
+Nodes (13): cdpJson(), cdpSend(), CHROME_CANDIDATES, cmdEval(), cmdGoto(), cmdLaunch(), cmdQuit(), cmdScreenshot() (+5 more)
+
+### Community 140 - "Community 140"
+Cohesion: 0.21
+Nodes (11): abschnitt(), cmd, fs, ohneKommentare(), path, pruef(), pruefungenAsync(), schneideAus() (+3 more)
+
+### Community 141 - "Community 141"
+Cohesion: 0.14
+Nodes (8): EDGE, fs, http, kind, os, path, PROFIL, { spawn }
+
+### Community 142 - "Community 142"
+Cohesion: 0.14
+Nodes (19): buildDynamicMoti(), eslOf(), eslOfDay(), ligaOf(), ligaOfDay(), normalizeStandort(), rcDetChart(), rcHeroCallList() (+11 more)
+
+### Community 143 - "Community 143"
+Cohesion: 0.18
+Nodes (10): zeichneZeit(), block, CMD, fs, i, kopf, path, PS1 (+2 more)
+
+### Community 144 - "Community 144"
+Cohesion: 0.22
+Nodes (9): rcCrc32(), rcDeflateRaw(), rcDrawingEinhaengen(), rcInflateRaw(), rcSheetDateiFinden(), rcXlsxVeredeln(), rcZipLesen(), rcZipSchreiben() (+1 more)
+
+### Community 145 - "Community 145"
+Cohesion: 0.22
+Nodes (8): driver.mjs command reference, Gotchas, Other harnesses (same server, same driver), Prerequisites (verified in this container), Run (agent path) — serve + drive + screenshot, Run (human path), Troubleshooting, What this actually is
+
+### Community 146 - "Community 146"
+Cohesion: 0.20
+Nodes (9): Arbeitsweise, Crawler v6: "DU führst, der Crawler folgt", Cross-Origin: der einzige Rückkanal, Die gemessenen Parameter (und was daran gefährlich ist), Genesys Monitor (Warteschleife), Leitplanken, Ligalisten-Portal: Eigenheiten, die dich sonst Stunden kosten, Recon: rc_lupe.js (rc_recon.js ist abgelöst) (+1 more)
+
+### Community 147 - "Community 147"
+Cohesion: 0.20
+Nodes (9): Arbeitsweise, Die andere Hälfte: `esl_autopilot.user.js`, Die Fehlerklasse, die dieses Projekt am teuersten zu stehen kam, Die Lage, in der das läuft, Die Landkarte (Stand 21.08., gegen die Datei gemessen), Die zweite Zeitfresser-Klasse: blockierender Startablauf vor idempotentem Wächter, Leitplanken, PowerShell-Fallstricke in dieser Datei (+1 more)
+
+### Community 148 - "Community 148"
+Cohesion: 0.39
+Nodes (8): parseDateTime(), rcAggregateDayBuffer(), rcAggregateMultiDayBuffer(), rcFinalizeAgg(), rcNewAgg(), rcReadSheet(), rcRowDayKey(), xlsx
+
+### Community 149 - "Community 149"
+Cohesion: 0.25
+Nodes (7): Arbeitsweise, Der teuerste Irrtum dieses Moduls — merke ihn dir wörtlich, Die dokumentierten Fallen dieses Moduls, Die Landkarte (Namensraum `mb*` im Konfigurator-IIFE), Layout v3 "Docking" — das 12er-Raster ist RAUS, Leitplanken, Wo das läuft, und was daraus folgt
+
+### Community 150 - "Community 150"
+Cohesion: 0.43
+Nodes (7): classify(), rcAccumRow(), rcIstPotentialTracking(), rcProduktGruppe(), renderProducts(), blatt(), stueckZaehlen()
+
+### Community 151 - "Community 151"
+Cohesion: 0.29
+Nodes (6): Berichtsformat, Leitplanken, Was der Prüfstand prinzipiell NICHT sehen kann, Was dieses Projekt ist (und warum es einen eigenen Prüfstand braucht), Wie du ein Ergebnis deutest, Zwingende Reihenfolge
+
+### Community 152 - "Community 152"
+Cohesion: 0.33
+Nodes (6): ansageAus(), baueAnsageLeiste(), buildShell(), piep(), tileShell(), zeigeAnsage()
+
+### Community 153 - "Community 153"
+Cohesion: 0.50
+Nodes (5): docAus(), pickLauf(), wacheLauf(), baueUmgebung(), fn
+
+### Community 154 - "Community 154"
+Cohesion: 0.50
+Nodes (4): dependencies, react-is, recharts, xlsx-js-style
 
 ## Knowledge Gaps
-- **436 isolated node(s):** `fs`, `path`, `MASTER`, `VARIANTEN`, `fs` (+431 more)
+- **1080 isolated node(s):** `STATE_FILE`, `CHROME_CANDIDATES`, `fs`, `path`, `MASTER` (+1075 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **7 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **9 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `el()` connect `Community 31` to `Community 32`, `esl_live_arena_v22.js`, `Community 34`, `rcWarUpdate`, `Community 79`, `esl_autopilot.user.js`, `wireBody`?**
-  _High betweenness centrality (0.032) - this node is a cross-community bridge._
-- **Why does `pickExportView()` connect `esl_autopilot.user.js` to `Community 31`?**
-  _High betweenness centrality (0.031) - this node is a cross-community bridge._
-- **Why does `pad2()` connect `kpi_crawler.js` to `Community 66`, `rcHarvestEslHistory`?**
-  _High betweenness centrality (0.029) - this node is a cross-community bridge._
+- **Why does `fn` connect `Community 153` to `Community 133`, `Community 72`, `Community 79`, `esl_autopilot.user.js`, `rcCarouselShow`?**
+  _High betweenness centrality (0.086) - this node is a cross-community bridge._
+- **Why does `bannerAction()` connect `esl_autopilot.user.js` to `Community 153`?**
+  _High betweenness centrality (0.068) - this node is a cross-community bridge._
+- **Why does `el()` connect `Community 132` to `Community 129`, `esl_live_arena_v22.js`, `Community 130`, `Community 135`, `Community 136`, `Community 143`, `esl_autopilot.user.js`, `wireBody`, `Community 152`, `Community 62`?**
+  _High betweenness centrality (0.049) - this node is a cross-community bridge._
 - **Are the 5 inferred relationships involving `el()` (e.g. with `pickExportView()` and `enforceOrder()`) actually correct?**
   _`el()` has 5 INFERRED edges - model-reasoned connections that need verification._
-- **What connects `fs`, `path`, `MASTER` to the rest of the system?**
-  _436 weakly-connected nodes found - possible documentation gaps or missing edges._
+- **What connects `STATE_FILE`, `CHROME_CANDIDATES`, `fs` to the rest of the system?**
+  _1080 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `esl_live_arena_v21.js` be split into smaller, more focused modules?**
   _Cohesion score 0.125 - nodes in this community are weakly interconnected._
 - **Should `STANDORT_METADATA Mapping (Code→Name/Nation/Color)` be split into smaller, more focused modules?**

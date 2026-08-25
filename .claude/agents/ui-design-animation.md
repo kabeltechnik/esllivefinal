@@ -82,11 +82,32 @@ Konkrete Vorschläge — neue Komponenten, verbesserte Übergänge, Layout-Anpas
 gegen das Design-System, sichtbar getrennt von den Befunden aus Phase 1.
 
 **Phase 3 — Umsetzung mit Nachweis.**
-Nach jeder visuellen Änderung: offline testen (`test_dashboard_offline.html`,
-`python -m http.server 8412 --bind 127.0.0.1`), per Browser-Tools tatsächlich ansehen — nicht nur
-den CSS-Diff lesen. Bei Motion-Änderungen: den Ablauf mehrfach durchspielen (bzw. bei Canvas-Modulen
-die jeweilige manuelle Step-Funktion aufrufen, siehe `war-engine-dev`/`league-modus-spezialist`) und
-Timing/Lesbarkeit aus Zuschauer-Distanz beurteilen, nicht nur „läuft ohne Fehler".
+Nach jeder visuellen Änderung offline testen über den Skill **`run-esl-live-arena`**
+(`.claude/skills/run-esl-live-arena/driver.mjs`, headless Chrome per CDP, Screenshot ohne sichtbare
+Browser-Pane). Harnesses: **`test_reportbilder.html`** (520 echte Liga-Agenten + echter
+ESL-Tagesexport, trägt das ganze Dashboard) und `test_quali_zeiten.html` (Qualitäts-Seite,
+`?zeiten=1` synthetisiert ACW/ACHT). **`test_dashboard_offline.html` gibt es NICHT mehr.**
+
+Tatsächlich ansehen, nicht nur den CSS-Diff lesen. Pflichtmessungen, weil das Ziel ein
+20-Zoll-Wandmonitor aus 3 Metern ist:
+- **Überstand `scrollHeight` gegen `clientHeight`**, je Karte und je Seite, Sollwert 0. Bei
+  automatischem Seitenwechsel gibt es kein Scrollen — was unter dem Rand liegt, sieht niemand.
+- Keine horizontale Abschneidung (die linke Arena-Spalte ist rund 400 px schmal).
+- Kontraste wirklich nachrechnen. **Zwei dunkle Flächen lassen sich NICHT über das
+  WCAG-Verhältnis beurteilen** — Karte `#1D1D1D` auf Leinwand `#121212` ergibt 1,25 : 1, und
+  benachbarte Dunkelflächen liegen dort immer bei rund 1,1. Maßgeblich ist der Helligkeitsabstand
+  **ΔL\*** (CIE): unter etwa 6 sieht das Auge keine Kante. Für Text auf Fläche bleibt WCAG ≥ 4,5:1.
+- Keine Schrift unter 10 px.
+
+Bei Motion-Änderungen den Ablauf mehrfach durchspielen (bei Canvas-Modulen über die manuelle
+Step-Funktion, siehe `war-engine-dev`/`league-modus-spezialist`) und Timing/Lesbarkeit aus
+Zuschauer-Distanz beurteilen, nicht nur "läuft ohne Fehler".
+
+**Kein `requestAnimationFrame` zum Starten von Übergängen.** In Hintergrund-Tabs feuert rAF nicht
+(gemessen: 1 Frame in 504 Sekunden), `setInterval` aber schon — ein FLIP bliebe dann mit
+`transform: translateY(…)` dauerhaft stehen. Stattdessen `void el.offsetHeight;` (erzwungener
+Reflow) zwischen Start- und Zielzustand. Ebenso: **kein `Math.random()`** in zustandslosen
+Renderern (Variation aus dem Index ableiten).
 
 ## Verfügbare Skills nutzen
 

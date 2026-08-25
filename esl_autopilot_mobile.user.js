@@ -2,7 +2,7 @@
 // @name         ESL Live-Arena Autopilot — Vodafone Mobile
 // @namespace    regiocom.esl.livearena
 // @version      2.0
-// @description  Startet die komplette ESL-Live-Arena-Kette automatisch: ESL-Login -> Vodafone Kabel -> Projektergebnisse -> Export -> Dashboard, parallel CCS-Login -> Ligaliste -> KPI-Crawler (+ Croco-Crawler).
+// @description  Startet die komplette ESL-Live-Arena-Kette automatisch: ESL-Login -> Vodafone Kabel -> Projektergebnisse -> Export -> Dashboard, parallel CCS-Login -> Ligaliste -> KPI-Crawler.
 // @author       regiocom
 // @match        https://esl.regiocom.net/*
 // @match        https://ccs.vodafone.de/*
@@ -71,17 +71,12 @@
 
     var CFG = {
         LIGA_URL:  'https://ccs.vodafone.de/cgi-bin/AGENTEN_KENNZAHLEN_2/LIGA_LISTEN_NEW/dist/liga_listen.rb?script_id=11035',
-        CROCO_URL: 'https://ccs.vodafone.de/cgi-bin/CROCO_REPORT/crocorep.rb?script_id=10760',
         // script_id ist PFLICHT — ohne sie antwortet das Portal mit
         // "Sie haben keine Berechtigung" und ORA-00936 (Ausdruck fehlt).
         GM_URL:    'https://ccs.vodafone.de/cgi-bin/GENESYS/MONITOR_2/gm2.rb?script_id=10777',
         CCS_START: 'https://ccs.vodafone.de/cgi-bin/LOGIN/start.rb',
-        // CroCo ist vorerst abgeschaltet (Wunsch 28.07.2026). Auf true setzen,
-        // um den Croco-Crawler wieder automatisch starten zu lassen.
-        CROCO_AN:  false,
         LS_DASH:   'rcDashboardCode',      // vom esl_dashboard_installer.js gesetzt
         LS_KPI:    'rcWcaCrawlerSrc',      // kpi_crawler.js   (optional)
-        LS_CROCO:  'rcCrocoCrawlerSrc',    // croco_crawler.js (optional)
         LS_GM:     'rcGmCrawlerSrc',       // genesys_monitor_crawler.js (Warteschleife, optional)
         LS_MAIL:   'rcAutoMail',           // NUR die Anmelde-Adresse, NIE ein Passwort
         // Fest hinterlegte Anmelde-Adresse (NUR die Adresse — ein Passwort steht
@@ -131,6 +126,18 @@
             var b = bannerEl();
             b.style.borderLeftColor = col || '#E60000';
             b.textContent = 'Autopilot: ' + msg;
+        } catch (e) {}
+        // Rote und gelbe Meldungen zusaetzlich FESTHALTEN. Der Banner wird von
+        // der naechsten Meldung ueberschrieben und verschwindet mit der Seite —
+        // ausgerechnet die Meldung, auf die es beim Haenger ankommt ("... nicht
+        // im Menue gefunden"), war deshalb nicht mehr auffindbar, wenn jemand
+        // nachsah. console.warn hebt sie ausserdem aus dem Normalbetrieb heraus.
+        try {
+            if (col === '#FF6666' || col === '#FFB84D') {
+                window.rcAutoLetzterFehler = { zeit: new Date().toLocaleTimeString('de-DE'), text: msg };
+                console.warn('[Autopilot] ' + msg);
+                return;
+            }
         } catch (e) {}
         try { console.log('[Autopilot] ' + msg); } catch (e) {}
     }
@@ -187,15 +194,78 @@
         }
         return null;
     }
+    // ---------- Projekt-Menue: sehen, was wirklich dasteht ----------
+    // EIN Selektor fuer beide Suchen. Vorher suchte der erste Anlauf mit
+    // 'span.ui-menuitem-text, a.ui-menuitem-link, a' und der zweite mit
+    // 'span.ui-menuitem-text, a' — zwei verschiedene Sichten auf dieselbe Frage.
+    var MENUE_SEL = 'span.ui-menuitem-text, a.ui-menuitem-link, a';
+    // Alles, was byText() beim Menue ueberhaupt zu sehen bekommt. Das ist die
+    // eine Auskunft, die den Haenger entscheidet: steht der Eintrag da, heisst
+    // er anders, oder ist er schlicht nicht sichtbar?
+    function menueEintraege() {
+        var out = [], seen = {};
+        var list = document.querySelectorAll(MENUE_SEL);
+        for (var i = 0; i < list.length; i++) {
+            var e = list[i];
+            var roh = (e.innerText || e.textContent || e.value || '').replace(/\s+/g, ' ').trim();
+            var n = norm(roh);
+            if (!n || n.length > 60) continue;              // Rumpftexte ganzer Bereiche raus
+            var key = n + '|' + vis(e);
+            if (seen[key]) continue;
+            seen[key] = 1;
+            out.push({ text: roh, normalisiert: n, sichtbar: vis(e), tag: e.tagName.toLowerCase() });
+        }
+        return out;
+    }
+    var menueVersuche = 0;                                  // je Seitenaufbau frisch
+    var MENUE_VERSUCHE_MAX = 3;
+    // Timeout im Projekt-Menue. Frueher endete der Autopilot hier lautlos:
+    // Banner setzen, fertig. Jetzt wird aufgeschrieben, was im Menue steht,
+    // und begrenzt oft neu nachgesehen.
+    function menueFehlgeschlagen(soll) {
+        var alle = menueEintraege();
+        var sichtbar = alle.filter(function (e) { return e.sichtbar; });
+        var nah = alle.filter(function (e) { return e.normalisiert.indexOf('vodafone') !== -1; });
+        window.rcAutoMenueBefund = { gesucht: norm(soll.name), sichtbar: sichtbar, alle: alle };
+        try {
+            console.warn('[Autopilot] "' + soll.name + '" NICHT im Menue gefunden. Gesucht wird EXAKT: "' + norm(soll.name) + '"');
+            console.warn('[Autopilot] ' + sichtbar.length + ' von ' + alle.length + ' Eintraegen sichtbar. Kandidaten:');
+            var zeig = nah.length ? nah : sichtbar.slice(0, 25);
+            if (console.table) console.table(zeig); else console.warn(JSON.stringify(zeig, null, 2));
+        } catch (e) {}
+
+        menueVersuche++;
+        if (menueVersuche < MENUE_VERSUCHE_MAX) {
+            banner('"' + soll.name + '" noch nicht im Menue — Versuch ' + menueVersuche +
+                   ' von ' + MENUE_VERSUCHE_MAX + ', ich sehe gleich noch einmal nach.', '#FFB84D');
+            // Steht das Menue noch offen, den Knopf NICHT erneut klicken — das
+            // klappt es zu, und der naechste Versuch suchte im geschlossenen Menue.
+            done.openMenu = sichtbar.length ? 1 : 0;
+            done.menuProjekt = 0;
+            setTimeout(function () { if (!stop) eslFlow(); }, 4000);
+            return;
+        }
+        banner('"' + soll.name + '" nicht im Menue gefunden (' + sichtbar.length +
+               ' sichtbare Eintraege). In der Konsole: rcAutoWarum() — dort steht, wie die Eintraege wirklich heissen.', '#FF6666');
+    }
+
     // Wartet, bis test() etwas liefert (oder Timeout) — dann act()
-    function until(test, act, timeoutMs, failMsg) {
+    // onFail (optional) laeuft beim Timeout. Ohne den war JEDER Timeout hier
+    // endgueltig: eslFlow() laeuft genau EINMAL je Seitenaufbau, die once()-
+    // Sperre ist verbraucht, und es gab nichts, was es noch einmal versucht
+    // haette. Beim Projekt-Menue sah das aus wie "steht einfach da".
+    function until(test, act, timeoutMs, failMsg, onFail) {
         var t0 = Date.now();
         var iv = setInterval(function () {
             if (stop) { clearInterval(iv); return; }
             var r = null;
             try { r = test(); } catch (e) { r = null; }
             if (r) { clearInterval(iv); try { act(r); } catch (e) { banner('Fehler: ' + e.message, '#FF6666'); } }
-            else if (Date.now() - t0 > (timeoutMs || 30000)) { clearInterval(iv); if (failMsg) banner(failMsg, '#FF6666'); }
+            else if (Date.now() - t0 > (timeoutMs || 30000)) {
+                clearInterval(iv);
+                if (failMsg) banner(failMsg, '#FF6666');
+                if (onFail) { try { onFail(); } catch (e) { banner('Fehler: ' + e.message, '#FF6666'); } }
+            }
         }, 400);
         return iv;
     }
@@ -216,7 +286,7 @@
     // __rcFiles setzt der PowerShell-Starter (ESL_Start.ps1) ueber die Edge-
     // Fernsteuerung — der Code kommt dann DIREKT von der Festplatte/U:, ganz
     // ohne Browser-Speicher. Damit ist Citrix' Aufraeumen voellig egal.
-    var FILEKEY = { rcDashboardCode: 'dash', rcWcaCrawlerSrc: 'kpi', rcCrocoCrawlerSrc: 'croco', rcGmCrawlerSrc: 'gm' };
+    var FILEKEY = { rcDashboardCode: 'dash', rcWcaCrawlerSrc: 'kpi', rcGmCrawlerSrc: 'gm' };
     // Quellen aus __rcFiles EINMAL in den Browser-Speicher spiegeln.
     // Vorher wurde localStorage nur im manuellen Datei-Dialog beschrieben
     // (pickAndStore) — die vom Starter mitgereichten Dateien landeten NIE dort.
@@ -291,11 +361,9 @@
     };
     // Crawler hinterlegen (auf ccs.vodafone.de auszufuehren)
     //   rcAutoSaveCrawler()        -> KPI-Crawler (Ligaliste)
-    //   rcAutoSaveCrawler('croco') -> Croco-Crawler (Auftraege)
     //   rcAutoSaveCrawler('gm')    -> Genesys-Monitor-Crawler (Warteschleife)
     var CRAWLER = {
         kpi:   { key: CFG.LS_KPI,   name: 'KPI-Crawler',            datei: 'kpi_crawler.js',            marke: 'kpi',   laeuft: function () { return !!window.kpiCrawlerInterval; } },
-        croco: { key: CFG.LS_CROCO, name: 'Croco-Crawler',          datei: 'croco_crawler.js',          marke: 'croco', laeuft: function () { return !!window.crocoCrawlerInterval; } },
         gm:    { key: CFG.LS_GM,    name: 'Genesys-Monitor-Crawler', datei: 'genesys_monitor_crawler.js', marke: 'gm',    laeuft: function () { return !!window.RC_GM; } }
     };
     window.rcAutoSaveCrawler = function (which) {
@@ -333,13 +401,120 @@
         done = {}; banner('Zustand zurueckgesetzt.', '#3DD68C'); return 'ok';
     };
     window.rcAutoStatus = function () {
-        var s = { host: H, pfad: P, dashboardHinterlegt: false, kpiCrawlerHinterlegt: false, crocoCrawlerHinterlegt: false, gmCrawlerHinterlegt: false, mail: getMail() ? 'gesetzt' : 'NICHT gesetzt' };
+        var s = { host: H, pfad: P, dashboardHinterlegt: false, kpiCrawlerHinterlegt: false, gmCrawlerHinterlegt: false, mail: getMail() ? 'gesetzt' : 'NICHT gesetzt' };
         try { s.dashboardHinterlegt = !!localStorage.getItem(CFG.LS_DASH); } catch (e) {}
         try { s.kpiCrawlerHinterlegt = !!localStorage.getItem(CFG.LS_KPI); } catch (e) {}
-        try { s.crocoCrawlerHinterlegt = !!localStorage.getItem(CFG.LS_CROCO); } catch (e) {}
         try { s.gmCrawlerHinterlegt = !!localStorage.getItem(CFG.LS_GM); } catch (e) {}
         try { console.log('[Autopilot] Status:', JSON.stringify(s, null, 2)); } catch (e) {}
         return s;
+    };
+    // ---- WARUM STEHT ER? ----------------------------------------------------
+    // Der Autopilot meldete Fehler bisher nur im Banner unten rechts — der wird
+    // von der naechsten Meldung ueberschrieben und ist nach einem Seitenwechsel
+    // weg. Genau die Auskunft, auf die es beim Haenger im Projekt-Menue ankommt
+    // (wie heissen die Eintraege WIRKLICH, sind sie sichtbar, auf welches
+    // Projekt ist dieser PC festgelegt), stand nirgends abrufbar.
+    window.rcAutoWarum = function () {
+        var soll = sollProjekt();
+        var alle = menueEintraege();
+        var sichtbar = alle.filter(function (e) { return e.sichtbar; });
+        var treffer = byText(MENUE_SEL, soll.name, true);
+        var lage = {
+            seite: location.href,
+            dateiname: projektDateiHier(),
+            istProjektSeite: istProjektSeite(),
+            aufSollProjekt: aufSollProjekt(),
+            markeRcEslProjekt: (function () { try { return sessionStorage.getItem('rcEslProjekt') || '(nicht gesetzt)'; } catch (e) { return '(nicht lesbar)'; } })(),
+            sollName: soll.name,
+            sollDatei: soll.datei,
+            cfgVorgabe: CFG.PROJEKT,
+            gesuchtNormalisiert: norm(soll.name),
+            eintragGefunden: !!treffer,
+            loginMaskeDa: !!id('loginform'),
+            filterFormDa: !!id('filterForm'),
+            menueKnopfPerId: !!id('frmMainMenu:mainMenu'),
+            menueKnopfSichtbar: vis(id('frmMainMenu:mainMenu')),
+            menueOffen: sichtbar.length > 0,
+            eintraegeGesamt: alle.length,
+            eintraegeSichtbar: sichtbar.length,
+            verbrauchteSperren: Object.keys(done),
+            menueVersuche: menueVersuche,
+            letzterFehler: window.rcAutoLetzterFehler || '(keiner)'
+        };
+        try {
+            console.log('%c[Autopilot] WARUM steht er?', 'color:#E60000;font-weight:bold');
+            console.log(JSON.stringify(lage, null, 2));
+            console.log('--- Menue-Eintraege (die entscheidende Liste) ---');
+            var zeig = sichtbar.length ? sichtbar : alle.slice(0, 30);
+            if (console.table) console.table(zeig); else console.log(JSON.stringify(zeig, null, 2));
+            if (!treffer) {
+                console.warn('Kein Eintrag hat EXAKT den Text "' + norm(soll.name) + '". Drei moegliche Gruende:\n' +
+                  '  1. Der Eintrag heisst im Portal anders — dann steht der echte Name oben in der Liste.\n' +
+                  '  2. menueOffen=false: das Menue ist zu, byText() verlangt Sichtbarkeit.\n' +
+                  '  3. markeRcEslProjekt zeigt auf ein anderes Projekt, als dieser PC fahren soll.');
+            }
+        } catch (e) {}
+        return lage;
+    };
+
+    // ---- HANDBETRIEB + Startknopf (14.08., Nutzer-Vorgabe) ------------------
+    // "ich moechte manuell gehen, aber ich brauche einen Button wo ich das
+    // Dashboard starten kann! ich werde bis projekte -> stack waehlen etc."
+    // Im Handbetrieb navigiert der Autopilot NICHT mehr selbst: kein Projekt-
+    // Menue, keine Ansicht-Auswahl. Die ANMELDEHILFE bleibt bewusst an — sie ist
+    // von Hand laestig (Edge gibt das Passwort erst nach einer echten Geste frei)
+    // und war nicht gemeint.
+    function manuell() {
+        try { return localStorage.getItem('rcAutoManuell') === '1'; } catch (e) { return false; }
+    }
+    window.rcAutoManuell = function (an) {
+        if (an === undefined) return manuell() ? 'Handbetrieb ist AN' : 'Handbetrieb ist AUS';
+        try { localStorage.setItem('rcAutoManuell', an ? '1' : '0'); } catch (e) {}
+        if (an) { startKnopf(); banner('Handbetrieb AN — ich navigiere nicht mehr selbst. Unten links: "Dashboard starten".', '#9C9C9C'); }
+        else banner('Handbetrieb AUS — ich navigiere wieder selbst (nach dem naechsten Seitenaufbau).', '#9C9C9C');
+        return an ? 'Handbetrieb AN' : 'Handbetrieb AUS';
+    };
+
+    // Fester Knopf unten LINKS — der Statusbanner sitzt rechts, sie stoeren sich
+    // also nicht. Er ist IMMER da, auch im Automatikbetrieb: dann als Nachstarter,
+    // falls der Ablauf irgendwo haengt. Sobald das Dashboard laeuft, verschwindet er.
+    function startKnopf() {
+        try {
+            if (document.getElementById('rcAutoStartBtn')) return;
+            if (window.rcLiveInterval) return;
+            var b = document.createElement('button');
+            b.id = 'rcAutoStartBtn';
+            b.type = 'button';
+            b.textContent = 'Dashboard starten';
+            b.style.cssText = 'position:fixed;bottom:14px;left:14px;z-index:2147483647;background:#E60000;' +
+                'color:#FFFFFF;border:none;padding:11px 18px;border-radius:8px;cursor:pointer;' +
+                'font:700 13px Arial,sans-serif;box-shadow:0 4px 18px rgba(0,0,0,.55);';
+            b.onclick = function (e) { e.preventDefault(); window.rcAutoStartJetzt(); };
+            (document.body || document.documentElement).appendChild(b);
+        } catch (e) {}
+    }
+    function knopfWeg() {
+        try { var b = document.getElementById('rcAutoStartBtn'); if (b && b.parentNode) b.parentNode.removeChild(b); } catch (e) {}
+    }
+    // Startet das Dashboard SOFORT — ohne once()-Sperre und ohne Wartefenster.
+    // Genau das braucht der Handbetrieb: der Nutzer weiss selbst, wann die Seite
+    // so weit ist, und ein Fehlversuch darf ihn nicht dauerhaft aussperren
+    // (once() setzt seine Sperre schon beim Pruefen, nicht beim Erfolg).
+    window.rcAutoStartJetzt = function () {
+        if (window.rcLiveInterval) { banner('Dashboard laeuft bereits.', '#9C9C9C'); knopfWeg(); return true; }
+        if (!id('filterForm')) {
+            banner('Noch keine Export-Ansicht auf dieser Seite. Bitte oben die Ansicht "Export Projektergebnisse" waehlen, dann noch einmal auf den Knopf.', '#FFB84D');
+            return false;
+        }
+        banner('starte Dashboard ...');
+        var ok = runStored(CFG.LS_DASH, 'Live-Arena-Dashboard', function () { return !!window.rcLiveInterval; });
+        if (!ok) {
+            bannerAction('Dashboard ist auf diesem PC noch nicht hinterlegt (einmalig).',
+                'esl_live_arena_v22.js waehlen', window.rcAutoSaveDashboard);
+            return false;
+        }
+        knopfWeg();
+        return true;
     };
 
     // ========================================================================
@@ -413,31 +588,72 @@
             return;
         }
 
+        // Der Startknopf ist ab hier IMMER da (nicht auf der Anmeldemaske —
+        // die steigt oben schon aus). Auch im Automatikbetrieb: er ist dann der
+        // Nachstarter, wenn der Ablauf irgendwo haengen bleibt.
+        startKnopf();
+
+        // --- HANDBETRIEB: ab hier navigiert der Nutzer selbst ----------------
+        // Steht VOR allen Navigationszweigen. Der Autopilot fasst die Seite
+        // nicht mehr an — sonst klickt er dem Nutzer die Auswahl weg, waehrend
+        // der gerade Projekt und Stack waehlt.
+        if (manuell()) {
+            banner('Handbetrieb: bitte selbst bis "Export Projektergebnisse" gehen, dann unten links auf "Dashboard starten".', '#9C9C9C');
+            return;
+        }
+
         // --- 1d) EXPORT-ANSICHT DA? -> DASHBOARD STARTEN ---------------------
         // (zuerst pruefen: wenn schon fertig, nicht erneut durchs Menue laufen)
         //
-        // ABER NUR, WENN ES DAS RICHTIGE PROJEKT IST. Alle drei Projektseiten
-        // haben ein filterForm. Ohne diese Pruefung bliebe der Autopilot auf der
-        // erstbesten Seite stehen — landet man nach dem Login auf "Vodafone
-        // Kabel", wuerde die Mobile-Fassung dort weiterarbeiten und stillschweigend
-        // die falschen Zahlen ins Dashboard schreiben. Das faellt niemandem auf,
-        // weil das Dashboard selbst nicht weiss, welches Projekt es gerade sieht.
-        if (id('filterForm') && aufRichtigemProjekt()) {
+        // FESTGENAGELT seit 06.08. spaetabends (Nutzer-Vorgabe "eine Startdatei,
+        // die nur EINEN Stack macht - die laufen eh auf verschiedenen PCs").
+        // Das Soll-Projekt kommt aus der Starter-Marke (sessionStorage
+        // rcEslProjekt, vom Paket bei JEDEM Seitenaufbau gesetzt), Fallback CFG.
+        // Die Zwischenloesung vom 06.08. abends ("Marke folgt der beobachteten
+        // Seite") ist damit BEWUSST zurueckgenommen — Live-Befund: alle ESL-Tabs
+        // eines Edge-Profils teilen sich EINE Server-Sitzung, und das Portal
+        // wirft einen Tab nach dem Re-Login auf das zuletzt serverseitig aktive
+        // Projekt. Mit "Marke folgt Seite" wurde aus dem Mobile-Tab dadurch
+        // still ein zweiter Kabel-Tab (Kabel doppelt, Mobile auf null — und
+        // andersrum). Jetzt gilt: dieser PC hat GENAU EIN Projekt, und wenn das
+        // Portal woanders landet, wird dorthin ZURUECKGEWECHSELT.
+        if (id('filterForm') && aufSollProjekt()) {
             pickExportView();
             return;
         }
-        if (id('filterForm') && !aufRichtigemProjekt()) {
-            banner('Falsches Projekt (' + kurzProjektHier() + ') — wechsle zu "' + CFG.PROJEKT + '" ...', '#FFB84D');
+        if (id('filterForm') && !aufSollProjekt()) {
+            banner('Portal steht auf einem anderen Projekt — wechsle zurueck zu "' + sollProjekt().name + '" (dieser PC ist darauf festgelegt) ...', '#FFB84D');
+        }
+        // --- 1c) SCHON AUF DER RICHTIGEN PROJEKTSEITE, aber der Reiter fehlt --
+        // Der Klick auf den Menueeintrag ist eine ECHTE Navigation: das Dokument
+        // wird ersetzt, das nachgestellte setTimeout(gotoProjektergebnisse) stirbt
+        // mit ihm, und eslFlow() laeuft auf der neuen Seite von vorn (es wird
+        // genau EINMAL je Seitenaufbau aus weiche() gerufen, die once()-Sperren
+        // sind also wieder leer).
+        // Dort steht dann: kein filterForm (der Reiter "Projektergebnisse" ist
+        // noch nicht gewaehlt) und ein zugeklapptes Menue, in dem byText() den
+        // Projekteintrag nicht findet (es verlangt vis()). Ohne diesen Zweig
+        // fiel der Autopilot damit in den Menue-Block darunter und klickte
+        // WIEDER "Projekte" an - Seite laedt, alles von vorn, endlos.
+        // Die Pruefung ist bewusst zweiteilig: eine FALSCHE Projektseite ohne
+        // filterForm muss weiterhin ins Menue (zurueck zum Soll-Projekt).
+        else if (istProjektSeite() && aufSollProjekt()) {
+            gotoProjektergebnisse();
+            return;
         }
 
-        // --- 1b) MENUE: das eingestellte Projekt waehlen ----------------------
+        // --- 1b) MENUE: das Projekt der MARKE waehlen (Fallback: CFG) --------
+        // Hierher kommt man nur auf Nicht-Projektseiten (Startseite, nach dem
+        // Re-Login). Ziel ist das Projekt, das der Nutzer zuletzt offen hatte
+        // (Marke) — erst ganz ohne Marke gilt die einkompilierte CFG-Vorgabe.
         // Der Menuepunkt heisst genau so, wie er auf dem Schirm steht — deshalb
         // EXAKTER Textvergleich. Ein "enthaelt"-Vergleich waere hier gefaehrlich:
         // "Vodafone UM" steckt als Zeichenfolge in keinem der anderen Namen, aber
         // ein kuenftiges "Vodafone UM Care" wuerde ihn faelschlich treffen.
-        var ziel = byText('span.ui-menuitem-text, a.ui-menuitem-link, a', CFG.PROJEKT, true);
+        var sollP = sollProjekt();
+        var ziel = byText(MENUE_SEL, sollP.name, true);
         if (ziel && once('menuProjekt')) {
-            banner('Menue "' + CFG.PROJEKT + '" ...');
+            banner('Menue "' + sollP.name + '" ...');
             click(ziel.closest('a') || ziel);
             setTimeout(gotoProjektergebnisse, 1500);
             return;
@@ -451,9 +667,12 @@
         if (mainMenu && once('openMenu')) {
             banner('oeffne Projekt-Menue ...');
             click(mainMenu);
-            until(function () { return byText('span.ui-menuitem-text, a', CFG.PROJEKT, true); },
+            // Der Timeout ist NICHT mehr das Ende: menueFehlgeschlagen schreibt
+            // auf, was im Menue wirklich steht, und sieht begrenzt oft neu nach.
+            until(function () { return byText(MENUE_SEL, sollP.name, true); },
                   function (el) { click(el.closest('a') || el); setTimeout(gotoProjektergebnisse, 1500); },
-                  8000, '"' + CFG.PROJEKT + '" nicht im Menue gefunden — heisst der Eintrag im Portal genau so?');
+                  8000, null,
+                  function () { menueFehlgeschlagen(sollP); });
             return;
         }
         gotoProjektergebnisse();
@@ -469,22 +688,36 @@
         var m = p.split('/').pop() || '';
         return m.toLowerCase();
     }
-    function aufRichtigemProjekt() {
-        var soll = String(CFG.PROJEKT_DATEI || '').toLowerCase();
-        if (!soll) return true;                       // nicht festgelegt -> nicht pruefen
-        var ist = projektDateiHier();
-        if (!ist || ist.indexOf('sis_') === -1) return true;   // keine Projektseite -> nichts zu pruefen
-        return ist === soll;
+    // Stehen wir ueberhaupt auf EINER der drei Projektseiten? Nur dann darf der
+    // Ausstieg vor dem Menue-Block greifen — auf der ESL-Startseite muss der
+    // Autopilot weiterhin ins Menue, um das Projekt (Marke bzw. CFG) zu waehlen.
+    function istProjektSeite() {
+        return projektDateiHier().indexOf('sis_') !== -1;
     }
-    // Klarname der Seite, auf der wir gerade sind — nur fuer die Meldung.
-    function kurzProjektHier() {
+    // ---- Projekt FESTGENAGELT je PC (06.08. spaetabends, Nutzer-Vorgabe) -----
+    // Das Soll kommt aus der Starter-Marke sessionStorage.rcEslProjekt
+    // ('kabel'/'mobile'/'um', exakt das BauPaket-Format aus ESL_Start.cmd —
+    // seit heute traegt sie das per Parameter gewaehlte Projekt dieses PCs und
+    // wird vom Paket bei JEDEM Seitenaufbau neu gesetzt). Fallback ist die
+    // einkompilierte CFG-Vorgabe (Handstart per F12 ohne Starter: dann gilt
+    // die Projekt-Variante der Datei, wie vor dem 06.08.).
+    function sollProjekt() {
+        var m = '';
+        try { m = sessionStorage.getItem('rcEslProjekt') || ''; } catch (e) {}
+        if (m === 'mobile') return { name: 'Vodafone Mobile', datei: 'sis_vodafone_mobile.xhtml' };
+        if (m === 'um')     return { name: 'Vodafone UM',     datei: 'sis_vodafone_um.xhtml' };
+        if (m === 'kabel')  return { name: 'Vodafone Kabel',  datei: 'sis_vodafone.xhtml' };
+        return { name: CFG.PROJEKT, datei: CFG.PROJEKT_DATEI };
+    }
+    // Steht die aktuelle Seite auf dem Soll-Projekt? Auf Nicht-Projektseiten
+    // (Anmeldemaske, Startseite) gibt es nichts zu pruefen -> true; als
+    // alleinige Ausstiegsbedingung waere das falsch, deshalb steht im Ablauf
+    // immer istProjektSeite() daneben.
+    function aufSollProjekt() {
         var d = projektDateiHier();
-        if (d.indexOf('_mobile') !== -1) return 'Vodafone Mobile';
-        if (d.indexOf('_um') !== -1) return 'Vodafone UM';
-        if (d.indexOf('sis_vodafone') !== -1) return 'Vodafone Kabel';
-        return d || 'unbekannt';
+        if (!d || d.indexOf('sis_') === -1) return true;
+        return d === String(sollProjekt().datei || '').toLowerCase();
     }
-
     // Login absenden — WIE EIN ENTER-DRUCK, nicht per Knopf-Klick.
     // ----------------------------------------------------------------------
     // Befund aus dem Live-Betrieb: Ein .click() auf den PrimeFaces-Login-Knopf
@@ -541,64 +774,148 @@
     // Statistik-Auswahl auf "Export Projektergebnisse" stellen.
     // WICHTIG: KEINE j_idt-IDs mehr — die Liste wird daran erkannt, dass sie
     // eine Option mit diesem TEXT enthaelt. Das ueberlebt Portal-Updates.
-    function pickExportView() {
-        if (stop) return;
+    // UMGEBAUT 22.08. (Live-Befund aus der Nacht 21./22.08.: nach dem Re-Login
+    // war die Auswahl leer, der EINE once()-Versuch verpuffte, und die Seite
+    // stand bis zum Morgen auf "Bitte Abfrage waehlen!"):
+    //  1. Zaehler mit Abstand statt once() — ein verpuffter Versuch ist nicht
+    //     mehr endgueltig; die startDashboard-Schleife waehlt nach.
+    //  2. Der PrimeFaces-KLICKWEG (Trigger auf, Eintrag klicken) kommt ZUERST:
+    //     das ist exakt der Nutzerpfad, den das Widget sicher versteht. Ein
+    //     select.value + change kann serverseitig verpuffen und bleibt Notnagel.
+    //  3. Das Label wird NICHT mehr von Hand gesetzt: bei echtem Erfolg
+    //     schreibt es PrimeFaces selbst — nur so bleibt exportAnsichtSteht()
+    //     ein ehrlicher Zeuge (das Hand-Label meldete frueher einen Erfolg,
+    //     den es nie gab, und jede Wiederholung stieg sofort aus).
+    var pickVersuche = 0, pickZuletzt = 0;
+    // Zaehler erst verbrauchen, wenn wirklich GEHANDELT wird (Klick oder
+    // Notnagel) — ein Lauf, der das Statistik-select noch gar nicht vorfindet
+    // (Export-Ansicht laedt noch per Ajax), darf keinen Versuch kosten.
+    function pickVerbrauch() { pickZuletzt = Date.now(); pickVersuche++; }
+    function exportAnsichtSteht() {
         var ZIEL = 'export projektergebnisse';
-
-        // Steht sie schon richtig? (PrimeFaces zeigt den Text im .ui-selectonemenu-label)
         var lbls = document.querySelectorAll('.ui-selectonemenu-label');
         for (var i = 0; i < lbls.length; i++) {
-            if (norm(lbls[i].textContent).indexOf(ZIEL) !== -1) { startDashboard(); return; }
+            if (norm(lbls[i].textContent).indexOf(ZIEL) !== -1) return true;
         }
+        if (!lbls.length) {
+            // Kein PrimeFaces-Widget auf der Seite? Dann zaehlt das native select.
+            var sels = document.querySelectorAll('select');
+            for (var s = 0; s < sels.length; s++) {
+                var o = sels[s].selectedIndex >= 0 ? sels[s].options[sels[s].selectedIndex] : null;
+                if (o && norm(o.textContent).indexOf(ZIEL) !== -1) return true;
+            }
+        }
+        return false;
+    }
+    function pickExportView() {
+        if (stop) return;
+        // Handbetrieb gilt auch HIER, nicht nur in eslFlow: der Nutzer schaltet
+        // ihn typischerweise ein, waehrend die startDashboard-Schleife schon
+        // laeuft — ohne diesen Ausstieg klickte sie ihm weiter alle 25 s ins
+        // Statistik-Dropdown, genau das, was der Handbetrieb verhindern soll.
+        if (manuell()) return;
+        var ZIEL = 'export projektergebnisse';
+        if (exportAnsichtSteht()) { startDashboard(); return; }
+        if (Date.now() - pickZuletzt < 25000 || pickVersuche >= 12) { startDashboard(); return; }
 
-        // Natives <select> mit passender Option suchen
+        // Das Statistik-select finden — es dient BEIDEN Wegen: sein Widget
+        // liefert den richtigen Trigger, und es selbst ist der Notnagel.
         var sels = document.querySelectorAll('select'), target = null, val = null;
         for (var s = 0; s < sels.length && !target; s++) {
             for (var o = 0; o < sels[s].options.length; o++) {
                 if (norm(sels[s].options[o].textContent).indexOf(ZIEL) !== -1) { target = sels[s]; val = sels[s].options[o].value; break; }
             }
         }
-        if (target && once('pickExport')) {
+
+        // 1) PrimeFaces-Klickweg. Steht das Panel schon offen (halber Versuch
+        //    davor), NICHT erneut den Trigger klicken — das klappte es nur zu
+        //    (dieselbe Falle wie beim Projekt-Menue); direkt den Eintrag nehmen.
+        var offenerEintrag = byText('li.ui-selectonemenu-item, li[role=option]', ZIEL);
+        if (offenerEintrag) {
+            pickVerbrauch();
             banner('waehle Ansicht "Export Projektergebnisse" ...');
-            target.value = val;
-            // PrimeFaces-Label mitziehen, damit die Oberflaeche stimmt
-            try {
-                var box = target.closest('.ui-selectonemenu');
-                var lab = box ? box.querySelector('.ui-selectonemenu-label') : null;
-                if (lab) lab.textContent = 'Export Projektergebnisse';
-            } catch (e) {}
-            target.dispatchEvent(new Event('change', { bubbles: true }));
+            click(offenerEintrag);
             setTimeout(startDashboard, 2200);
             return;
         }
-
-        // Kein natives select? Dann PrimeFaces-Dropdown aufklappen und Eintrag klicken.
-        var trig = document.querySelector('.ui-selectonemenu-trigger');
-        if (trig && once('pfDropdown')) {
-            banner('oeffne Ansicht-Auswahl ...');
+        // NUR der Trigger des eigenen Widgets — der fruehere Rueckfall auf das
+        // erste .ui-selectonemenu-trigger der SEITE klappte ein beliebiges
+        // fremdes Dropdown auf, sobald das Statistik-select (noch) fehlte.
+        var box = target ? target.closest('.ui-selectonemenu') : null;
+        var trig = box ? box.querySelector('.ui-selectonemenu-trigger') : null;
+        if (trig) {
+            pickVerbrauch();
+            banner('waehle Ansicht "Export Projektergebnisse"' + (pickVersuche > 1 ? ' (Versuch ' + pickVersuche + ')' : '') + ' ...');
             click(trig);
+            // onFail ist PFLICHT: ohne ihn startete nach einem 8-s-Timeout im
+            // ERSTEN Aufruf je Seitenaufbau nie die startDashboard-Schleife —
+            // und damit auch nie die Wache, die den naechsten Versuch traegt.
+            // Exakt die once()-Sackgasse in neuer Verkleidung.
             until(function () { return byText('li.ui-selectonemenu-item, li[role=option]', ZIEL); },
                   function (el) { click(el); setTimeout(startDashboard, 2200); },
-                  8000, 'Eintrag "Export Projektergebnisse" nicht gefunden.');
+                  8000, 'Eintrag "Export Projektergebnisse" nicht gefunden — naechster Versuch folgt.',
+                  function () { startDashboard(); });
             return;
         }
-        startDashboard();
+
+        // 2) Notnagel ohne Widget: natives <select> setzen + change ausloesen.
+        if (target) {
+            pickVerbrauch();
+            banner('waehle Ansicht "Export Projektergebnisse" (natives Feld) ...');
+            target.value = val;
+            target.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+        // Kein select gefunden (Ansicht laedt noch): Versuch NICHT verbrennen —
+        // die startDashboard-Wache ruft in Kuerze erneut an.
+        setTimeout(startDashboard, 2200);
     }
 
+    // Zaehler statt once() — dieselbe Lehre wie bei msFlow: once() setzt seine
+    // Sperre schon beim PRUEFEN. Ein einziger Fehlversuch (Speicher leer, Seite
+    // noch nicht fertig, eval-Fehler) liess das Dashboard frueher fuer immer
+    // aus; der Starter musste per Hand nachhelfen ("Starter laeuft, Dashboard
+    // fehlt trotzdem"). Jetzt: solange filterForm da ist und das Dashboard
+    // nicht laeuft, alle 30 s ein neuer Versuch, gedeckelt auf 10.
+    var dashIv = null, dashVersuche = 0, dashZuletzt = 0;
     function startDashboard() {
         if (stop) return;
-        until(
-            function () { return id('filterForm'); },
-            function () {
-                if (!once('startDash')) return;
-                banner('Export-Ansicht bereit — starte Dashboard ...');
-                var ok = runStored(CFG.LS_DASH, 'Live-Arena-Dashboard', function () { return !!window.rcLiveInterval; });
-                if (!ok) bannerAction('Dashboard ist auf diesem PC noch nicht hinterlegt (einmalig).',
-                    'esl_live_arena_v22.js waehlen', window.rcAutoSaveDashboard);
-            },
-            25000,
-            'Export-Ansicht (filterForm) nicht gefunden.'
-        );
+        if (dashIv) return;                                       // laeuft schon (zweiter Aufrufer)
+        var t0 = Date.now(), gewarnt = false;
+        dashIv = setInterval(function () {
+            if (stop) { clearInterval(dashIv); dashIv = null; return; }
+            if (window.rcLiveInterval) {                          // Ziel erreicht
+                clearInterval(dashIv); dashIv = null;
+                knopfWeg();
+                return;
+            }
+            if (!id('filterForm')) {                              // Ansicht (noch) nicht da
+                if (!gewarnt && Date.now() - t0 > 25000) {
+                    gewarnt = true;
+                    banner('Export-Ansicht (filterForm) nicht gefunden — ich versuche es weiter.', '#FFB84D');
+                }
+                return;
+            }
+            // Ansicht-Wache (22.08.): steht die Statistik-Auswahl nicht (mehr),
+            // erneut waehlen — Nacht-Befund: der Re-Login liess sie leer zurueck,
+            // und ohne Auswahl liefert der Export nur HTML statt Excel.
+            // pickExportView drosselt sich selbst (25 s Abstand, Deckel 12);
+            // das Dashboard wird davon unabhaengig weiter gestartet, denn auch
+            // ohne Auswahl zeigt es wenigstens den Stoerungs-Streifen.
+            if (!exportAnsichtSteht()) { try { pickExportView(); } catch (e) {} }
+            if (Date.now() - dashZuletzt < 30000) return;         // Abstand zwischen Versuchen
+            if (dashVersuche >= 10) {
+                clearInterval(dashIv); dashIv = null;
+                banner('Dashboard-Start nach 10 Versuchen aufgegeben — unten links "Dashboard starten" oder rcAutoStartJetzt().', '#FF6666');
+                return;
+            }
+            dashZuletzt = Date.now();
+            dashVersuche++;
+            window.rcAutoDashVersuche = dashVersuche;             // fuer rcAutoWarum()/Diagnose
+            banner('Export-Ansicht bereit — starte Dashboard (Versuch ' + dashVersuche + ') ...');
+            var ok = runStored(CFG.LS_DASH, 'Live-Arena-Dashboard', function () { return !!window.rcLiveInterval; });
+            if (!ok) bannerAction('Dashboard ist auf diesem PC noch nicht hinterlegt (einmalig).',
+                'esl_live_arena_v22.js waehlen', window.rcAutoSaveDashboard);
+        }, 2000);
     }
 
     // ========================================================================
@@ -680,7 +997,7 @@
     }
 
     // ========================================================================
-    //  ABLAUF 3 — CCS / Ligaliste / Croco (ccs.vodafone.de)
+    //  ABLAUF 3 — CCS / Ligaliste / Genesys-Monitor (ccs.vodafone.de)
     // ========================================================================
     function ccsFlow() {
         // ---- Selbstheilung: Fachanwendung ohne stehende CCS-Sitzung ----
@@ -699,7 +1016,7 @@
                         if (!window.name || window.name === 'about:blank') {
                             window.name = (P.indexOf('MONITOR_2') !== -1 || P.indexOf('gm2.rb') !== -1)
                                 ? 'rcQueueQuelle'
-                                : (P.indexOf('crocorep') !== -1 ? 'rcCrocoQuelle' : 'rcKpiQuelle');
+                                : 'rcKpiQuelle';
                         }
                     } catch (e) {}
                     banner('Keine CCS-Sitzung — melde an und komme zurueck ...');
@@ -709,24 +1026,6 @@
             }
         }
 
-        // CroCo Sales Operation Report offen -> Croco-Crawler starten
-        // (eigene Anwendung: /cgi-bin/CROCO_REPORT/crocorep.rb, Tabelle
-        //  .croco-result-table, Ok-Button #ok-button)
-        if (CFG.CROCO_AN && (P.indexOf('crocorep') !== -1 || document.querySelector('table.croco-result-table'))) {
-            banner('CroCo-Report erkannt — starte Croco-Crawler ...');
-            until(
-                function () { return document.querySelector('table.croco-result-table tr') || (document.readyState === 'complete' ? document.body : null); },
-                function () {
-                    if (!once('crocoPage')) return;
-                    var ok = runStored(CFG.LS_CROCO, 'Croco-Crawler', function () { return !!window.crocoCrawlerInterval; });
-                    if (!ok) bannerAction('Croco-Crawler ist auf diesem PC noch nicht hinterlegt (einmalig).',
-                        'croco_crawler.js waehlen', function () { window.rcAutoSaveCrawler('croco'); });
-                },
-                40000,
-                'CroCo-Report laedt nicht — bitte einmal "Ok" klicken.'
-            );
-            return;
-        }
         // Genesys-Monitor offen -> Warteschleifen-Crawler starten
         // (/cgi-bin/GENESYS/MONITOR_2/gm2.rb — Qualitaets-Auswahl #quality-list)
         if (P.indexOf('MONITOR_2') !== -1 || P.indexOf('gm2.rb') !== -1) {
@@ -754,8 +1053,6 @@
                     var ok = runStored(CFG.LS_KPI, 'KPI-Crawler', function () { return !!window.kpiCrawlerInterval; });
                     if (!ok) bannerAction('KPI-Crawler ist auf diesem PC noch nicht hinterlegt (einmalig).',
                         'kpi_crawler.js waehlen', function () { window.rcAutoSaveCrawler(); });
-                    // Croco-Crawler nur starten, wenn eine Auftrags-Tabelle da ist
-                    if (CFG.CROCO_AN) setTimeout(maybeCroco, 4000);
                 },
                 30000,
                 'Ligaliste laedt nicht — Seite pruefen.'
@@ -769,8 +1066,13 @@
         // Navigation und ist im eigenen Fenster auch cross-origin lesbar.
         if (once('gotoZiel')) {
             var ziel = CFG.LIGA_URL, was = 'Ligaliste';
-            if (window.name === 'rcQueueQuelle') { ziel = CFG.GM_URL; was = 'Genesys-Monitor'; }
-            else if (window.name === 'rcCrocoQuelle' && CFG.CROCO_AN) { ziel = CFG.CROCO_URL; was = 'CroCo-Report'; }
+            // PRAEFIX-Vergleich statt exakt (05.08.): die Fensternamen sind seit
+            // der Stack-Trennung projektspezifisch (rcQueueQuelle_mob,
+            // rcKpiQuelle_um, ...). Ein exakter Vergleich liesse jeden Mobile-/
+            // UM-Monitor-Tab in den Ligaliste-Zweig fallen — nach dem Login
+            // stuende dann die Ligaliste im Monitor-Fenster.
+            var wname = String(window.name || '');
+            if (wname.indexOf('rcQueueQuelle') === 0) { ziel = CFG.GM_URL; was = 'Genesys-Monitor'; }
             // Erst weiter, wenn die Anmeldung wirklich durch ist. Steht noch ein
             // Passwortfeld auf der Seite, wuerde ein sofortiges Weiterspringen die
             // Anmeldung abbrechen und man landete wieder bei "keine Berechtigung".
@@ -788,20 +1090,6 @@
                 'CCS-Anmeldung steht noch aus — bitte anmelden, danach geht es automatisch weiter.'
             );
         }
-    }
-
-    function maybeCroco() {
-        if (stop || !CFG.CROCO_AN) return;
-        var hasCroco = false;
-        try {
-            var sel = document.getElementById('description-settings-list') || document.querySelector('.description-settings-list');
-            if (sel) Array.prototype.forEach.call(sel.options, function (o) { if (/croco/i.test(o.textContent || '')) hasCroco = true; });
-        } catch (e) {}
-        if (!hasCroco) return;
-        if (!once('croco')) return;
-        var ok = runStored(CFG.LS_CROCO, 'Croco-Crawler', function () { return !!window.crocoCrawlerInterval; });
-        if (!ok) bannerAction('Croco-Report erkannt — Croco-Crawler noch nicht hinterlegt (optional, einmalig).',
-            'croco_crawler.js waehlen', function () { window.rcAutoSaveCrawler('croco'); }, '#9C9C9C');
     }
 
     // ========================================================================
@@ -842,7 +1130,7 @@
     }
 
     try {
-        console.log('%c[Autopilot v2] aktiv auf ' + H + '  —  rcAutoStatus() · rcAutoReset() · rcAutoMail("...") · rcAutoOff()',
+        console.log('%c[Autopilot v2] aktiv auf ' + H + '  —  rcAutoManuell(true) · rcAutoStartJetzt() · rcAutoWarum() · rcAutoStatus() · rcAutoReset() · rcAutoOff()',
             'color:#E60000;font-weight:bold');
     } catch (e) {}
 })();

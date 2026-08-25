@@ -376,7 +376,11 @@
     var katalog = {};
     try { Object.keys(RC_GM.katalog).forEach(function (k) { katalog[k] = RC_GM.katalog[k].name || k; }); } catch (e) {}
     var nutzlast = { typ: 'gm_daten', quelle: 'genesys_monitor', ts: jetzt(), provider: RC_GM.provider, daten: stand,
-                     katalog: katalog, auswahl: auswahlLesen() };
+                     katalog: katalog, auswahl: auswahlLesen(),
+                     // Projekt-Kennung (05.08.): das Dashboard verwirft fremde
+                     // Pakete — sonst spraenge die Warteschleifen-Anzeige bei
+                     // drei Monitoren zwischen den Qualitaets-Saetzen hin und her.
+                     projekt: projektAusName() };
     var ziele = [];
     try { new BroadcastChannel(KANAL).postMessage(nutzlast); ziele.push('BroadcastChannel'); } catch (e) {}
     try { if (window.opener && !window.opener.closed) { window.opener.postMessage(nutzlast, '*'); ziele.push('opener'); } } catch (e) {}
@@ -419,11 +423,49 @@
   // dann mit HTTP 414 (Request-URI Too Long) und es kommt GAR NICHTS an.
   // Vorgabe ist deshalb genau die eine Qualitaet, auf die es hier ankommt;
   // weitere lassen sich zuschalten (rcGmQualitaeten oder aus dem Dashboard).
-  var STD_QUALITAET = 'CCS_Category_KA_TEC_TV';        // "C VOICE TECH VKD STANDARD"
   var LS_AUSWAHL    = 'rcGmAuswahl';
   var MAX_FILTER    = 12;                               // Sicherheitsnetz gegen 414
 
+  // Welches ESL-Projekt bedient dieser Monitor-Tab? Aus dem FENSTERNAMEN, den
+  // das oeffnende Dashboard vergibt (rcKey('rcQueueQuelle') -> rcQueueQuelle /
+  // rcQueueQuelle_mob / rcQueueQuelle_um). Tab-eigen, reload-fest — dieselbe
+  // Mechanik wie beim Ligalisten-Crawler (05.08.).
+  function projektAusName() {
+    var n = '';
+    try { n = String(window.name || ''); } catch (e) { return null; }
+    if (n.indexOf('rcQueueQuelle') !== 0) return null;
+    if (n === 'rcQueueQuelle_mob') return 'mobile';
+    if (n === 'rcQueueQuelle_um')  return 'um';
+    if (n === 'rcQueueQuelle')     return 'kabel';
+    return null;
+  }
+  // Standard-Qualitaet(en) je Projekt. Namen aus dem Portal-Katalog (Nutzer-
+  // Mitschnitt 05.08.), Schnittfuehrung wie die belegten Ligaliste-Baeume:
+  // Kabel=Tech, Mobile=Care+Tec, UM=Care.
+  function stdAbfrage() {
+    var p = projektAusName();
+    if (p === 'mobile') return ['CCS_Category_MF_01', 'CCS_Category_MF_02'];
+    if (p === 'um')     return ['CCS_Category_UM_SONST_007'];
+    return ['CCS_Category_KA_TEC_TV'];   // Kabel und unbenannte Tabs
+  }
+  var STD_QUALITAET = stdAbfrage()[0];
+
+  // AUSWAHL-ABLAGE (umgebaut 05.08.): sessionStorage ZUERST, dann die Projekt-
+  // Vorgabe, dann erst localStorage. Grund: rcGmAuswahl liegt im localStorage
+  // von ccs.vodafone.de und wird von ALLEN Monitor-Tabs geteilt — bei drei
+  // Monitoren (Kabel/Mobile/UM) gaelte die zuletzt geschriebene Auswahl fuer
+  // alle drei. sessionStorage ist tab-eigen und ueberlebt den Reload; nach
+  // einem Browser-Neustart greift die Projekt-Vorgabe aus dem Fensternamen.
+  // localStorage bleibt NUR als Rueckfall fuer unbenannte Hand-Tabs — ein
+  // benannter Projekt-Tab darf ihn nie lesen, dort koennte die Auswahl eines
+  // ANDEREN Projekts liegen.
+  var SS_AUSWAHL = 'rcGmAuswahlTab';
   function auswahlLesen() {
+    try {
+      var rohS = sessionStorage.getItem(SS_AUSWAHL);
+      if (rohS) { var aS = JSON.parse(rohS); if (Array.isArray(aS) && aS.length) return aS; }
+    } catch (e) {}
+    if (projektAusName()) return stdAbfrage().slice();
     try {
       var roh = localStorage.getItem(LS_AUSWAHL);
       if (roh) { var a = JSON.parse(roh); if (Array.isArray(a) && a.length) return a; }
@@ -431,7 +473,14 @@
     return [STD_QUALITAET];
   }
   function auswahlSchreiben(liste) {
-    try { localStorage.setItem(LS_AUSWAHL, JSON.stringify(liste)); } catch (e) {}
+    try { sessionStorage.setItem(SS_AUSWAHL, JSON.stringify(liste)); } catch (e) {}
+    // In den geteilten Origin-Speicher nur schreiben, wenn dieser Tab KEIN
+    // benannter Projekt-Tab ist — sonst ueberschriebe der Mobile-Monitor die
+    // Auswahl des Kabel-Monitors (und umgekehrt), genau die Kollision, die
+    // der Umbau beseitigt.
+    if (!projektAusName()) {
+      try { localStorage.setItem(LS_AUSWAHL, JSON.stringify(liste)); } catch (e) {}
+    }
   }
   // Liefert die filter-Strings der gewaehlten Qualitaeten. Unbekannte (noch nicht
   // angelernte) werden uebersprungen; ist am Ende nichts uebrig, wird auf die
@@ -485,6 +534,15 @@
     if (!d || d.typ !== 'gm_auswahl' || !Array.isArray(d.keys)) return;
     auswahlSchreiben(d.keys.slice(0, MAX_FILTER));
     console.log('[GM] Auswahl vom Dashboard uebernommen (' + d.keys.length + ').');
+    // Fehlt eine der gewuenschten Qualitaeten im Katalog, wird sie NACHGELERNT
+    // statt still uebersprungen (05.08.) — sonst fragt aktiveFilter weiter die
+    // Standard-Qualitaet ab, waehrend payload.auswahl die neuen Keys meldet.
+    var fehlend = d.keys.filter(function (k) { return !RC_GM.katalog[k]; });
+    if (fehlend.length) {
+      console.log('[GM] Davon noch nicht angelernt: ' + fehlend.join(', ') + ' — lerne nach.');
+      lerneAlle(LERN_GRENZE_STD, fehlend).then(function () { lauf(false).then(function () { tabelle(); }); });
+      return;
+    }
     lauf(false).then(function () { tabelle(); });
   });
 
@@ -810,7 +868,30 @@
     console.log('Katalog mit ' + Object.keys(RC_GM.katalog).length + ' Qualitaeten geladen. Starte in 3 s.');
   }
   setTimeout(function () {
-    if (Object.keys(RC_GM.katalog).length) { lauf(false).then(function () { starteTakt(); tabelle(); }); return; }
+    if (Object.keys(RC_GM.katalog).length) {
+      // ANLERN-LUECKE geschlossen (05.08.): Vorher wurde NUR bei komplett leerem
+      // Katalog gelernt. Ein Mobile-/UM-Monitor traf aber auf den geteilten
+      // Katalog des Kabel-Monitors (localStorage rcGmKatalog, Origin-weit) —
+      // seine eigenen Qualitaeten (MF_01/MF_02 bzw. UM_SONST_007) fehlten darin,
+      // aktiveFilter uebersprang sie STILL und fiel auf die Kabel-Standard-
+      // Qualitaet zurueck. Der Monitor zeigte dann Kabel-Zahlen unter Mobile-
+      // Ueberschrift, und payload.auswahl meldete trotzdem die MF-Keys — fuer
+      // das Dashboard sah alles richtig aus. Jetzt: fehlen gewuenschte
+      // Qualitaeten im Katalog, werden GENAU DIESE nachgelernt, dann Start.
+      var fehlend = auswahlLesen().filter(function (k) { return !RC_GM.katalog[k]; });
+      if (fehlend.length) {
+        console.log('[GM] ' + fehlend.length + ' gewaehlte Qualitaet(en) noch nicht angelernt: ' +
+          fehlend.join(', ') + ' — lerne sie jetzt nach.');
+        lerneAlle(LERN_GRENZE_STD, fehlend).then(function () {
+          var immerNoch = fehlend.filter(function (k) { return !RC_GM.katalog[k]; });
+          if (immerNoch.length) console.warn('[GM] Nicht anlernbar: ' + immerNoch.join(', ') +
+            ' — heissen die Schluessel in DIESEM Portal so? rcGmKatalog() zeigt, was da ist.');
+          lauf(false).then(function () { starteTakt(); tabelle(); });
+        });
+        return;
+      }
+      lauf(false).then(function () { starteTakt(); tabelle(); }); return;
+    }
     // OHNE Katalog lief der Crawler bisher gar nicht an — er hat nur einen Hinweis
     // ausgegeben und gewartet. Auf einem Wandmonitor liest den niemand, und der
     // Katalog liegt in localStorage, den Citrix regelmaessig leert. Deshalb wird

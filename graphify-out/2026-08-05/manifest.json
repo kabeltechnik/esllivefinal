@@ -1,0 +1,522 @@
+{
+  "kpi_crawler.js": {
+    "mtime": 1785961078.364652,
+    "ast_hash": "f86ba1ad739dd520f7f32f66da3211fd",
+    "semantic_hash": ""
+  },
+  "CLAUDE.md": {
+    "mtime": 1785961477.585337,
+    "ast_hash": "f16f325bc5fd92f9ddee5a2226c337bf",
+    "semantic_hash": ""
+  },
+  "CR-Berechnung.md": {
+    "mtime": 1785189005.6312332,
+    "ast_hash": "58681f88383f07b18d6de87244d5e3b0",
+    "semantic_hash": ""
+  },
+  "Chat_mit_Gemini_um_zu_verstehen.md": {
+    "mtime": 1785189005.6071124,
+    "ast_hash": "fe6e270e86afa3ebda8fb99b554feee3",
+    "semantic_hash": ""
+  },
+  "ESL_ORginal_Konsolen_Elemente_Codes.txt": {
+    "mtime": 1785189005.6765838,
+    "ast_hash": "ef9c35a4a204318b80d2a7bbe205f79b",
+    "semantic_hash": ""
+  },
+  "Inhalt_Eines_Standort_Excels_Als_Beispiel.txt": {
+    "mtime": 1785189005.7216952,
+    "ast_hash": "84b3f68f2a2779ce3a51c2d3397ac3ed",
+    "semantic_hash": ""
+  },
+  "Mitarbeiternamen_Vo_Nummer_Team_Standort.txt": {
+    "mtime": 1785189005.8166611,
+    "ast_hash": "c83c96bd5e53dcb3597922e938dae76f",
+    "semantic_hash": ""
+  },
+  "SETUP_BroadcastChannel.md": {
+    "mtime": 1785189005.8513503,
+    "ast_hash": "9c85b2323b06c7394c6b110121d4fc73",
+    "semantic_hash": ""
+  },
+  "Ziele -leistungsindikatoren-und-servicestandards-des-kpi's.md": {
+    "mtime": 1785189005.9532106,
+    "ast_hash": "559b77ce1b48019bf8bb44c74b6401fb",
+    "semantic_hash": ""
+  },
+  "esl_live_arena_v22.js": {
+    "mtime": 1785940915.9384413,
+    "ast_hash": "76be8c4e00b978437a7ce3040b3b0c83",
+    "semantic_hash": ""
+  },
+  "test_fixture_current_week.json": {
+    "mtime": 1785189005.887634,
+    "ast_hash": "7211932566b3fb9d10f0e9dd99f75187",
+    "semantic_hash": ""
+  },
+  "test_fixture_user_defined.json": {
+    "mtime": 1785189005.9034457,
+    "ast_hash": "c7410db6d6dcc1db97e8f02e329d6c51",
+    "semantic_hash": ""
+  },
+  "Test Excels/Entwicklungsbericht_BCR_Performance_09.07.2026.pdf": {
+    "mtime": 1785189007.8879213,
+    "ast_hash": "0cfc7f6042226eeacde9c8ebe7d476a6",
+    "semantic_hash": ""
+  },
+  ".claude/launch.json": {
+    "mtime": 1785189005.9626906,
+    "ast_hash": "f15723489dd55c552443002a8ac16a8b",
+    "semantic_hash": ""
+  },
+  "league_demo_rows.js": {
+    "mtime": 1785189005.7443545,
+    "ast_hash": "59b54321c4b83e6be04bf27809bc0b91",
+    "semantic_hash": ""
+  },
+  "package.json": {
+    "mtime": 1785404737.7192776,
+    "ast_hash": "7a65f74a83dffcc8f187581bf398dcf3",
+    "semantic_hash": ""
+  },
+  "SALES_LEAGUE_PLAN.md": {
+    "mtime": 1785189005.8463502,
+    "ast_hash": "b43d4ffcf2cfed7d9673c229bc086629",
+    "semantic_hash": ""
+  },
+  ".claude/agents/war-engine-dev.md": {
+    "mtime": 1785189005.974465,
+    "ast_hash": "18242ba917f83f70618387c074ca9928",
+    "semantic_hash": ""
+  },
+  "Chatverlauf mit Claude Code.txt": {
+    "mtime": 1785189005.6204987,
+    "ast_hash": "da5f9a301f84745f2a2b4ff1edd83260",
+    "semantic_hash": ""
+  },
+  "VODAFONE_DESIGN.md": {
+    "mtime": 1785189005.9227247,
+    "ast_hash": "792ec68d1089b361b97327afe26f8223",
+    "semantic_hash": ""
+  },
+  ".claude/settings.local.json": {
+    "mtime": 1785189935.8352332,
+    "ast_hash": "8ee527268c5ee5da29cd9e74bd03be29",
+    "semantic_hash": ""
+  },
+  "ESL_Start.ps1": {
+    "mtime": 1785941076.8914998,
+    "ast_hash": "c9bc21564dfd2d6289a3889002f29b19",
+    "semantic_hash": ""
+  },
+  "esl_autopilot.user.js": {
+    "mtime": 1785940782.0139205,
+    "ast_hash": "f7a3f838c9c5ed3882f7cb7aa4121bfc",
+    "semantic_hash": ""
+  },
+  "esl_autopilot_bookmarklet.txt": {
+    "mtime": 1785189005.6505334,
+    "ast_hash": "f78428c1f8f4ecff94b0dc465643ce1e",
+    "semantic_hash": ""
+  },
+  "fixture_get_data.json": {
+    "mtime": 1785189962.6445363,
+    "ast_hash": "253f0b2ead7da5b3141daf9ebffe8c22",
+    "semantic_hash": ""
+  },
+  "fixture_gm_getdata.json": {
+    "mtime": 1785192166.7551725,
+    "ast_hash": "07d9ff542a7e82a0578848bcc4cf7568",
+    "semantic_hash": ""
+  },
+  "fixture_gm_values.json": {
+    "mtime": 1785192115.1604736,
+    "ast_hash": "f3e17fb8a2a45739d7536e816bb582a8",
+    "semantic_hash": ""
+  },
+  "genesys_monitor_crawler.js": {
+    "mtime": 1785940994.9891565,
+    "ast_hash": "1b2c17a59f54d59ed27182d4562ceb93",
+    "semantic_hash": ""
+  },
+  "rc_recon.js": {
+    "mtime": 1785191930.8734329,
+    "ast_hash": "84f661786e63f7c9bbb0eb5c01a1d1ab",
+    "semantic_hash": ""
+  },
+  ".claude/Skills/SKILL.md": {
+    "mtime": 1785189878.5908792,
+    "ast_hash": "e011e579ec4452562ad319eb27b7e4b0",
+    "semantic_hash": ""
+  },
+  ".claude/Skills/references/clip-path-techniques.md": {
+    "mtime": 1785189878.5318093,
+    "ast_hash": "d23104d2e13034735d1a9e429ee0ca4f",
+    "semantic_hash": ""
+  },
+  ".claude/Skills/references/component-patterns.md": {
+    "mtime": 1785189878.543806,
+    "ast_hash": "e1902925abbc78463cf00ac8162f2a3b",
+    "semantic_hash": ""
+  },
+  ".claude/Skills/references/contextual-animations.md": {
+    "mtime": 1785189878.550811,
+    "ast_hash": "73eb25d1d24f393005eebd7f746c6678",
+    "semantic_hash": ""
+  },
+  ".claude/Skills/references/decision-framework.md": {
+    "mtime": 1785189878.556812,
+    "ast_hash": "d35befe40d5dcdb269e47a6e308a203f",
+    "semantic_hash": ""
+  },
+  ".claude/Skills/references/gesture-drag.md": {
+    "mtime": 1785189878.5623195,
+    "ast_hash": "d0bf27bb40fcc6fe024b19cdcdf5cbad",
+    "semantic_hash": ""
+  },
+  ".claude/Skills/references/performance-deep-dive.md": {
+    "mtime": 1785189878.5688512,
+    "ast_hash": "0499dae6d205e727b8d8cf46ceb6f919",
+    "semantic_hash": ""
+  },
+  ".claude/Skills/references/review-format.md": {
+    "mtime": 1785189878.5748706,
+    "ast_hash": "0c768881c835a214e80f8f60a95f3b40",
+    "semantic_hash": ""
+  },
+  ".claude/Skills/references/spring-animations.md": {
+    "mtime": 1785189878.5818734,
+    "ast_hash": "5965976566dce72eeb6f55c6dc4c4630",
+    "semantic_hash": ""
+  },
+  "fixture_table.html": {
+    "mtime": 1785189964.8222954,
+    "ast_hash": "536de47de7eff10bc62274483a77b966",
+    "semantic_hash": ""
+  },
+  "test_gm_offline.html": {
+    "mtime": 1785192178.9806023,
+    "ast_hash": "ce6af4667aefea74f487583e8cf9ec07",
+    "semantic_hash": ""
+  },
+  "test_recon_offline.html": {
+    "mtime": 1785189960.8341887,
+    "ast_hash": "480f9f8aabc2d9b7ebafc7295a59548d",
+    "semantic_hash": ""
+  },
+  "croco_crawler.js": {
+    "mtime": 1785193713.1543736,
+    "ast_hash": "13ec6b3011be36a1f2c7852721360e35",
+    "semantic_hash": ""
+  },
+  "croco_tuner.js": {
+    "mtime": 1785194314.2580154,
+    "ast_hash": "705935a7697ec195b0fef031bcd0071d",
+    "semantic_hash": ""
+  },
+  "fixture_croco_result.json": {
+    "mtime": 1785193730.9878404,
+    "ast_hash": "fdea874b0e2d92ae93e2152070889748",
+    "semantic_hash": ""
+  },
+  ".claude/Skills/ui-animation/SKILL.md": {
+    "mtime": 1785193413.6827548,
+    "ast_hash": "e011e579ec4452562ad319eb27b7e4b0",
+    "semantic_hash": ""
+  },
+  ".claude/Skills/ui-animation/references/clip-path-techniques.md": {
+    "mtime": 1785193413.643329,
+    "ast_hash": "d23104d2e13034735d1a9e429ee0ca4f",
+    "semantic_hash": ""
+  },
+  ".claude/Skills/ui-animation/references/component-patterns.md": {
+    "mtime": 1785193413.6486466,
+    "ast_hash": "e1902925abbc78463cf00ac8162f2a3b",
+    "semantic_hash": ""
+  },
+  ".claude/Skills/ui-animation/references/contextual-animations.md": {
+    "mtime": 1785193413.654648,
+    "ast_hash": "73eb25d1d24f393005eebd7f746c6678",
+    "semantic_hash": ""
+  },
+  ".claude/Skills/ui-animation/references/decision-framework.md": {
+    "mtime": 1785193413.6593378,
+    "ast_hash": "d35befe40d5dcdb269e47a6e308a203f",
+    "semantic_hash": ""
+  },
+  ".claude/Skills/ui-animation/references/gesture-drag.md": {
+    "mtime": 1785193413.6633465,
+    "ast_hash": "d0bf27bb40fcc6fe024b19cdcdf5cbad",
+    "semantic_hash": ""
+  },
+  ".claude/Skills/ui-animation/references/performance-deep-dive.md": {
+    "mtime": 1785193413.6680129,
+    "ast_hash": "0499dae6d205e727b8d8cf46ceb6f919",
+    "semantic_hash": ""
+  },
+  ".claude/Skills/ui-animation/references/review-format.md": {
+    "mtime": 1785193413.6720164,
+    "ast_hash": "0c768881c835a214e80f8f60a95f3b40",
+    "semantic_hash": ""
+  },
+  ".claude/Skills/ui-animation/references/spring-animations.md": {
+    "mtime": 1785193413.676023,
+    "ast_hash": "5965976566dce72eeb6f55c6dc4c4630",
+    "semantic_hash": ""
+  },
+  "test_croco_offline.html": {
+    "mtime": 1785194165.1022928,
+    "ast_hash": "689e4239c13892a4287f50102f20c924",
+    "semantic_hash": ""
+  },
+  ".claude/agents/autopilot-spezialist.md": {
+    "mtime": 1785195561.547786,
+    "ast_hash": "17d0380111b5bc7b27be9aaf8ac74d3a",
+    "semantic_hash": ""
+  },
+  ".claude/agents/daten-auditor.md": {
+    "mtime": 1785195109.8994074,
+    "ast_hash": "7b7c7a16e06b3a28fe038ab998bda7aa",
+    "semantic_hash": ""
+  },
+  ".claude/agents/excel-export-spezialist.md": {
+    "mtime": 1785195505.6752098,
+    "ast_hash": "19d3b6bfb0dec0c9fe0f61562b5b5721",
+    "semantic_hash": ""
+  },
+  ".claude/agents/league-modus-spezialist.md": {
+    "mtime": 1785195457.2930217,
+    "ast_hash": "c3fad9d04a4e5f1f4d1fbd0291f9811f",
+    "semantic_hash": ""
+  },
+  ".claude/agents/portal-recon-spezialist.md": {
+    "mtime": 1785195396.7516313,
+    "ast_hash": "88562c097bb7e170e4176a08f1d6de81",
+    "semantic_hash": ""
+  },
+  ".claude/agents/ui-design-animation.md": {
+    "mtime": 1785195619.094858,
+    "ast_hash": "4e08f51bb614941caa0e9a76aeeba371",
+    "semantic_hash": ""
+  },
+  ".claude/agents/sales-manager.md": {
+    "mtime": 1785220441.2543628,
+    "ast_hash": "babb0a11928f84c21fb5468297a9c53c",
+    "semantic_hash": ""
+  },
+  "motion_demo.html": {
+    "mtime": 1785196082.358981,
+    "ast_hash": "07585e2804babb3fdc35e880be28d67c",
+    "semantic_hash": ""
+  },
+  "bundle_bauen.js": {
+    "mtime": 1785959771.1443808,
+    "ast_hash": "9208df889f3c2530ed638d2fd3c1ff47",
+    "semantic_hash": ""
+  },
+  "esl_mail_report.ps1": {
+    "mtime": 1785908686.1742637,
+    "ast_hash": "1200f56c44acfb4a9dda44b4efacd2c6",
+    "semantic_hash": ""
+  },
+  "ps1_erzeugen.js": {
+    "mtime": 1785278889.6850345,
+    "ast_hash": "c6b278b9f2fe08c3cda511d803e93f96",
+    "semantic_hash": ""
+  },
+  "pruefwerkzeuge/liga_nach_crawlerformat.js": {
+    "mtime": 1785282680.1709929,
+    "ast_hash": "08bcce6500faa876ab8c888b08754e79",
+    "semantic_hash": ""
+  },
+  "pruefwerkzeuge/tdz_pruefen.js": {
+    "mtime": 1785282680.1388364,
+    "ast_hash": "6165c03e612ada5911e262da285de79f",
+    "semantic_hash": ""
+  },
+  "pruefwerkzeuge/LIESMICH.md": {
+    "mtime": 1785282696.6231778,
+    "ast_hash": "735f965a567b016e05ef8f1623483236",
+    "semantic_hash": ""
+  },
+  "rc_lupe.js": {
+    "mtime": 1785357590.9017756,
+    "ast_hash": "97c96fce835370d01acda9372ab181e7",
+    "semantic_hash": ""
+  },
+  "Ligaliste_Crawler.html": {
+    "mtime": 1785361282.4577537,
+    "ast_hash": "c252adbb0d2f8d165ea26f1be405b68b",
+    "semantic_hash": ""
+  },
+  "UPDATE_PAKET_BAUPLAN.md": {
+    "mtime": 1785324738.3263552,
+    "ast_hash": "56afd581bbd385bcdcca5049214e2afa",
+    "semantic_hash": ""
+  },
+  "test_standexport.html": {
+    "mtime": 1785417613.0774927,
+    "ast_hash": "260886a9e7b24d8d91358e6f2de4b3e0",
+    "semantic_hash": ""
+  },
+  "pruefwerkzeuge/portal_steckbrief.js": {
+    "mtime": 1785444342.6798713,
+    "ast_hash": "776b3f503aa4c6fa42e8bba1a965c8ee",
+    "semantic_hash": ""
+  },
+  "pruefwerkzeuge/sperre_pruefen.js": {
+    "mtime": 1785445939.1529906,
+    "ast_hash": "44a3d7dcd7e7c30358e493be297cce93",
+    "semantic_hash": ""
+  },
+  "pruefwerkzeuge/standort_varianten_pruefen.js": {
+    "mtime": 1785961122.2832532,
+    "ast_hash": "3f22d5133e9c94f6dcfc7b2792f879dc",
+    "semantic_hash": ""
+  },
+  "autopilot_varianten_erzeugen.js": {
+    "mtime": 1785484076.246709,
+    "ast_hash": "4c92bd44ff1cbbc904b6b14903e2a15a",
+    "semantic_hash": ""
+  },
+  "esl_autopilot_mobile.user.js": {
+    "mtime": 1785941076.8123932,
+    "ast_hash": "1f913a7a09a2233bd8f022bb38c3daa2",
+    "semantic_hash": ""
+  },
+  "esl_autopilot_um.user.js": {
+    "mtime": 1785941076.8173928,
+    "ast_hash": "7b09ffdb5e792aba23a73098791da06e",
+    "semantic_hash": ""
+  },
+  "pruefwerkzeuge/neuanmeldung_pruefen.js": {
+    "mtime": 1785519106.1587029,
+    "ast_hash": "0c5f5fbc0a49971540753c124f2f245e",
+    "semantic_hash": ""
+  },
+  "pruefwerkzeuge/projekt_trennung_pruefen.js": {
+    "mtime": 1785484256.4028666,
+    "ast_hash": "c59b6b49275106c7aa58fea458ccc129",
+    "semantic_hash": ""
+  },
+  "pruefwerkzeuge/vertrieb_historie_pruefen.js": {
+    "mtime": 1785481371.6273644,
+    "ast_hash": "3bf10424e8ae79253efab64d596e4a00",
+    "semantic_hash": ""
+  },
+  "pruefwerkzeuge/zeitraum_rechnen_pruefen.js": {
+    "mtime": 1785525213.6588552,
+    "ast_hash": "54995f418d4e1c68fed26bd2caa3da70",
+    "semantic_hash": ""
+  },
+  "pruefwerkzeuge/kennzahlen_pruefen.js": {
+    "mtime": 1785794559.3411016,
+    "ast_hash": "9f5de6337865521fb415da93976d2efd",
+    "semantic_hash": ""
+  },
+  "pruefwerkzeuge/stundenmail_pruefen.js": {
+    "mtime": 1785908810.3292487,
+    "ast_hash": "329f0e278ad8cc1c473ccb942ae40bf2",
+    "semantic_hash": ""
+  },
+  "pruefwerkzeuge/vertrieb_spalten_pruefen.js": {
+    "mtime": 1785837603.169866,
+    "ast_hash": "94c50bf921efe662b31c062028f4bb05",
+    "semantic_hash": ""
+  },
+  "README.md": {
+    "mtime": 1785734372.565625,
+    "ast_hash": "57c506e03c10d102469d4353a5548387",
+    "semantic_hash": ""
+  },
+  "pruefwerkzeuge/warteschleife_acw_pruefen.js": {
+    "mtime": 1785959236.846664,
+    "ast_hash": "695dd69ca671a4d48f90732c174a1e99",
+    "semantic_hash": ""
+  },
+  "pruefwerkzeuge/ziele_pruefen.js": {
+    "mtime": 1785839313.981367,
+    "ast_hash": "858af170f452270232cce9d46aff8500",
+    "semantic_hash": ""
+  },
+  "liga_echt.json": {
+    "mtime": 1785838924.4603992,
+    "ast_hash": "406e697e72ff4c4529f1d286b87c9b86",
+    "semantic_hash": ""
+  },
+  "test_reportbilder.html": {
+    "mtime": 1785870524.7540023,
+    "ast_hash": "1ed1e7326ac6fce4b2f1aec15889130b",
+    "semantic_hash": ""
+  },
+  "veyseLL_Update_20260804_2215.txt": {
+    "mtime": 1785870917.448273,
+    "ast_hash": "5d045fed4d3b0cb40ac2856e5ecf6c97",
+    "semantic_hash": ""
+  },
+  "pruefwerkzeuge/aktualisieren_pruefen.js": {
+    "mtime": 1785877751.2473562,
+    "ast_hash": "6c28032685b4b8b20964a5de0c37add5",
+    "semantic_hash": ""
+  },
+  "pruefwerkzeuge/projektwechsel_pruefen.js": {
+    "mtime": 1785903557.1560228,
+    "ast_hash": "324295a57317ff2da4837cf29af5f7b7",
+    "semantic_hash": ""
+  },
+  "veyseLL_Update_20260805_0735.txt": {
+    "mtime": 1785904557.2987187,
+    "ast_hash": "9052551d3478508b79f505344a7dea04",
+    "semantic_hash": ""
+  },
+  "pruefwerkzeuge/vollbericht_zeitraum_pruefen.js": {
+    "mtime": 1785908490.4129562,
+    "ast_hash": "9edc00ed5e6804ef36d4126dce669c5d",
+    "semantic_hash": ""
+  },
+  "veyseLL_Update_20260805_0847.txt": {
+    "mtime": 1785908832.298659,
+    "ast_hash": "55e2ea234203d6cd9b75cca587a86157",
+    "semantic_hash": ""
+  },
+  "veyseLL_Update_20260805_1723.txt": {
+    "mtime": 1785939789.3701909,
+    "ast_hash": "c7453b3bcb80a29811cc964b21f4e699",
+    "semantic_hash": ""
+  },
+  "pruefwerkzeuge/stack_trennung_pruefen.js": {
+    "mtime": 1785961445.5699465,
+    "ast_hash": "c52aa4bab46b29441394bb55cd7159d5",
+    "semantic_hash": ""
+  },
+  "veyseLL_Update_20260805_1747.txt": {
+    "mtime": 1785941250.8748913,
+    "ast_hash": "7fe9f316cc74ed4175d21d5058fe1d9d",
+    "semantic_hash": ""
+  },
+  "liga_diagnose.js": {
+    "mtime": 1785959348.4955096,
+    "ast_hash": "8fb809afe7a2619e9e4374c0ab2e26b8",
+    "semantic_hash": ""
+  },
+  "veyseLL_Update_20260805_2247.txt": {
+    "mtime": 1785959243.8141847,
+    "ast_hash": "abef242f3c956186353708c3a63d98ed",
+    "semantic_hash": ""
+  },
+  "veyseLL_Update_20260805_2256.txt": {
+    "mtime": 1785959782.1051116,
+    "ast_hash": "9e490b0323d6e799f99d76072752dff9",
+    "semantic_hash": ""
+  },
+  "veyseLL_Update_20260805_2319.txt": {
+    "mtime": 1785961172.416857,
+    "ast_hash": "a649070d17fb5ee2589fd163189dc8a1",
+    "semantic_hash": ""
+  },
+  "veyseLL_Update_20260805_2324.txt": {
+    "mtime": 1785961488.9081876,
+    "ast_hash": "b320dfd48eee3eacea13c755f088bc16",
+    "semantic_hash": ""
+  }
+}

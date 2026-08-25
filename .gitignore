@@ -9,3 +9,15 @@ ESL_ORginal_Konsolen_Elemente_Codes.txt
 Inhalt_Eines_Standort_Excels_Als_Beispiel.txt
 Test Excels/
 ~$*
+
+# 22.08. beim GitHub-Sync gefunden: Zugangsdaten-Klartext, echte Mitarbeiter-
+# PII in Fixture-Daten, reale Produktionsexporte, Portal-Mitschnitte mit
+# internen IDs/URLs, sowie generierte Update-Pakete (gehoeren laut CLAUDE.md
+# ohnehin in ein isoliertes, separates Repo, nicht ins Haupt-Repo).
+esl-login-projekte.txt
+liga_echt.json
+Excels vergleich/
+veyseLL_Update_*.txt
+ligaliste_vorlage_mitschnitt.txt
+ESL_Kopierte_Konsolen_Codes.txt
+.driver_state.json

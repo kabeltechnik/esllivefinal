@@ -107,7 +107,7 @@
   schreib('Speicher:     ' + (function () {
     try {
       var w = [];
-      ['rcWcaCrawlerSrc', 'rcGmCrawlerSrc', 'rcCrocoCrawlerSrc', 'rcGmKatalog', 'rcGmAuswahl',
+      ['rcWcaCrawlerSrc', 'rcGmCrawlerSrc', 'rcGmKatalog', 'rcGmAuswahl',
        'rcLigaMonatsHarvest', 'rcLigaWochenHarvest', 'rcCrawlerAlleStd'].forEach(function (k) {
         var v = localStorage.getItem(k);
         w.push('    ' + k + ' = ' + (v == null ? '(fehlt)' : (v.length > 60 ? v.length + ' Zeichen' : v)));
