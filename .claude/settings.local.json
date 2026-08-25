@@ -2,7 +2,10 @@
   "permissions": {
     "allow": [
       "PowerShell(node --check \"C:\\\\Users\\\\v3reg\\\\Downloads\\\\CRAW ESL\\\\LIVE ARENA\\\\rc_recon.js\")",
-      "PowerShell(if \\($?\\) { \"Syntax OK\" })"
+      "PowerShell(if \\($?\\) { \"Syntax OK\" })",
+      "PowerShell($f = Get-Item \"CLAUDE.md\"; \"Groesse: $\\($f.Length\\) Byte, geaendert: $\\($f.LastWriteTime\\)\"; $h = Get-Item \"CLAUDE_HISTORIE.md\"; \"HISTORIE: $\\($h.Length\\) Byte\"; \"python: \" + \\(Get-Command python -ErrorAction SilentlyContinue\\).Source; \"python3: \" + \\(Get-Command python3 -ErrorAction SilentlyContinue\\).Source; \"py: \" + \\(Get-Command py -ErrorAction SilentlyContinue\\).Source; \"claude: \" + \\(Get-Command claude -ErrorAction SilentlyContinue\\).Source; \"PYTHONUTF8=\" + $env:PYTHONUTF8; \"API-Key gesetzt: \" + [bool]$env:ANTHROPIC_API_KEY; \"MaxOut=\" + $env:CLAUDE_CODE_MAX_OUTPUT_TOKENS; $b = Join-Path $env:LOCALAPPDATA \"caveman-compress\\\\backups\\\\LIVE ARENA\\\\CLAUDE.original.md\"; \"Alt-Backup vorhanden: \" + \\(Test-Path $b\\))",
+      "Bash(cd \"/c/Users/v3reg/Downloads/Regiocom Project/TL_Command_Center\" && ls -la && ls docs .agents 2>/dev/null; wc -l TL_Cockpit.html TL_Starter.cmd tl_dienst.js README.md CLAUDE.md AGENTS.md 2>/dev/null)",
+      "Bash(graphify explain *)"
     ]
   }
 }

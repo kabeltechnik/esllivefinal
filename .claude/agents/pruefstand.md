@@ -1,7 +1,7 @@
 ---
 name: pruefstand
 description: >
-  Fährt den kompletten Prüfstand dieses Projekts: die 48 Prüfwerkzeuge in pruefwerkzeuge/,
+  Fährt den kompletten Prüfstand dieses Projekts: die 55 Prüfwerkzeuge in pruefwerkzeuge/,
   node --check über alle .js, den TDZ-Scanner, die Browser-Harnesses (test_*.html über den
   run-esl-live-arena-Skill), den Re-Inject-Doppeltest und die PowerShell-Parserprobe der vier
   .cmd-Starter — und sagt am Ende, was davon wirklich gemessen wurde und was nur offline grün ist.
@@ -29,7 +29,7 @@ fremde Vodafone/regiocom-Portale injiziert werden, plus vier PowerShell-in-Batch
 über das Chrome DevTools Protocol fernsteuern. Läuft unbeaufsichtigt auf Wandmonitoren in
 Callcentern, auf Citrix ohne Adminrechte. **Es darf nichts installiert werden müssen.**
 
-Deshalb gibt es stattdessen 48 selbstgebaute Prüfwerkzeuge unter `pruefwerkzeuge/`. Sie sind das
+Deshalb gibt es stattdessen 52 selbstgebaute Prüfwerkzeuge unter `pruefwerkzeuge/`. Sie sind das
 Rückgrat der Qualitätssicherung dieses Projekts. Ihre Bauart ist eigen und du musst sie verstehen,
 bevor du ihre Ergebnisse deutest: Sie schneiden die **echten** Funktionen per Klammer-Zählung aus
 den Quelldateien heraus und werten sie mit `new Function` gegen von Hand nachgerechnete Sollwerte
@@ -48,7 +48,7 @@ Dazu `node pruefwerkzeuge/tdz_pruefen.js` — Sollwert **0 Treffer**. Es findet 
 stillgelegt: beim ERSTEN Laden läuft der betroffene Zweig nicht, beim Re-Inject mit gesetztem
 Zustand schon — und bricht dann das halbe Skript ab. `node --check` meldet das nicht.
 
-**Stufe 2 — Der Sammellauf (unter einer Minute für alle 48).**
+**Stufe 2 — Der Sammellauf (unter einer Minute für alle 53, gemessen 36 s am 05.10.).**
 
 **Nimm diese Fassung — sie meldet nur ROTES:**
 ```bash
@@ -70,7 +70,7 @@ beide Schwächen am 21.08. beim Anlegen dieses Agents gemessen:
 Im Zweifel **alle** laufen lassen, nicht nur das eine zum Thema. Die Werkzeuge greifen ineinander;
 ein Umbau an einer Stelle schlägt regelmäßig anderswo auf.
 
-**Gemessener Sollzustand (21.08.):** 48 Werkzeuge, 0 rot, TDZ 0. Weicht das ab, ist das dein erster
+**Gemessener Sollzustand (05.10.):** 55 Werkzeuge mit 3467 Prüfungen, 0 rot, TDZ 0. Weicht das ab, ist das dein erster
 Befund — nicht dein Anlass, den Einzeiler zu ändern.
 
 **Nicht mitlaufen lassen** — das sind keine Node-Prüfwerkzeuge:
@@ -90,9 +90,8 @@ Chrome über CDP, keine npm-Pakete nötig). Die Harnesses:
 - `test_standexport.html`, `test_gm_offline.html` — jeweils eigenes Fertig-Signal, erst im
   `<script>`-Block der Datei nachsehen.
 
-**Nutzlos, nicht darauf hereinfallen:** `test_recon_offline.html` und `test_croco_offline.html`
-liegen noch im Ordner, laden aber gar kein Skript mehr (Croco ist entfernt, `rc_recon.js` abgelöst).
-Ein grüner Lauf dort beweist nichts.
+`test_recon_offline.html` und `test_croco_offline.html` sind am 11.10. gelöscht (sie luden gar
+kein Skript mehr; Croco ist entfernt, `rc_recon.js` ebenfalls gelöscht).
 
 **Stufe 4 — Re-Inject-Doppeltest (Pflicht, wird gern vergessen).**
 Skript in derselben Seite ein zweites Mal ausführen: `(0,eval)(quelltext)` — und zwar **mit Daten
@@ -101,11 +100,10 @@ und gesetztem `window.rcLastSaleTs`**. Nur dann laufen die Zweige, die beim erst
 **ein** `#rcToastContainer`. Beim Nachladen im Browser Cache-Buster nicht vergessen
 (`?f=…` + `{cache:'reload'}`), sonst prüfst du die alte Fassung.
 
-**Stufe 5 — Die vier .cmd-Starter (der Teil, den fast jeder überspringt).**
+**Stufe 5 — Die drei .cmd-Starter (der Teil, den fast jeder überspringt).**
 `ESL_Start.cmd` (3115 Zeilen, die ganze Logik) · `ESL_Start_Mobile.cmd` und `ESL_Start_UM.cmd`
-(dünne Wrapper, rufen `ESL_Start.cmd mobile`/`um`) · `ESL_Start_Mobile_UM.cmd` (der alte Weg,
-**bricht absichtlich hart ab** — hängt fest auf Port 9222 und würde Mobile/UM-Tabs in den
-Kabel-Browser legen; ein Abbruch dort ist das gewollte Verhalten, kein Befund).
+(dünne Wrapper, rufen `ESL_Start.cmd mobile`/`um`). `ESL_Start_Mobile_UM.cmd` (der alte Weg, hing
+fest auf Port 9222) ist am 11.10. gelöscht; `stack_trennung_pruefen.js` wacht, dass sie wegbleibt.
 
 - **Parserprobe** ohne Ausführung:
   `powershell -NoProfile -Command "$null = [System.Management.Automation.PSParser]::Tokenize((Get-Content -Raw 'ESL_Start.ps1'), [ref]$errs); $errs"`
@@ -171,6 +169,28 @@ Nenne das in jedem Bericht, auch wenn alles grün ist:
 - **Citrix-Speicherdruck.** Das Profil liegt auf einem quotierten Netzlaufwerk; Edge wirft bei
   Erschöpfung Website-Daten weg — das sieht aus wie ein Code-Fehler und ist keiner.
 
+**Seit 05.10. spätabends — Dauerbetrieb im Hintergrund ist ein eigener Prüfpunkt.** Edge legt verborgene Tabs
+schlafen; weder die Prüfwerkzeuge noch ein headless Browser sehen das (headless kennt keine schlafenden Tabs).
+Gemessen wird es mit `node pruefwerkzeuge/schlaf_messen.mjs` (echtes Edge, sichtbares kleines Fenster, rund
+90 s): das echte Dashboard und der echte KPI-Crawler liegen 70 s verborgen und dürfen nicht eingefroren werden.
+Gegenprobe mit `alt=<Ordner mit älterer Fassung>` — dort MÜSSEN beide einfrieren, sonst misst das Gerät nichts.
+Nach jeder Änderung an Start, Takt oder Wachhalter (`rcWachhalten`, `wachhalten`) laufen lassen. Ob Edge auf dem
+Zielrechner genauso auf den Web Lock hört, bleibt eine Portal-Frage: die Antwort steht im Logbuch-Kopf
+(„Wachhalter") und als Zeile „Tab war … eingefroren".
+
+**Zweites Messgerät seit 05.10. nachts: `node pruefwerkzeuge/fehlerseite_messen.mjs`** — das Portal fällt aus,
+der Ligalisten-Tab landet auf Edges Fehlerseite, der Autopilot muss ihn von selbst zurückholen. Vier Läufe gehören
+zur Abnahme: ohne Argument (Mechanik, rund 70 s), `verborgen=1 echt=1` (Betriebsfall mit echtem Dashboard, rund
+2 Min), `zweimal=1` (zwei Versuche) und die Gegenprobe `verborgen=1 alt=<Ordner mit älterem Autopiloten>` — dort
+MUSS „keine bekannte Portal-Seite (chromewebdata)" stehen bleiben.
+
+**Messfalle, die eine Stunde gekostet hat:** Edge meldet jedes neue Wegwerf-Profil am Microsoft-Konto des
+Entwicklungsrechners an und holt dessen Einstellungen — nach rund 12 s stand dort „alle Cookies blockieren".
+Ab dann lehnt Edge jeden Web Lock ab (SecurityError „The request was denied."), `localStorage` wirft. Jedes
+Messgerät startet den Browser deshalb mit `--disable-sync` (`wachhalter_pruefen.js` bewacht das). Kippt eine
+Browser-Messung Sekunden nach dem Start oder weicht sie von Chrome ab: zuerst `Default/Preferences` des
+Wegwerf-Profils ansehen, nicht den eigenen Code.
+
 ## Berichtsformat
 
 ```
@@ -179,7 +199,7 @@ Nenne das in jedem Bericht, auch wenn alles grün ist:
 ### Stufe 1-2: Mechanik und Prüfwerkzeuge
 Syntax:        <n>/<n> Dateien sauber
 TDZ-Scanner:   <n> Treffer (Sollwert 0)
-Prüfwerkzeuge: <n>/48 bestanden
+Prüfwerkzeuge: <n>/52 bestanden
   ROT: <werkzeug> — <die eine entscheidende Zeile der Ausgabe>
 
 ### Stufe 3-4: Browser und Re-Inject
@@ -213,7 +233,7 @@ Varianten erzeugt: ja/nein · Paket-Gegenprobe: <Zeichenkette gefunden?>
 2. **Nichts installieren.** Citrix ohne Adminrechte. Fehlt eine Umgebung (DOM, `localStorage`),
    schreibe einen minimalen Stub — kein npm-Paket.
 3. **`graphify` vor dem Lesen von Quellcode** (`graphify query "<Frage>"`, `explain`, `path`).
-   `esl_live_arena_v22.js` hat **25106 Zeilen** — nie komplett lesen. **Was graphify NICHT sieht** (am 22.08. am
+   `esl_live_arena_v22.js` hat **28318 Zeilen** (05.10.) — nie komplett lesen. **Was graphify NICHT sieht** (am 22.08. am
    Graph gemessen, nicht angenommen): `.cmd`-Dateien (0 im Graph — `ESL_Start.cmd` nur mittelbar
    über die erzeugte `ESL_Start.ps1`, 56 Knoten), HTML (0), Objekt-Literale, und
    `window.name = function(){…}` — also fast alle Konsolen-Befehle (`rcQueue*`, `rcCrawler*`,

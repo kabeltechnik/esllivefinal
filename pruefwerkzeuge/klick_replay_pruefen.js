@@ -156,6 +156,9 @@ async function replayBody(capBody){
     schneideAus(src, 'function baumAusBody(') +
     schneideAus(src, 'function lokVollstaendig(') +
     schneideAus(src, 'function verwerteAntwort(') +
+    // Seit 05.10.: der Replay geht ueber abrufMitFrist (Frist + Roh-fetch).
+    'var ABRUF_FRIST_MS = 90000, ABRUF_FRIST_ZEITRAUM_MS = 150000;' +
+    schneideAus(src, 'function abrufMitFrist(') +
     schneideAus(src, 'function pollKpis(') +
     '; return pollKpis(false);';
   const p = new Function('window', 'URLSearchParams', 'console', 'setTimeout', 'clearTimeout', body)(

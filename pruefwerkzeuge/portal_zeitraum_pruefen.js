@@ -98,7 +98,10 @@ function baueUmgebung() {
     const koeder = knoten({ id:'filterForm:anz', type:'submit', innerText:'Anzeigen' });
     koeder.click = function(){ if (this.abgehaengt) { zustand.totKlicks++; return; } zustand.koederKlicks++; };
 
-    const exp = knoten({ id:'filterForm:j_idt640', type:'button', title:'Export Projektergebnisse', innerText:'Excel-Export' });
+    // Export-Knopf wie am Portal gemessen (28.09.): type="submit", icon-only,
+    // title "Liste exportieren". Gesucht wird er nach dem Klick im FRISCHEN Formular.
+    const exp = knoten({ id:'filterForm:j_idt640', type:'submit', title:'Liste exportieren',
+                         innerHTML:'<span class="ui-icon fa fa-file-excel-o"></span><span class="ui-button-text">Liste exportieren</span>' });
     exp.click = function(){};
 
     const felder = [von, bis], knoepfe = [upd, koeder, exp];
@@ -218,7 +221,8 @@ pruef('  ... und erzwingen=true umgeht sie (Mitternacht)', /if \(!erzwingen && j
 console.log('\n-- 3. Der Historienlauf stellt den Zeitraum zurueck (der eigentliche Fehler) --');
 {
   const { zustand, umgebung } = baueUmgebung();
-  const fn = lade('async function rcFetchRangeViaUIIntern(fromStr, toStr)', umgebung, helferTxt);
+  // Seit 28.09. sucht der Export-Schritt ueber rcExportKnopfFinden im frischen Formular.
+  const fn = lade('async function rcFetchRangeViaUIIntern(fromStr, toStr)', umgebung, helferTxt + '\n' + schneide(dash, 'function rcExportKnopfFinden(liste)'));
   const p = fn('01.08.2026', '13.08.2026');
   p.then(buf => {
     pruef('der Bereichs-Export kommt weiter an (Harvest bleibt heil)', !!buf);
@@ -273,6 +277,8 @@ console.log('\n-- 3. Der Historienlauf stellt den Zeitraum zurueck (der eigentli
     pruef('die verwaisten oVon/oBis sind entfernt', !/const oVon = vonI\.value/.test(dash));
 
     // ------------------------------------------------------------------
+    // 27.09.: dritte Stelle rcRahmenExport — dasselbe Abrufprotokoll fuer die
+    // Mobile-/UM-Rahmen des Alle-Projekte-Betriebs, ebenfalls ohne Klick.
     // Zwei weitere Stellen tragen dieselbe alte Wortliste. Sie sind ABSICHTLICH
     // unveraendert und das hier haelt es fest, damit sie nicht als "uebersehen"
     // gelten: beide KLICKEN nichts. Sie lesen nur searchBtn.id und bauen daraus
@@ -282,14 +288,18 @@ console.log('\n-- 3. Der Historienlauf stellt den Zeitraum zurueck (der eigentli
     // angefasst; ein falsch gewaehltes javax.faces.source koennte einen
     // funktionierenden Export kaputtmachen.
     console.log('\n-- 6. Bewusst NICHT angefasst (kein Klick, sondern javax.faces.source) --');
-    const posts = ['async function holeExcelVomServer()', 'async function rcFetchRangeBuffer(fromStr, toStr, fullMode)'];
+    const posts = ['async function holeExcelVomServer()', 'async function rcFetchRangeBuffer(fromStr, toStr, fullMode)',
+                   'async function rcRahmenExport(f)'];
     posts.forEach(kopf => {
       const b = schneide(dash, kopf);
       pruef(kopf.replace(/async function |\(.*/g,'') + ' klickt den Knopf nicht', !!b && !/searchBtn\.click\(\)/.test(b));
       pruef('  ... sondern postet ihn als javax.faces.source', /javax\.faces\.source/.test(b));
     });
-    pruef('  ... deshalb steht die alte Wortliste dort noch (2 Vorkommen, unveraendert)',
-      (dash.match(/suchen\|aktualisieren\|filtern\|anzeigen/g) || []).length === 2,
+    // Jedes Vorkommen muss in einer dieser Stellen stehen — ein viertes ausserhalb
+    // waere ein ungeprueftes Klick-Risiko.
+    pruef('  ... deshalb steht die alte Wortliste dort noch (3 Vorkommen, je eins pro Stelle)',
+      (dash.match(/suchen\|aktualisieren\|filtern\|anzeigen/g) || []).length === 3 &&
+      posts.every(k => /suchen\|aktualisieren\|filtern\|anzeigen/.test(schneide(dash, k) || '')),
       String((dash.match(/suchen\|aktualisieren\|filtern\|anzeigen/g) || []).length));
 
     console.log('\n' + (fehl ? '  ' + ok + ' bestanden, ' + fehl + ' FEHLGESCHLAGEN.'

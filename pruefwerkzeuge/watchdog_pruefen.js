@@ -99,6 +99,7 @@ abschnitt('2. Die Leiter, funktional durchgespielt');
         schneideAus(src, 'function rcWdStilleMin(quelle)'),
         schneideAus(src, 'function rcWdTick()'),
         schneideAus(src, 'function rcWdAlarm(quelle, stillMin)'),
+        schneideAus(src, 'function rcDienstModus()'),   // Dienst-Schalter (27.10.): ohne Marke wie bisher
         'return { RC_WD, rcWdTick, rcWdStilleMin };',
     ].join('\n');
 

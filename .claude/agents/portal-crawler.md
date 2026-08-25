@@ -56,6 +56,28 @@ Klick-Persistenz: Hook v3 (`__rcReqHooked = 3`) sichert den Mitschnitt über `wi
 nach `rcKlickMitschnitt_v1[_mob|_um]`, projektgetrennt, Alterung 3 h. Der tot-Pfad ruft
 `klickVerwerfen()` VOR `sitzungTot`.
 
+**Stand 05.10. spätabends (v6.1) — die Ligaliste läuft im HINTERGRUND, und Edge friert verborgene Tabs ein.**
+Zeitgeber und Abrufe stehen dann, Nachrichten kommen weiter an; alles läuft weiter, sobald jemand den Tab ansieht.
+Im Log sah das aus wie „Sperre von Live-Takt ist verfallen (787 s)". Dagegen hält der Crawler einen Web Lock
+(`wachhalten`, Zustand `window.rcCrawlerWach`) — an echtem Edge gemessen mit `pruefwerkzeuge/schlaf_messen.mjs`.
+Dazu gehört seitdem:
+- **`abrufMitFrist(url, init, fristMs)`** ist der EINE Weg für jeden eigenen Abruf (Replay, Woche, Zeitraum):
+  Roh-fetch am Hook vorbei, Frist für Anfrage und Lesen. Wer wieder `fetch(cap.url …)` schreibt, lässt den Hook
+  den eigenen Abruf für einen Ok-Klick des Nutzers halten (gemerkte Abfrage überschrieben, Wochenzeilen als
+  `current_week` ans Dashboard).
+- **`meldeHinweis(text)`** schickt eine Klartext-Zeile ins Dashboard-Logbuch (Typ `KPI_HINWEIS`). Ein NEUER
+  Nachrichtentyp muss im Dashboard an ZWEI Stellen stehen: `handleKpiMessage` und das Tor `__rcKpiMsgHandler`
+  (`KPI_QUELLE_TOT` fehlte dort von 08.08. bis 05.10. — die Sitzungs-Meldung kam nie an).
+- Nach einem Ok-Klick mit anderem Zeitraum holt der Crawler Intraday selbst nach (`KLICK_NACHHOL_MS`).
+- **Der eigene Neustart kann auf Edges FEHLERSEITE landen** (05.10. nachts): `sitzungTot` lädt die Seite neu;
+  antwortet das Portal in dem Moment nicht, steht dort `chrome-error://chromewebdata/` — ohne Crawler, und Edges
+  eigener Neuversuch ruht im verborgenen Tab. Dort übernimmt der Autopilot (`fehlerseiteFlow`: alle 20 s neu
+  laden, Fehlercode aus `.error-code`, Meldung ans Dashboard als `KPI_HINWEIS`). Fenstername und `opener`
+  überleben die Fehlerseite, der Crawler startet danach wie gewohnt. Messgerät: `pruefwerkzeuge/fehlerseite_messen.mjs`.
+- Das Dashboard zählt denselben Hinweis-Text fünf Minuten lang nur einmal — ein Hinweis, der sich wiederholt,
+  muss deshalb bei jedem Mal GLEICH lauten (keine Uhrzeit, kein Zähler im Text).
+- Prüfwerkzeug: `wachhalter_pruefen.js` (172).
+
 ## Die gemessenen Parameter (und was daran gefährlich ist)
 
 **Maßgeblich für den Produktivpfad ist `RC_ABFRAGEN`** — drei am Portal gemessene Parametersätze:
@@ -147,7 +169,7 @@ ausdrücklich `false`, die Harvest-Pfade reichen gar nichts durch. **Ein leeres 
 
 ## Recon: rc_lupe.js (rc_recon.js ist abgelöst)
 
-**`rc_recon.js` nicht mehr benutzen** — jeder Code, den es ausgab, war unbrauchbar.
+**`rc_recon.js` ist am 11.10. gelöscht** — jeder Code, den es ausgab, war unbrauchbar.
 
 `rc_lupe.js` (853 Zeilen): F12-Inject auf einer beliebigen Zielseite, schneidet fetch/XHR/WebSocket
 mit und ordnet jeden Request dem Klick zu, der ihn ausgelöst hat. Bedienung über ein Panel unten
@@ -213,4 +235,4 @@ Wiederholversuche nur bei Übertragungsfehlern: bei "keine Berechtigung" bricht 
 4. **Keine Emojis.** Corporate-Design-Regel.
 5. **`graphify` vor dem Lesen von Quellcode.** `kpi_crawler.js` (2359 Zeilen) und
    `genesys_monitor_crawler.js` (933) dürfen am Stück gelesen werden; `esl_live_arena_v22.js`
-   (25106) nie.
+   (28318) nie.

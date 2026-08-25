@@ -70,7 +70,7 @@ Ansprachen aus `rcWarBoteCands`; Agenten OHNE Abschluss kommen erst über die Bo
 trägt `rcWarBoteCands` das Feld `vo`, ohne Schlüssel kein Join) · `mbAgenten` (schaltet selbst um)
 `mbTeams` `mbStandorte` `mbSales` `mbLiga` `mbLigaCalls` `mbStdIn` `mbAgentIn` `mbLeerAgent`.
 
-**Kennzahlen:** `MB_KENN` (Registry, v22.js:3497 — EINE Stelle für Quelle/Aggregationsart/Format/
+**Kennzahlen:** `MB_KENN` (Registry, v22.js:4675 — EINE Stelle für Quelle/Aggregationsart/Format/
 Ziel/Richtung) · `mbKenn` `mbKennListe` `mbZiel` `mbWert` `mbEinheiten` `mbEinheitWert`.
 Aggregationsarten: `summe` addiert · `menge` addiert Calls · **`quote` POOLT über z/n** (Mittelwert
 nur als Rückfall) · `zeit` über `rcZeitMittel` (calls-gewichtet, **eigener Nenner** je Kennzahl —
@@ -195,9 +195,9 @@ ESL-Tagesexport ein und trägt das ganze Dashboard. Zu messen sind mindestens:
 3. **`VODAFONE_DESIGN.md` ist verbindlich.** Vor UI-Arbeit lesen. Ampel echt dreistufig
    (ok `#008A00`, warn `#EB9700`, breach `#E60000`) — `zielColor` lieferte einmal **Weiß** für
    "Ziel erreicht", damit trug die Seite keine Information mehr in der Farbe.
-4. **`motion_demo.html` vor Motion-Arbeit ansehen** — 16 lauffähige Muster im Vodafone-Design,
-   inklusive Zeitlupe 0,25× zum Prüfen von Timings. Nicht neu erfinden.
+4. **`motion_demo.html` ist am 11.10. gelöscht** (Fokus Daten statt Bewegung). Bei Bedarf aus Git
+   zurückholen: `git checkout 0449384 -- motion_demo.html` — 16 Muster inkl. Zeitlupe 0,25×.
 5. **Keine Emojis.** Corporate-Design-Regel.
-6. **`graphify` vor dem Lesen von Quellcode.** `esl_live_arena_v22.js` hat **25106 Zeilen** — nie
+6. **`graphify` vor dem Lesen von Quellcode.** `esl_live_arena_v22.js` hat **28318 Zeilen** — nie
    komplett lesen. **Objekt-Literale wie `MOD_TYPES`/`MB_KENN` und `window.x = function(){}` landen
    NICHT im Graph** — dafür `grep -n` und dann gezielt `Read` mit offset/limit.

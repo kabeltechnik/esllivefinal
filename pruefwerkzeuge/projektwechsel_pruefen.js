@@ -37,7 +37,6 @@ const auto   = lies('esl_autopilot.user.js');
 const mob    = lies('esl_autopilot_mobile.user.js');
 const um     = lies('esl_autopilot_um.user.js');
 const cmd    = lies('ESL_Start.cmd');
-const cmdMU  = lies('ESL_Start_Mobile_UM.cmd');
 const dash   = lies('esl_live_arena_v22.js');
 
 let ok = 0, bad = 0;
@@ -326,27 +325,10 @@ pruef('fehlt eine Variante, wird NICHTS eingespielt statt Kabel',
 
 // ============================================================================
 console.log('\n-- 6. ESL_Start_Mobile_UM.cmd --');
-pruef('Datei ist selbst-enthaltend (Marker #PSSTART)', cmdMU.indexOf('#PSSTART') > 0);
-pruef('sie startet Edge NICHT selbst', !/Start-Process\s+-FilePath\s+\$Edge/.test(cmdMU),
-      'ein zweiter Edge auf dasselbe Profil ist nicht moeglich');
-pruef('sie verlangt einen laufenden ESL_Start.cmd',
-      /FernsteuerungBereit \$DebugPort/.test(cmdMU) && /ZUERST ESL_Start\.cmd/.test(cmdMU));
-pruef('sie setzt die Projekt-Marke', /sessionStorage\.setItem\('rcEslProjekt','\$marke'\)/.test(cmdMU));
-pruef('sie legt Tabs ueber Target.createTarget an (nicht ueber PUT /json/new)',
-      /Target\.createTarget/.test(cmdMU) && !/Invoke-RestMethod[^\n]*json\/new/.test(cmdMU),
-      'PUT /json/new ist in neueren Edge-Fassungen abgekuendigt');
-pruef('erst registrieren, dann navigieren',
-      cmdMU.indexOf("addScriptToEvaluateOnNewDocument") < cmdMU.indexOf("'Page.navigate'"),
-      'andersherum waere die Seite ggf. schon aufgebaut, bevor der Autopilot da ist');
-pruef('doppelter Start legt keinen zweiten Tab an', /function OffeneMarken\(/.test(cmdMU) &&
-      /\$schonDa -contains \$pr\.marke/.test(cmdMU));
-pruef('es wird nachgemessen, ob die Tabs anlaufen', /__rcAutoPilotV2/.test(cmdMU));
-// Geprueft wird die ZUWEISUNG, nicht das Vorkommen der Zeichenkette irgendwo —
-// im Kopf der Datei steht "secure%20" als Erklaerung, warum genau dieser Weg
-// NICHT genommen wird.
-pruef('sie faehrt die Anmeldeseite an, nicht die UM-Adresse mit %20',
-      /\$EslUrl\s*=\s*'https:\/\/esl\.regiocom\.net\/Agents\/login_esl\.xhtml'/.test(cmdMU) &&
-      !/url\s*=\s*'[^']*secure%20/.test(cmdMU));
+// Am 11.10. entfernt (brach seit 07.08. nur noch ab: sie hing fest auf Port
+// 9222 und haette Mobile-/UM-Tabs in den Kabel-Browser gelegt). Ihre Innereien
+// zu pruefen ergibt keinen Sinn mehr; geprueft wird, dass sie weg bleibt.
+pruef('Datei ist entfernt', !fs.existsSync(path.join(DIR, 'ESL_Start_Mobile_UM.cmd')));
 
 // ============================================================================
 console.log('\n-- 7. Logo und Empfaenger --');
@@ -355,8 +337,6 @@ pruef('das Logo reist in __rcFiles mit', /logo:\s*\$\(AlsJsText \$LogoB64\)/.tes
 pruef('die Mindestgroesse ist fuer ein PNG passend (nicht 10 KB)',
       /LiesBinaerBase64 'regiocom\.png' 300/.test(cmd),
       'mit der festen 10-KB-Schwelle waere ein kleines Logo still abgelehnt worden');
-pruef('ESL_Start_Mobile_UM.cmd reicht das Logo ebenfalls mit',
-      /LiesBinaerBase64 'regiocom\.png' 300/.test(cmdMU) && /logo:\s*\$\(AlsJsText \$LogoB64\)/.test(cmdMU));
 pruef('das Dashboard sucht auch nach "regiocom.png"', /'regiocom\.png'/.test(dash));
 // Nur INNERHALB von rcLogoPngBytes vergleichen: rcLogoZeichnen() wird auch von
 // den Report-Bildern gerufen, rund 7000 Zeilen weiter oben — ein Vergleich ueber

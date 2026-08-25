@@ -1,0 +1,273 @@
+<span id="j_idt13"></span>
+
+<table id="wrapper" class="esl-centered-panel" style="margin-left: -223.899px; margin-top: -122.18px;">
+<tbody>
+<tr>
+<td><div id="loginP" class="ui-panel ui-widget ui-widget-content ui-corner-all" data-widget="widget_loginP"><div id="loginP_header" class="ui-panel-titlebar ui-widget-header ui-helper-clearfix ui-corner-all"><span class="ui-panel-title"><table cellspacing="5" style="font-size: 1.5em;">
+<tbody>
+<tr>
+<td>             
+                        <i class="fa fa-sign-in fa-lg" aria-hidden="true"></i></td>
+<td>Anmeldung</td>
+<td><div id="pStatus"><div id="pStatus_start" style="display:none">
+                                <i class="fa fa-spinner fa-pulse fa-lg" aria-hidden="true"></i></div></div></td>
+</tr>
+</tbody>
+</table>
+</span></div><div id="loginP_content" class="ui-panel-content ui-widget-content"><span id="j_idt13"></span><script type="text/javascript">$(function(){PrimeFaces.focus(null, 'loginform');});</script>
+<form id="loginform" name="loginform" method="post" action="/Agents/login_esl.xhtml" enctype="application/x-www-form-urlencoded">
+<input type="hidden" name="loginform" value="loginform">
+
+                    <div class="ui-fluid"><div id="loginform:j_idt15" class="ui-panelgrid ui-widget ui-panelgrid-blank"><div id="loginform:j_idt15_content" class="ui-panelgrid-content ui-widget-content ui-grid ui-grid-responsive"><div class="ui-grid-row"><div class="ui-panelgrid-cell ui-grid-col-3"><label id="loginform:j_idt16" class="ui-outputlabel ui-widget" for="loginform:user">Benutzername<span class="ui-outputlabel-rfi">*</span></label></div><div class="ui-panelgrid-cell ui-grid-col-7"><input id="loginform:user" name="loginform:user" type="text" class="ui-inputfield ui-inputtext ui-widget ui-state-default ui-corner-all" aria-required="true" data-p-label="Benutzername" data-p-rmsg="Benutzername erforderlich !" data-p-required="true" role="textbox" aria-disabled="false" aria-readonly="false" aria-invalid="false"></div><div class="ui-panelgrid-cell ui-grid-col-2"><div id="loginform:j_idt17" aria-live="polite" data-display="icon" data-target="loginform:user" data-redisplay="true" class="ui-message"></div></div></div><div class="ui-grid-row"><div class="ui-panelgrid-cell ui-grid-col-3"><label id="loginform:j_idt18" class="ui-outputlabel ui-widget ui-state-error" for="loginform:pw">Passwort<span class="ui-outputlabel-rfi">*</span></label></div><div class="ui-panelgrid-cell ui-grid-col-7"><input id="loginform:pw" name="loginform:pw" type="password" class="ui-inputfield ui-password ui-widget ui-state-default ui-corner-all ui-state-error" aria-required="true" data-p-label="Passwort" data-p-rmsg="Passwort erforderlich !" data-p-required="true" role="textbox" aria-disabled="false" aria-readonly="false" aria-invalid="true"></div><div class="ui-panelgrid-cell ui-grid-col-2"><div id="loginform:j_idt19" aria-live="polite" data-display="icon" data-target="loginform:pw" data-redisplay="true" class="ui-message ui-message-error ui-widget ui-corner-all ui-helper-clearfix ui-message-icon-only"><span class="ui-message-error-icon" title="Passwort erforderlich !"></span></div></div></div><div class="ui-grid-row"><div class="ui-panelgrid-cell ui-grid-col-3"><img id="loginform:j_idt20" alt="" src="/Agents/javax.faces.resource/spacer/dot_clear.gif.xhtml?ln=primefaces&amp;v=7.0"></div><div class="ui-panelgrid-cell ui-grid-col-7"><button id="loginform:btnLogin" name="loginform:btnLogin" class="ui-button ui-widget ui-state-default ui-corner-all ui-button-text-icon-left" onclick="if(PrimeFaces.vb({s:this,a:true,u:'loginform dlgNewPassword'})){PrimeFaces.ab({s:&quot;loginform:btnLogin&quot;,f:&quot;loginform&quot;,u:&quot;loginform dlgNewPassword&quot;,ps:true});return false;}else{return false;}" type="submit" role="button" aria-disabled="false"><span class="ui-button-icon-left ui-icon ui-c fa fa-sign-in fa-lg"></span><span class="ui-button-text ui-c">Login</span></button></div><div class="ui-panelgrid-cell ui-grid-col-2"><img id="loginform:j_idt21" alt="" src="/Agents/javax.faces.resource/spacer/dot_clear.gif.xhtml?ln=primefaces&amp;v=7.0"></div></div></div></div><div id="loginform:msgs" class="ui-messages ui-widget" aria-live="polite" data-global="false" data-summary="data-summary" data-severity="all,error" data-redisplay="true"><div class="ui-messages-error ui-corner-all"><span class="ui-messages-error-icon"></span><ul><li><span class="ui-messages-error-summary">Passwort erforderlich !</span></li></ul></div></div>
+                    </div><input type="hidden" name="loginform:j_idt24" value="0"><input type="hidden" name="javax.faces.ViewState" id="j_id1:javax.faces.ViewState:0" value="stateless" autocomplete="off">
+</form></div></div></td>
+</tr>
+</tbody>
+</table>
+
+---
+
+<input id="loginform:user" name="loginform:user" type="text" class="ui-inputfield ui-inputtext ui-widget ui-state-default ui-corner-all" aria-required="true" data-p-label="Benutzername" data-p-rmsg="Benutzername erforderlich !" data-p-required="true" role="textbox" aria-disabled="false" aria-readonly="false" aria-invalid="false">
+
+---
+
+<input id="loginform:pw" name="loginform:pw" type="password" class="ui-inputfield ui-password ui-widget ui-state-default ui-corner-all ui-state-error" aria-required="true" data-p-label="Passwort" data-p-rmsg="Passwort erforderlich !" data-p-required="true" role="textbox" aria-disabled="false" aria-readonly="false" aria-invalid="true">
+
+---
+<button id="loginform:btnLogin" name="loginform:btnLogin" class="ui-button ui-widget ui-state-default ui-corner-all ui-button-text-icon-left" onclick="if(PrimeFaces.vb({s:this,a:true,u:'loginform dlgNewPassword'})){PrimeFaces.ab({s:&quot;loginform:btnLogin&quot;,f:&quot;loginform&quot;,u:&quot;loginform dlgNewPassword&quot;,ps:true});return false;}else{return false;}" type="submit" role="button" aria-disabled="false"><span class="ui-button-icon-left ui-icon ui-c fa fa-sign-in fa-lg"></span><span class="ui-button-text ui-c">Login</span></button>
+
+---
+
+
+document.querySelector("#frmMainMenu\\:mainMenu") 
+
+<button id="frmMainMenu:mainMenu" name="frmMainMenu:mainMenu" class="ui-button ui-widget ui-state-default ui-corner-all ui-button-text-icon-left" type="button" role="button" aria-disabled="false"><span class="ui-button-icon-left ui-icon ui-c fa fa-caret-down"></span><span class="ui-button-text ui-c">Projekte</span></button>
+
+document.querySelector("#eslBody > div.ui-layout-resizer.ui-layout-resizer-north.ui-draggable-handle.ui-layout-resizer-open.ui-layout-resizer-north-open")
+
+<div id="j_idt34" class="ui-layout-north ui-layout-unit ui-widget-content ui-corner-all ui-layout-unit-content pe-layout-pane-content ui-layout-pane ui-layout-pane-north" data-combinedposition="north" style="position: absolute; margin: 0px; inset: 0px 0px auto 1px; width: auto; z-index: 0; height: 83.5938px; display: block; visibility: visible;"><table class="esl-grid-bottom esl-grid-center" style="height: 80px; width:100%;">
+<tbody>
+<tr>
+<td class="esl-grid-col-2">
+<form id="frmLogo" name="frmLogo" method="post" action="/Agents/secure/main.xhtml" enctype="application/x-www-form-urlencoded">
+<input type="hidden" name="frmLogo" value="frmLogo">
+<a id="frmLogo:j_idt38" href="#" class="ui-commandlink ui-widget" aria-label="ESL Home" onclick="PrimeFaces.ab({s:&quot;frmLogo:j_idt38&quot;,f:&quot;frmLogo&quot;,ps:true});return false;" title="ESL Home"><img src="/Agents/javax.faces.resource/images/Vodafone_logo.png.xhtml" class="esl-logo"></a><input type="hidden" name="javax.faces.ViewState" id="j_id1:javax.faces.ViewState:3" value="-3546842822071698909:1399423584305807605" autocomplete="off">
+</form></td>
+<td class="esl-ui-grid-col-10">
+<form id="frmMainMenu" name="frmMainMenu" method="post" action="/Agents/secure/main.xhtml" enctype="application/x-www-form-urlencoded">
+<input type="hidden" name="frmMainMenu" value="frmMainMenu">
+<div id="frmMainMenu:j_idt40" class="ui-toolbar ui-widget ui-widget-header ui-corner-all ui-helper-clearfix" role="toolbar" style="border: 0; padding-top: .571em; padding-bottom: .571em; padding-left: .571em; padding-right: .571em;"><div class="ui-toolbar-group-left"><table class="esl-grid-middle esl-color-inherit">
+<tbody>
+<tr>
+<td><button id="frmMainMenu:mainMenu" name="frmMainMenu:mainMenu" class="ui-button ui-widget ui-state-default ui-corner-all ui-button-text-icon-left" type="button" role="button" aria-disabled="false"><span class="ui-button-icon-left ui-icon ui-c fa fa-caret-down"></span><span class="ui-button-text ui-c">Projekte</span></button></td>
+<td></td>
+<td><button id="frmMainMenu:verwaltungMenu" name="frmMainMenu:verwaltungMenu" class="ui-button ui-widget ui-state-default ui-corner-all ui-button-text-icon-left ui-state-disabled" type="button" disabled="disabled" role="button" aria-disabled="true"><span class="ui-button-icon-left ui-icon ui-c fa fa-caret-down"></span><span class="ui-button-text ui-c">Verwaltung</span></button></td>
+<td></td>
+<td><label id="frmMainMenu:j_idt45" class="ui-outputlabel ui-widget" style="margin-left: 4em;">Hallo</label></td>
+<td><a id="frmMainMenu:j_idt46" href="#" class="ui-commandlink ui-widget esl-font-bold" aria-label="Meine Daten" onclick="PF('dlgMeineDaten').show();;PrimeFaces.ab({s:&quot;frmMainMenu:j_idt46&quot;,f:&quot;frmMainMenu&quot;,ps:true});return false;" title="Meine Daten">Britta Ünsal</a></td>
+<td><table class="esl-my-news" style="margin-left: 1em;">
+<tbody>
+<tr><td></td></tr></tbody>
+</table>
+</td>
+<td><label style="margin-left: 2em; margin-right: .4em;" title="Uhrzeit" class="fa fa-clock-o fa-lg"></label></td>
+<td><span id="frmMainMenu:j_idt52" class="ui-clock ui-widget ui-widget-header ui-corner-all">00:56:23</span></td>
+<td><div id="frmMainMenu:j_idt53"><div id="frmMainMenu:j_idt53_start" style="display:none">  
+                            <i class="fa fa-spinner fa-pulse fa-lg" aria-hidden="true" style="margin-left: 1em;"></i></div><div id="frmMainMenu:j_idt53_complete" style="display:none">  
+                            <i class="fa fa-fw">&nbsp;</i></div></div></td>
+</tr>
+</tbody>
+</table>
+</div><div class="ui-toolbar-group-right"><table class="esl-grid-middle esl-color-inherit">
+<tbody>
+<tr>
+<td><button id="frmMainMenu:logout" name="frmMainMenu:logout" class="ui-button ui-widget ui-state-default ui-corner-all ui-button-icon-only esl-icon-style" onclick="PrimeFaces.ab({s:&quot;frmMainMenu:logout&quot;,f:&quot;frmMainMenu&quot;,ps:true});return false;" title="Abmelden" type="submit" role="button" aria-disabled="false"><span class="ui-button-icon-left ui-icon ui-c fa fa-sign-out fa-lg"></span><span class="ui-button-text ui-c">Abmelden</span></button></td>
+</tr>
+</tbody>
+</table>
+</div></div><input type="hidden" name="javax.faces.ViewState" id="j_id1:javax.faces.ViewState:4" value="-3546842822071698909:1399423584305807605" autocomplete="off">
+</form></td>
+</tr>
+</tbody>
+</table>
+</div>
+
+---
+
+<span class="ui-menuitem-text">Projektergebnisse</span>
+
+---
+
+<div id="j_idt96" class="ui-layout-center ui-layout-unit ui-widget-content ui-corner-all ui-layout-pane ui-layout-pane-center" data-combinedposition="center" style="position: absolute; margin: 0px; inset: 99.5938px 0px 0px 307px; height: 846.406px; width: 1218px; z-index: 0; display: block; visibility: visible;"><div class="ui-layout-unit-header ui-widget-header ui-corner-top pe-layout-pane-header esl-projekt-menu">
+<form id="sis_form_01" name="sis_form_01" method="post" action="/Agents/secure/sis_vodafone.xhtml" enctype="application/x-www-form-urlencoded">
+<input type="hidden" name="sis_form_01" value="sis_form_01">
+<div id="sis_form_01:projektMenu" class="ui-tabmenu ui-widget ui-widget-content ui-corner-all esl-projekt-menu"><ul class="ui-tabmenu-nav ui-helper-reset ui-helper-clearfix ui-widget-header ui-corner-all" role="tablist"><li class="ui-tabmenuitem ui-state-default ui-corner-top ui-tabmenuitem-hasicon" role="tab" aria-expanded="false" aria-selected="false" tabindex="0"><a tabindex="-1" id="sis_form_01:tabProjektHome" title="Vodafone Kabel" class="ui-menuitem-link ui-corner-all esl-icon-style" href="#" onclick="PrimeFaces.ab({s:&quot;sis_form_01:tabProjektHome&quot;,f:&quot;sis_form_01&quot;,p:&quot;sis_form_01&quot;,u:&quot;sis_form_01:projektMenu projektPanel pnlProjekt&quot;,ps:true});return false;"><span class="ui-menuitem-icon ui-icon fa fa-home fa-lg"></span><span class="ui-menuitem-text"></span></a></li><li class="ui-tabmenuitem ui-state-default ui-corner-top" role="tab" aria-expanded="false" aria-selected="false" tabindex="0"><a tabindex="-1" id="sis_form_01:CTS_tabEingabe" class="ui-menuitem-link ui-corner-all" href="#" onclick="PrimeFaces.ab({s:&quot;sis_form_01:CTS_tabEingabe&quot;,f:&quot;sis_form_01&quot;,p:&quot;sis_form_01&quot;,u:&quot;sis_form_01:projektMenu projektPanel pnlProjekt&quot;,ps:true,onco:function(xhr,status,args){treeTableLabelClick();;}});return false;"><span class="ui-menuitem-text">Eingabe</span></a></li><li class="ui-tabmenuitem ui-state-default ui-corner-top" role="tab" aria-expanded="false" aria-selected="false" tabindex="0"><a tabindex="-1" id="sis_form_01:CTS_tabKontakt" class="ui-menuitem-link ui-corner-all" href="#" onclick="PrimeFaces.ab({s:&quot;sis_form_01:CTS_tabKontakt&quot;,f:&quot;sis_form_01&quot;,p:&quot;sis_form_01&quot;,u:&quot;sis_form_01:projektMenu projektPanel pnlProjekt&quot;,ps:true});return false;"><span class="ui-menuitem-text">letzte Kontakte</span></a></li><li class="ui-tabmenuitem ui-state-default ui-corner-top" role="tab" aria-expanded="false" aria-selected="false" tabindex="0"><a tabindex="-1" id="sis_form_01:CTS_tabStatistikAgent" class="ui-menuitem-link ui-corner-all" href="#" onclick="PrimeFaces.ab({s:&quot;sis_form_01:CTS_tabStatistikAgent&quot;,f:&quot;sis_form_01&quot;,p:&quot;sis_form_01&quot;,u:&quot;sis_form_01:projektMenu projektPanel pnlProjekt&quot;,ps:true});return false;"><span class="ui-menuitem-text">meine Statistik</span></a></li><li class="ui-tabmenuitem ui-state-default ui-corner-top" role="tab" aria-expanded="false" aria-selected="false" tabindex="0"><a tabindex="-1" id="sis_form_01:CTS_tabStatistikTeam" class="ui-menuitem-link ui-corner-all" href="#" onclick="PrimeFaces.ab({s:&quot;sis_form_01:CTS_tabStatistikTeam&quot;,f:&quot;sis_form_01&quot;,p:&quot;sis_form_01&quot;,u:&quot;sis_form_01:projektMenu projektPanel pnlProjekt&quot;,ps:true});return false;"><span class="ui-menuitem-text">Teamstatistik</span></a></li><li class="ui-tabmenuitem ui-state-default ui-corner-top" role="tab" aria-expanded="false" aria-selected="false" tabindex="0"><a tabindex="-1" id="sis_form_01:CTS_tabTeamQueries" class="ui-menuitem-link ui-corner-all" href="#" onclick="PrimeFaces.ab({s:&quot;sis_form_01:CTS_tabTeamQueries&quot;,f:&quot;sis_form_01&quot;,p:&quot;sis_form_01&quot;,u:&quot;sis_form_01:projektMenu projektPanel pnlProjekt&quot;,ps:true});return false;"><span class="ui-menuitem-text">Teamergebnisse</span></a></li><li class="ui-tabmenuitem ui-state-default ui-corner-top" role="tab" aria-expanded="false" aria-selected="false" tabindex="0"><a tabindex="-1" id="sis_form_01:CTS_tabStatistikProjekt" class="ui-menuitem-link ui-corner-all" href="#" onclick="PrimeFaces.ab({s:&quot;sis_form_01:CTS_tabStatistikProjekt&quot;,f:&quot;sis_form_01&quot;,p:&quot;sis_form_01&quot;,u:&quot;sis_form_01:projektMenu projektPanel pnlProjekt&quot;,ps:true});return false;"><span class="ui-menuitem-text">Projektstatistik</span></a></li><li class="ui-tabmenuitem ui-state-default ui-state-active ui-corner-top" role="tab" aria-expanded="true" aria-selected="true" tabindex="0"><a tabindex="-1" id="sis_form_01:CTS_tabProjektQueries" class="ui-menuitem-link ui-corner-all" href="#" onclick="PrimeFaces.ab({s:&quot;sis_form_01:CTS_tabProjektQueries&quot;,f:&quot;sis_form_01&quot;,p:&quot;sis_form_01&quot;,u:&quot;sis_form_01:projektMenu projektPanel pnlProjekt&quot;,ps:true});return false;"><span class="ui-menuitem-text">Projektergebnisse</span></a></li></ul></div><input type="hidden" name="javax.faces.ViewState" id="j_id1:javax.faces.ViewState:6" value="9176824752587610686:-2117760667783616969" autocomplete="off">
+</form></div><div class="ui-layout-content ui-layout-unit-content pe-layout-pane-content esl-layout-pane-content" style="border-width: medium; border-style: none; border-color: currentcolor; border-image: none; position: relative; height: 800px; visibility: visible;">
+<form id="sis_form_02" name="sis_form_02" method="post" action="/Agents/secure/sis_vodafone.xhtml" enctype="application/x-www-form-urlencoded">
+<input type="hidden" name="sis_form_02" value="sis_form_02">
+<script id="sis_form_02:j_idt97" type="text/javascript">rc_init_view = function() {PrimeFaces.ab({s:"sis_form_02:j_idt97",f:"sis_form_02",p:"sis_form_02:j_idt97",u:"@(.esl-projekt-panel)",ps:true,pa:arguments[0]});}</script><input type="hidden" name="javax.faces.ViewState" id="j_id1:javax.faces.ViewState:7" value="9176824752587610686:-2117760667783616969" autocomplete="off">
+</form><div id="projektPanel" class="ui-outputpanel ui-widget esl-projekt-panel">
+            <script type="text/javascript">
+                /* Dummy poll observer */
+                rc_poll_observes = function() { };
+            </script>
+<form id="frmProjektStatRem" name="frmProjektStatRem" method="post" action="/Agents/secure/sis_vodafone.xhtml" enctype="application/x-www-form-urlencoded">
+<input type="hidden" name="frmProjektStatRem" value="frmProjektStatRem">
+<script id="frmProjektStatRem:j_idt199" type="text/javascript">rc_poll_observes = function() {PrimeFaces.ab({s:"frmProjektStatRem:j_idt199",f:"frmProjektStatRem",p:"@(.poll-update)",u:"@(.poll-update)",a:true,g:false,ps:true,onco:function(xhr,status,args){try {PF('dataTableWidget').filter();} catch (ignore) {};},pa:arguments[0]});}</script>
+<input type="hidden" name="javax.faces.ViewState" value="9176824752587610686:-2117760667783616969" autocomplete="off"></form><div id="j_idt200" class="esl-layout-full ui-layout-container" style="overflow: visible; position: relative;"><div id="j_idt201" class="ui-layout-north ui-layout-unit ui-widget-content ui-corner-all ui-layout-unit-content pe-layout-pane-content ui-layout-pane ui-layout-pane-north" data-combinedposition="north" style="position: absolute; margin: 0px; inset: 0px 0px auto; width: auto; z-index: 0; height: 56.375px; display: block; visibility: visible;">
+            <div class="ui-fluid">
+<form id="filterForm" name="filterForm" method="post" action="/Agents/secure/sis_vodafone.xhtml" class="poll-update" enctype="application/x-www-form-urlencoded">
+<input type="hidden" name="filterForm" value="filterForm">
+<div id="filterForm:j_idt203" class="ui-panelgrid ui-widget ui-panelgrid-blank esl-color-inherit esl-font-bold"><div id="filterForm:j_idt203_content" class="ui-panelgrid-content ui-widget-content ui-grid ui-grid-responsive"><div class="ui-grid-row"><div class="ui-panelgrid-cell ui-grid-col-3"><label id="filterForm:j_idt204" class="ui-outputlabel ui-widget">Statistik</label></div><div class="ui-panelgrid-cell ui-grid-col-2"><label id="filterForm:j_idt205" class="ui-outputlabel ui-widget">von</label></div><div class="ui-panelgrid-cell ui-grid-col-2"><label id="filterForm:j_idt206" class="ui-outputlabel ui-widget">bis</label></div><div class="ui-panelgrid-cell ui-grid-col-1"><label id="filterForm:j_idt207" class="ui-outputlabel ui-widget"></label></div><div class="ui-panelgrid-cell ui-grid-col-1"><label id="filterForm:j_idt208" class="ui-outputlabel ui-widget"></label></div></div><div class="ui-grid-row"><div class="ui-panelgrid-cell ui-grid-col-3"><div id="filterForm:j_idt209" class="ui-selectonemenu ui-widget ui-state-default ui-corner-all" title="Abfrage" role="combobox" aria-haspopup="true" aria-expanded="false" aria-owns="filterForm:j_idt209_items" style="min-width: 299px;"><div class="ui-helper-hidden-accessible"><input id="filterForm:j_idt209_focus" name="filterForm:j_idt209_focus" type="text" autocomplete="off" aria-expanded="false" aria-required="true" aria-autocomplete="list" aria-activedescendant="filterForm:j_idt209_7" aria-describedby="filterForm:j_idt209_7" aria-disabled="false"></div><div class="ui-helper-hidden-accessible"><select id="filterForm:j_idt209_input" name="filterForm:j_idt209_input" tabindex="-1" aria-hidden="true" onchange="PrimeFaces.ab({s:&quot;filterForm:j_idt209&quot;,e:&quot;change&quot;,f:&quot;filterForm&quot;,p:&quot;filterForm data&quot;,u:&quot;@(.esl-projekt-panel)&quot;,ps:true,onco:function(xhr,status,args){try {PF('dataTableWidget').clearFilters();} catch (ignore) {};;}});" data-p-rmsg="Bitte Abfrage wählen!" data-p-con="javax.faces.Integer" data-p-required="true" data-p-hl="onemenu"><option value="36" data-escape="true">Export Projektergebnisse</option><option value="67" data-escape="true">Mitarbeiterleistung Intraday</option><option value="83" data-escape="true">Intraday-Steuerung (ohne Gutschr., ohne KüRü) </option><option value="130" data-escape="true">Intra-Week</option><option value="131" data-escape="true">Intra-Month</option><option value="146" data-escape="true">REPORTING-1039</option><option value="200" data-escape="true">Intraday-Steuerung (REPORTING-1706)</option><option value="" disabled="disabled" selected="selected" data-escape="true"></option></select></div><label id="filterForm:j_idt209_label" class="ui-selectonemenu-label ui-inputfield ui-corner-all">&nbsp;</label><div class="ui-selectonemenu-trigger ui-state-default ui-corner-right"><span class="ui-icon ui-icon-triangle-1-s ui-c"></span></div></div></div><div class="ui-panelgrid-cell ui-grid-col-2"><span id="filterForm:j_idt212" class="ui-calendar"><input id="filterForm:j_idt212_input" name="filterForm:j_idt212_input" type="text" value="27.07.2026" class="ui-inputfield ui-widget ui-state-default ui-corner-all hasDatepicker" aria-required="true" data-p-con="javax.faces.DateTime" data-p-pattern="dd.mm.yy" data-p-dttype="date" data-p-required="true" role="textbox" aria-disabled="false" aria-readonly="false"></span></div><div class="ui-panelgrid-cell ui-grid-col-2"><span id="filterForm:j_idt213" class="ui-calendar"><input id="filterForm:j_idt213_input" name="filterForm:j_idt213_input" type="text" value="27.07.2026" class="ui-inputfield ui-widget ui-state-default ui-corner-all hasDatepicker" aria-required="true" data-p-con="javax.faces.DateTime" data-p-pattern="dd.mm.yy" data-p-dttype="date" data-p-required="true" role="textbox" aria-disabled="false" aria-readonly="false"></span></div><div class="ui-panelgrid-cell ui-grid-col-1"><button id="filterForm:j_idt214" name="filterForm:j_idt214" class="ui-button ui-widget ui-state-default ui-corner-all ui-button-icon-only esl-icon-style disable-on-ajax" onclick="if(PrimeFaces.vb({s:this,a:true,p:'filterForm data',u:'filterForm data'})){PrimeFaces.ab({s:&quot;filterForm:j_idt214&quot;,f:&quot;filterForm&quot;,p:&quot;filterForm data&quot;,u:&quot;filterForm data&quot;,ps:true,onco:function(xhr,status,args){try {PF('dataTableWidget').filter();} catch (ignore) {};;}});return false;}else{return false;}" title="Liste aktualisieren" type="submit" role="button" aria-disabled="false"><span class="ui-button-icon-left ui-icon ui-c fa fa-refresh fa-lg"></span><span class="ui-button-text ui-c">Liste aktualisieren</span></button></div><div class="ui-panelgrid-cell ui-grid-col-1"><label id="filterForm:j_idt216" class="ui-outputlabel ui-widget"></label></div></div></div></div><div id="filterForm:j_idt227"></div>
+<input type="hidden" name="javax.faces.ViewState" value="9176824752587610686:-2117760667783616969" autocomplete="off"></form>
+            </div></div><div id="j_idt229" class="ui-layout-center ui-layout-unit ui-widget-content ui-corner-all ui-layout-unit-content pe-layout-pane-content esl-layout-pane-content ui-layout-pane ui-layout-pane-center" data-combinedposition="center" style="position: absolute; margin: 0px; inset: 76.375px 0px 0px; height: 709.625px; width: 1212px; z-index: 0; display: block; visibility: visible;">
+            <div class="ui-fluid">
+<form id="data" name="data" method="post" action="/Agents/secure/sis_vodafone.xhtml" class="poll-update" enctype="application/x-www-form-urlencoded">
+<input type="hidden" name="data" value="data">
+<div id="data:j_idt231" class="ui-messages ui-widget" aria-live="polite" data-global="false" data-summary="data-summary" data-severity="all,error" data-redisplay="true"></div>
+<input type="hidden" name="javax.faces.ViewState" value="9176824752587610686:-2117760667783616969" autocomplete="off"></form>
+            </div></div><input type="hidden" id="j_idt200_state" name="j_idt200_state" autocomplete="off"><div id="" class="ui-layout-resizer ui-layout-resizer-north ui-layout-resizer-open ui-layout-resizer-north-open" style="position: absolute; padding: 0px; margin: 0px; font-size: 1px; text-align: left; overflow: hidden; z-index: 2; top: 70.375px; cursor: default; width: 1216px; height: 6px; left: 0px;"></div></div></div></div></div>
+
+---
+
+<div id="filterForm:j_idt209" class="ui-selectonemenu ui-widget ui-state-default ui-corner-all" title="Abfrage" role="combobox" aria-haspopup="true" aria-expanded="true" aria-owns="filterForm:j_idt209_items" style="min-width: 299px;"><div class="ui-helper-hidden-accessible"><input id="filterForm:j_idt209_focus" name="filterForm:j_idt209_focus" type="text" autocomplete="off" aria-expanded="true" aria-required="true" aria-autocomplete="list" aria-activedescendant="filterForm:j_idt209_7" aria-describedby="filterForm:j_idt209_7" aria-disabled="false"></div><div class="ui-helper-hidden-accessible"><select id="filterForm:j_idt209_input" name="filterForm:j_idt209_input" tabindex="-1" aria-hidden="true" onchange="PrimeFaces.ab({s:&quot;filterForm:j_idt209&quot;,e:&quot;change&quot;,f:&quot;filterForm&quot;,p:&quot;filterForm data&quot;,u:&quot;@(.esl-projekt-panel)&quot;,ps:true,onco:function(xhr,status,args){try {PF('dataTableWidget').clearFilters();} catch (ignore) {};;}});" data-p-rmsg="Bitte Abfrage wählen!" data-p-con="javax.faces.Integer" data-p-required="true" data-p-hl="onemenu"><option value="36" data-escape="true">Export Projektergebnisse</option><option value="67" data-escape="true">Mitarbeiterleistung Intraday</option><option value="83" data-escape="true">Intraday-Steuerung (ohne Gutschr., ohne KüRü) </option><option value="130" data-escape="true">Intra-Week</option><option value="131" data-escape="true">Intra-Month</option><option value="146" data-escape="true">REPORTING-1039</option><option value="200" data-escape="true">Intraday-Steuerung (REPORTING-1706)</option><option value="" disabled="disabled" selected="selected" data-escape="true"></option></select></div><label id="filterForm:j_idt209_label" class="ui-selectonemenu-label ui-inputfield ui-corner-all">&nbsp;</label><div class="ui-selectonemenu-trigger ui-state-default ui-corner-right"><span class="ui-icon ui-icon-triangle-1-s ui-c"></span></div></div>
+
+---
+<li class="ui-selectonemenu-item ui-selectonemenu-list-item ui-corner-all ui-state-highlight" data-label="Export Projektergebnisse" tabindex="-1" role="option" id="filterForm:j_idt209_0">Export Projektergebnisse</li>
+
+---
+
+<input id="filterForm:j_idt212_input" name="filterForm:j_idt212_input" type="text" value="27.07.2026" class="ui-inputfield ui-widget ui-state-default ui-corner-all hasDatepicker" aria-required="true" data-p-con="javax.faces.DateTime" data-p-pattern="dd.mm.yy" data-p-dttype="date" data-p-required="true" role="textbox" aria-disabled="false" aria-readonly="false">
+
+<table class="ui-datepicker-calendar"><thead><tr><th scope="col"><span title="Montag">Mo</span></th><th scope="col"><span title="Dienstag">Di</span></th><th scope="col"><span title="Mittwoch">Mi</span></th><th scope="col"><span title="Donnerstag">Do</span></th><th scope="col"><span title="Freitag">Fr</span></th><th scope="col" class="ui-datepicker-week-end"><span title="Samstag">Sa</span></th><th scope="col" class="ui-datepicker-week-end"><span title="Sonntag">So</span></th></tr></thead><tbody><tr><td class=" ui-datepicker-other-month ui-datepicker-unselectable ui-state-disabled">&nbsp;</td><td class=" ui-datepicker-other-month ui-datepicker-unselectable ui-state-disabled">&nbsp;</td><td class=" " data-handler="selectDay" data-event="click" data-month="6" data-year="2026"><a class="ui-state-default" href="#">1</a></td><td class=" " data-handler="selectDay" data-event="click" data-month="6" data-year="2026"><a class="ui-state-default" href="#">2</a></td><td class=" " data-handler="selectDay" data-event="click" data-month="6" data-year="2026"><a class="ui-state-default" href="#">3</a></td><td class=" ui-datepicker-week-end " data-handler="selectDay" data-event="click" data-month="6" data-year="2026"><a class="ui-state-default" href="#">4</a></td><td class=" ui-datepicker-week-end " data-handler="selectDay" data-event="click" data-month="6" data-year="2026"><a class="ui-state-default" href="#">5</a></td></tr><tr><td class=" " data-handler="selectDay" data-event="click" data-month="6" data-year="2026"><a class="ui-state-default" href="#">6</a></td><td class=" " data-handler="selectDay" data-event="click" data-month="6" data-year="2026"><a class="ui-state-default" href="#">7</a></td><td class=" " data-handler="selectDay" data-event="click" data-month="6" data-year="2026"><a class="ui-state-default" href="#">8</a></td><td class=" " data-handler="selectDay" data-event="click" data-month="6" data-year="2026"><a class="ui-state-default" href="#">9</a></td><td class=" " data-handler="selectDay" data-event="click" data-month="6" data-year="2026"><a class="ui-state-default" href="#">10</a></td><td class=" ui-datepicker-week-end " data-handler="selectDay" data-event="click" data-month="6" data-year="2026"><a class="ui-state-default" href="#">11</a></td><td class=" ui-datepicker-week-end " data-handler="selectDay" data-event="click" data-month="6" data-year="2026"><a class="ui-state-default" href="#">12</a></td></tr><tr><td class=" " data-handler="selectDay" data-event="click" data-month="6" data-year="2026"><a class="ui-state-default" href="#">13</a></td><td class=" " data-handler="selectDay" data-event="click" data-month="6" data-year="2026"><a class="ui-state-default" href="#">14</a></td><td class=" " data-handler="selectDay" data-event="click" data-month="6" data-year="2026"><a class="ui-state-default" href="#">15</a></td><td class=" " data-handler="selectDay" data-event="click" data-month="6" data-year="2026"><a class="ui-state-default" href="#">16</a></td><td class=" " data-handler="selectDay" data-event="click" data-month="6" data-year="2026"><a class="ui-state-default" href="#">17</a></td><td class=" ui-datepicker-week-end " data-handler="selectDay" data-event="click" data-month="6" data-year="2026"><a class="ui-state-default" href="#">18</a></td><td class=" ui-datepicker-week-end " data-handler="selectDay" data-event="click" data-month="6" data-year="2026"><a class="ui-state-default" href="#">19</a></td></tr><tr><td class=" " data-handler="selectDay" data-event="click" data-month="6" data-year="2026"><a class="ui-state-default" href="#">20</a></td><td class=" " data-handler="selectDay" data-event="click" data-month="6" data-year="2026"><a class="ui-state-default" href="#">21</a></td><td class=" " data-handler="selectDay" data-event="click" data-month="6" data-year="2026"><a class="ui-state-default" href="#">22</a></td><td class=" " data-handler="selectDay" data-event="click" data-month="6" data-year="2026"><a class="ui-state-default" href="#">23</a></td><td class=" " data-handler="selectDay" data-event="click" data-month="6" data-year="2026"><a class="ui-state-default" href="#">24</a></td><td class=" ui-datepicker-week-end " data-handler="selectDay" data-event="click" data-month="6" data-year="2026"><a class="ui-state-default" href="#">25</a></td><td class=" ui-datepicker-week-end " data-handler="selectDay" data-event="click" data-month="6" data-year="2026"><a class="ui-state-default" href="#">26</a></td></tr><tr><td class=" ui-datepicker-days-cell-over  ui-datepicker-current-day ui-datepicker-today" data-handler="selectDay" data-event="click" data-month="6" data-year="2026"><a class="ui-state-default ui-state-highlight ui-state-active" href="#">27</a></td><td class=" " data-handler="selectDay" data-event="click" data-month="6" data-year="2026"><a class="ui-state-default" href="#">28</a></td><td class=" " data-handler="selectDay" data-event="click" data-month="6" data-year="2026"><a class="ui-state-default" href="#">29</a></td><td class=" " data-handler="selectDay" data-event="click" data-month="6" data-year="2026"><a class="ui-state-default" href="#">30</a></td><td class=" " data-handler="selectDay" data-event="click" data-month="6" data-year="2026"><a class="ui-state-default" href="#">31</a></td><td class=" ui-datepicker-week-end ui-datepicker-other-month ui-datepicker-unselectable ui-state-disabled">&nbsp;</td><td class=" ui-datepicker-week-end ui-datepicker-other-month ui-datepicker-unselectable ui-state-disabled">&nbsp;</td></tr></tbody></table>
+
+<a class="ui-state-default ui-state-highlight ui-state-active" href="#">27</a>
+
+---
+
+<input id="filterForm:j_idt213_input" name="filterForm:j_idt213_input" type="text" value="27.07.2026" class="ui-inputfield ui-widget ui-state-default ui-corner-all hasDatepicker" aria-required="true" data-p-con="javax.faces.DateTime" data-p-pattern="dd.mm.yy" data-p-dttype="date" data-p-required="true" role="textbox" aria-disabled="false" aria-readonly="false">
+
+
+<a class="ui-state-default ui-state-highlight ui-state-active" href="#">27</a>
+
+---
+
+<input id="filterForm:j_idt212_input" name="filterForm:j_idt212_input" type="text" value="27.07.2026" class="ui-inputfield ui-widget ui-state-default ui-corner-all hasDatepicker" aria-required="true" data-p-con="javax.faces.DateTime" data-p-pattern="dd.mm.yy" data-p-dttype="date" data-p-required="true" role="textbox" aria-disabled="false" aria-readonly="false">
+
+<input id="filterForm:j_idt213_input" name="filterForm:j_idt213_input" type="text" value="27.07.2026" class="ui-inputfield ui-widget ui-state-default ui-corner-all hasDatepicker" aria-required="true" data-p-con="javax.faces.DateTime" data-p-pattern="dd.mm.yy" data-p-dttype="date" data-p-required="true" role="textbox" aria-disabled="false" aria-readonly="false">
+
+---
+
+
+<span class="ui-button-icon-left ui-icon ui-c fa fa-refresh fa-lg"></span>
+
+---
+
+<div class="ui-fluid">
+
+
+
+
+
+
+
+
+<form id="filterForm" name="filterForm" method="post" action="/Agents/secure/sis_vodafone.xhtml" class="poll-update" enctype="application/x-www-form-urlencoded">
+<input type="hidden" name="filterForm" value="filterForm">
+<div id="filterForm:j_idt203" class="ui-panelgrid ui-widget ui-panelgrid-blank esl-color-inherit esl-font-bold"><div id="filterForm:j_idt203_content" class="ui-panelgrid-content ui-widget-content ui-grid ui-grid-responsive"><div class="ui-grid-row"><div class="ui-panelgrid-cell ui-grid-col-3"><label id="filterForm:j_idt204" class="ui-outputlabel ui-widget">Statistik</label></div><div class="ui-panelgrid-cell ui-grid-col-2"><label id="filterForm:j_idt205" class="ui-outputlabel ui-widget">von</label></div><div class="ui-panelgrid-cell ui-grid-col-2"><label id="filterForm:j_idt206" class="ui-outputlabel ui-widget">bis</label></div><div class="ui-panelgrid-cell ui-grid-col-1"><label id="filterForm:j_idt207" class="ui-outputlabel ui-widget"></label></div><div class="ui-panelgrid-cell ui-grid-col-1"><label id="filterForm:j_idt208" class="ui-outputlabel ui-widget"></label></div></div><div class="ui-grid-row"><div class="ui-panelgrid-cell ui-grid-col-3"><div id="filterForm:j_idt209" class="ui-selectonemenu ui-widget ui-state-default ui-corner-all" title="Abfrage" role="combobox" aria-haspopup="true" aria-expanded="false" aria-owns="filterForm:j_idt209_items" style="min-width: 299px;"><div class="ui-helper-hidden-accessible"><input id="filterForm:j_idt209_focus" name="filterForm:j_idt209_focus" type="text" autocomplete="off" aria-expanded="false" aria-required="true" aria-autocomplete="list" aria-activedescendant="filterForm:j_idt209_0" aria-describedby="filterForm:j_idt209_0" aria-disabled="false"></div><div class="ui-helper-hidden-accessible"><select id="filterForm:j_idt209_input" name="filterForm:j_idt209_input" tabindex="-1" aria-hidden="true" onchange="PrimeFaces.ab({s:&quot;filterForm:j_idt209&quot;,e:&quot;change&quot;,f:&quot;filterForm&quot;,p:&quot;filterForm data&quot;,u:&quot;@(.esl-projekt-panel)&quot;,ps:true,onco:function(xhr,status,args){try {PF('dataTableWidget').clearFilters();} catch (ignore) {};;}});" data-p-rmsg="Bitte Abfrage wählen!" data-p-con="javax.faces.Integer" data-p-required="true" data-p-hl="onemenu"><option value="36" selected="selected" data-escape="true">Export Projektergebnisse</option><option value="67" data-escape="true">Mitarbeiterleistung Intraday</option><option value="83" data-escape="true">Intraday-Steuerung (ohne Gutschr., ohne KüRü) </option><option value="130" data-escape="true">Intra-Week</option><option value="131" data-escape="true">Intra-Month</option><option value="146" data-escape="true">REPORTING-1039</option><option value="200" data-escape="true">Intraday-Steuerung (REPORTING-1706)</option><option value="" disabled="disabled" data-escape="true"></option></select></div><label id="filterForm:j_idt209_label" class="ui-selectonemenu-label ui-inputfield ui-corner-all">Export Projektergebnisse</label><div class="ui-selectonemenu-trigger ui-state-default ui-corner-right"><span class="ui-icon ui-icon-triangle-1-s ui-c"></span></div></div></div><div class="ui-panelgrid-cell ui-grid-col-2"><span id="filterForm:j_idt212" class="ui-calendar"><input id="filterForm:j_idt212_input" name="filterForm:j_idt212_input" type="text" value="27.07.2026" class="ui-inputfield ui-widget ui-state-default ui-corner-all hasDatepicker" aria-required="true" data-p-con="javax.faces.DateTime" data-p-pattern="dd.mm.yy" data-p-dttype="date" data-p-required="true" role="textbox" aria-disabled="false" aria-readonly="false"></span></div><div class="ui-panelgrid-cell ui-grid-col-2"><span id="filterForm:j_idt213" class="ui-calendar"><input id="filterForm:j_idt213_input" name="filterForm:j_idt213_input" type="text" value="27.07.2026" class="ui-inputfield ui-widget ui-state-default ui-corner-all hasDatepicker" aria-required="true" data-p-con="javax.faces.DateTime" data-p-pattern="dd.mm.yy" data-p-dttype="date" data-p-required="true" role="textbox" aria-disabled="false" aria-readonly="false"></span></div><div class="ui-panelgrid-cell ui-grid-col-1"><button id="filterForm:j_idt214" name="filterForm:j_idt214" class="ui-button ui-widget ui-state-default ui-corner-all ui-button-icon-only esl-icon-style disable-on-ajax" onclick="if(PrimeFaces.vb({s:this,a:true,p:'filterForm data',u:'filterForm data'})){PrimeFaces.ab({s:&quot;filterForm:j_idt214&quot;,f:&quot;filterForm&quot;,p:&quot;filterForm data&quot;,u:&quot;filterForm data&quot;,ps:true,onco:function(xhr,status,args){try {PF('dataTableWidget').filter();} catch (ignore) {};;}});return false;}else{return false;}" title="Liste aktualisieren" type="submit" role="button" aria-disabled="false"><span class="ui-button-icon-left ui-icon ui-c fa fa-refresh fa-lg"></span><span class="ui-button-text ui-c">Liste aktualisieren</span></button></div><div class="ui-panelgrid-cell ui-grid-col-1"><label id="filterForm:j_idt216" class="ui-outputlabel ui-widget"></label></div></div></div></div><div id="filterForm:j_idt227"></div>
+<input type="hidden" name="javax.faces.ViewState" value="9176824752587610686:-2117760667783616969" autocomplete="off"></form>
+            </div>
+
+---
+
+<span class="ui-button-text ui-c">Liste exportieren</span>
+
+---
+
+fetch("https://esl.regiocom.net/Agents/secure/sis_vodafone.xhtml", {
+  "headers": {
+    "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
+    "accept-language": "de,de-DE;q=0.9,en;q=0.8,en-GB;q=0.7,en-US;q=0.6",
+    "cache-control": "max-age=0",
+    "content-type": "application/x-www-form-urlencoded",
+    "sec-ch-ua": "\"Not;A=Brand\";v=\"8\", \"Chromium\";v=\"150\", \"Microsoft Edge\";v=\"150\"",
+    "sec-ch-ua-mobile": "?0",
+    "sec-ch-ua-platform": "\"Windows\"",
+    "sec-fetch-dest": "document",
+    "sec-fetch-mode": "navigate",
+    "sec-fetch-site": "same-origin",
+    "sec-fetch-user": "?1",
+    "upgrade-insecure-requests": "1"
+  },
+  "referrer": "https://esl.regiocom.net/Agents/secure/sis_vodafone.xhtml",
+  "body": "filterForm=filterForm&filterForm%3Aj_idt209_focus=&filterForm%3Aj_idt209_input=36&filterForm%3Aj_idt212_input=26.07.2026&filterForm%3Aj_idt213_input=26.07.2026&filterForm%3Aj_idt215=&javax.faces.ViewState=9176824752587610686%3A-2117760667783616969",
+  "method": "POST",
+  "mode": "cors",
+  "credentials": "include"
+}); ;
+fetch("https://esl.regiocom.net/Agents/secure/sis_vodafone.xhtml", {
+  "headers": {
+    "accept": "application/xml, text/xml, */*; q=0.01",
+    "accept-language": "de,de-DE;q=0.9,en;q=0.8,en-GB;q=0.7,en-US;q=0.6",
+    "content-type": "application/x-www-form-urlencoded; charset=UTF-8",
+    "faces-request": "partial/ajax",
+    "sec-ch-ua": "\"Not;A=Brand\";v=\"8\", \"Chromium\";v=\"150\", \"Microsoft Edge\";v=\"150\"",
+    "sec-ch-ua-mobile": "?0",
+    "sec-ch-ua-platform": "\"Windows\"",
+    "sec-fetch-dest": "empty",
+    "sec-fetch-mode": "cors",
+    "sec-fetch-site": "same-origin",
+    "x-requested-with": "XMLHttpRequest"
+  },
+  "referrer": "https://esl.regiocom.net/Agents/secure/sis_vodafone.xhtml",
+  "body": "javax.faces.partial.ajax=true&javax.faces.source=frmPoll%3Aj_idt120&javax.faces.partial.execute=%40all&javax.faces.partial.render=pnlProjektMessage+pnlTeamMessage+j_idt74&frmPoll%3Aj_idt120=frmPoll%3Aj_idt120&frmPoll=frmPoll&javax.faces.ViewState=9176824752587610686%3A-2117760667783616969",
+  "method": "POST",
+  "mode": "cors",
+  "credentials": "include"
+}); ;
+fetch("https://esl.regiocom.net/Agents/secure/sis_vodafone.xhtml", {
+  "headers": {
+    "accept": "application/xml, text/xml, */*; q=0.01",
+    "accept-language": "de,de-DE;q=0.9,en;q=0.8,en-GB;q=0.7,en-US;q=0.6",
+    "content-type": "application/x-www-form-urlencoded; charset=UTF-8",
+    "faces-request": "partial/ajax",
+    "sec-ch-ua": "\"Not;A=Brand\";v=\"8\", \"Chromium\";v=\"150\", \"Microsoft Edge\";v=\"150\"",
+    "sec-ch-ua-mobile": "?0",
+    "sec-ch-ua-platform": "\"Windows\"",
+    "sec-fetch-dest": "empty",
+    "sec-fetch-mode": "cors",
+    "sec-fetch-site": "same-origin",
+    "x-requested-with": "XMLHttpRequest"
+  },
+  "referrer": "https://esl.regiocom.net/Agents/secure/sis_vodafone.xhtml",
+  "body": "javax.faces.partial.ajax=true&javax.faces.source=frmProjektStatRem%3Aj_idt199&javax.faces.partial.execute=pnlProjekt+filterForm+data&javax.faces.partial.render=pnlProjekt+filterForm+data&frmProjektStatRem%3Aj_idt199=frmProjektStatRem%3Aj_idt199&filterForm=filterForm&filterForm%3Aj_idt209_focus=&filterForm%3Aj_idt209_input=36&filterForm%3Aj_idt212_input=26.07.2026&filterForm%3Aj_idt213_input=26.07.2026&data=data&data%3AdataTable%3Aj_idt235%3A1%3Afilter=&data%3AdataTable%3Aj_idt235%3A2%3Afilter=&data%3AdataTable%3Aj_idt235%3A3%3Afilter=&data%3AdataTable%3Aj_idt235%3A4%3Afilter=&data%3AdataTable%3Aj_idt235%3A5%3Afilter=&data%3AdataTable%3Aj_idt235%3A6%3Afilter=&data%3AdataTable%3Aj_idt235%3A7%3Afilter=&data%3AdataTable%3Aj_idt235%3A8%3Afilter=&data%3AdataTable%3Aj_idt235%3A10%3Afilter=&data%3AdataTable%3Aj_idt235%3A11%3Afilter=&data%3AdataTable_rppDD=15&data%3AdataTable_scrollState=0%2C0&javax.faces.ViewState=9176824752587610686%3A-2117760667783616969",
+  "method": "POST",
+  "mode": "cors",
+  "credentials": "include"
+}); ;
+fetch("https://esl.regiocom.net/Agents/secure/sis_vodafone.xhtml", {
+  "headers": {
+    "accept": "application/xml, text/xml, */*; q=0.01",
+    "accept-language": "de,de-DE;q=0.9,en;q=0.8,en-GB;q=0.7,en-US;q=0.6",
+    "content-type": "application/x-www-form-urlencoded; charset=UTF-8",
+    "faces-request": "partial/ajax",
+    "sec-ch-ua": "\"Not;A=Brand\";v=\"8\", \"Chromium\";v=\"150\", \"Microsoft Edge\";v=\"150\"",
+    "sec-ch-ua-mobile": "?0",
+    "sec-ch-ua-platform": "\"Windows\"",
+    "sec-fetch-dest": "empty",
+    "sec-fetch-mode": "cors",
+    "sec-fetch-site": "same-origin",
+    "x-requested-with": "XMLHttpRequest"
+  },
+  "referrer": "https://esl.regiocom.net/Agents/secure/sis_vodafone.xhtml",
+  "body": "javax.faces.partial.ajax=true&javax.faces.source=data%3AdataTable&javax.faces.partial.execute=data%3AdataTable&javax.faces.partial.render=data%3AdataTable&data%3AdataTable=data%3AdataTable&data%3AdataTable_filtering=true&data%3AdataTable_encodeFeature=true&data=data&data%3AdataTable%3Aj_idt235%3A1%3Afilter=&data%3AdataTable%3Aj_idt235%3A2%3Afilter=&data%3AdataTable%3Aj_idt235%3A3%3Afilter=&data%3AdataTable%3Aj_idt235%3A4%3Afilter=&data%3AdataTable%3Aj_idt235%3A5%3Afilter=&data%3AdataTable%3Aj_idt235%3A6%3Afilter=&data%3AdataTable%3Aj_idt235%3A7%3Afilter=&data%3AdataTable%3Aj_idt235%3A8%3Afilter=&data%3AdataTable%3Aj_idt235%3A10%3Afilter=&data%3AdataTable%3Aj_idt235%3A11%3Afilter=&data%3AdataTable_rppDD=15&data%3AdataTable_scrollState=0%2C0&javax.faces.ViewState=9176824752587610686%3A-2117760667783616969",
+  "method": "POST",
+  "mode": "cors",
+  "credentials": "include"
+});
+
+---
+
+
+
+

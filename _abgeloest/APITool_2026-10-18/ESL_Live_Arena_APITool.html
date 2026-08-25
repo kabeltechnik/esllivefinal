@@ -1,0 +1,1550 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ESL Live-Arena | APITool &amp; Excel Live-Bridge</title>
+<style>
+  :root {
+    --vf-red: #E60000;
+    --vf-red-dark: #BD0000;
+    --bg-dark: #121212;
+    --bg-card: #1D1D1D;
+    --bg-elevated: #262626;
+    --border-col: #3E3E3E;
+    --txt-main: #F5F5F5;
+    --txt-muted: #9C9C9C;
+    --st-green: #3DD68C;
+    --st-amber: #FFB84D;
+    --st-red: #FF6666;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg-dark);
+    color: var(--txt-main);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+  }
+
+  /* Schwebende APITool & Excel Live-Bridge Kopfleiste */
+  #rcApiBridgeBar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 2147483645;
+    background: rgba(18, 18, 18, 0.97);
+    border-bottom: 2px solid var(--vf-red);
+    box-shadow: 0 6px 24px rgba(0, 0, 0, 0.75);
+    padding: 8px 14px;
+    font-size: 12.5px;
+    transition: transform 0.2s ease, opacity 0.2s ease;
+  }
+  #rcApiBridgeBar.collapsed {
+    transform: translateY(-105%);
+    pointer-events: none;
+    opacity: 0;
+  }
+  #rcApiBridgePill {
+    position: fixed;
+    top: 8px;
+    right: 14px;
+    z-index: 2147483646;
+    background: #1A1A1A;
+    color: var(--txt-main);
+    border: 1px solid var(--vf-red);
+    border-radius: 6px;
+    padding: 5px 11px;
+    font-size: 11.5px;
+    font-weight: 700;
+    cursor: pointer;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.65);
+    display: none;
+    align-items: center;
+    gap: 8px;
+  }
+  #rcApiBridgePill.visible {
+    display: inline-flex;
+  }
+  #rcApiBridgePill:hover {
+    background: #262626;
+  }
+  .ab-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--st-amber);
+    display: inline-block;
+  }
+  .ab-dot.ok { background: var(--st-green); }
+  .ab-dot.err { background: var(--st-red); }
+
+  .ab-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    justify-content: space-between;
+  }
+  .ab-brand {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    font-weight: 800;
+    font-size: 13px;
+    letter-spacing: 0.3px;
+    color: #FFFFFF;
+  }
+  .ab-rhombus {
+    width: 11px;
+    height: 11px;
+    background: var(--vf-red);
+    transform: rotate(45deg);
+    display: inline-block;
+    flex: none;
+  }
+  .ab-tag {
+    background: #2A2A2A;
+    border: 1px solid var(--border-col);
+    color: var(--txt-muted);
+    font-size: 10.5px;
+    font-weight: 700;
+    padding: 2px 7px;
+    border-radius: 4px;
+    text-transform: uppercase;
+  }
+
+  .ab-badges {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+  }
+  .ab-slot {
+    background: var(--bg-card);
+    border: 1px solid var(--border-col);
+    border-radius: 5px;
+    padding: 3px 8px;
+    font-size: 11.5px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--txt-muted);
+  }
+  .ab-slot.loaded {
+    border-color: rgba(61, 214, 140, 0.55);
+    color: var(--txt-main);
+  }
+  .ab-slot b {
+    color: #FFFFFF;
+    font-weight: 700;
+  }
+
+  .ab-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+  }
+  .ab-btn {
+    background: var(--bg-elevated);
+    color: var(--txt-main);
+    border: 1px solid var(--border-col);
+    border-radius: 5px;
+    padding: 5px 10px;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    font-family: inherit;
+    transition: background 0.15s ease, border-color 0.15s ease;
+  }
+  .ab-btn:hover {
+    background: #333333;
+    border-color: #666666;
+  }
+  .ab-btn.primary {
+    background: var(--vf-red);
+    border-color: var(--vf-red);
+    color: #FFFFFF;
+  }
+  .ab-btn.primary:hover {
+    background: var(--vf-red-dark);
+  }
+  .ab-btn.green {
+    background: rgba(61, 214, 140, 0.14);
+    border-color: var(--st-green);
+    color: var(--st-green);
+  }
+  .ab-btn.green:hover {
+    background: rgba(61, 214, 140, 0.24);
+  }
+
+  .ab-dropzone {
+    border: 1px dashed #666666;
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 5px;
+    padding: 4px 10px;
+    font-size: 11.5px;
+    color: var(--txt-main);
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+  .ab-dropzone:hover, .ab-dropzone.dragover {
+    border-color: var(--vf-red);
+    background: rgba(230, 0, 0, 0.12);
+    color: #FFFFFF;
+  }
+
+  .ab-toggles {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 11.5px;
+    color: var(--txt-muted);
+  }
+  .ab-toggles label {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    cursor: pointer;
+    user-select: none;
+  }
+  .ab-toggles input[type="checkbox"] {
+    accent-color: var(--vf-red);
+    cursor: pointer;
+  }
+
+  /* Modal fuer APITool Vorlagen und TSV-Import */
+  #rcApiModalBackdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 2147483647;
+    background: rgba(0, 0, 0, 0.78);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+  }
+  #rcApiModalBackdrop.open {
+    display: flex;
+  }
+  .ab-modal {
+    background: var(--bg-card);
+    border: 1px solid var(--border-col);
+    border-top: 3px solid var(--vf-red);
+    border-radius: 8px;
+    width: 100%;
+    max-width: 860px;
+    max-height: 88vh;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 16px 48px rgba(0, 0, 0, 0.85);
+  }
+  .ab-modal-head {
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--border-col);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-weight: 800;
+    font-size: 15px;
+  }
+  .ab-modal-body {
+    padding: 16px 18px;
+    overflow-y: auto;
+    font-size: 13px;
+    line-height: 1.55;
+  }
+  .ab-modal-body h3 {
+    margin: 14px 0 6px;
+    font-size: 13.5px;
+    color: #FFFFFF;
+  }
+  .ab-modal-body pre, .ab-modal-body textarea {
+    width: 100%;
+    background: #0E0E0E;
+    color: #E0E0E0;
+    border: 1px solid var(--border-col);
+    border-radius: 6px;
+    padding: 10px;
+    font-family: Consolas, monospace;
+    font-size: 11.5px;
+    overflow-x: auto;
+  }
+  .ab-modal-body textarea {
+    min-height: 130px;
+    resize: vertical;
+  }
+</style>
+</head>
+<body>
+
+<!-- Minimiertes Eck-Badge, wenn die Leiste eingeklappt ist -->
+<div id="rcApiBridgePill" onclick="window.rcApiBridgeToggle(false)" title="APITool &amp; Excel-Steuerleiste einblenden">
+  <span class="ab-dot" id="abPillDot"></span>
+  <span>APITool Bridge</span>
+  <span id="abPillText" style="color:#9C9C9C;font-weight:400;">Bereit</span>
+</div>
+
+<!-- Haupt-Steuerleiste fuer APITool & Excel-Import -->
+<div id="rcApiBridgeBar">
+  <div class="ab-row">
+    <div class="ab-brand">
+      <span class="ab-rhombus"></span>
+      <span>APITOOL &amp; CDP AUTO-HARVESTER</span>
+      <span class="ab-tag" id="abModeTag">STARTE...</span>
+    </div>
+
+    <div class="ab-badges">
+      <div class="ab-slot" id="abSlotCdpEsl" title="Vollautomatischer Hintergrund-Abruf aus esl.regiocom.net per Chrome DevTools Protocol (Port 9222)">
+        <span class="ab-dot" id="abDotCdpEsl"></span>
+        <span>CDP ESL: <b id="abTxtCdpEsl">Init</b></span>
+      </div>
+      <div class="ab-slot" id="abSlotCdpLiga" title="Vollautomatischer Hintergrund-Abruf aus ccs.vodafone.de (get_data.rb) per Chrome DevTools Protocol (Port 9222)">
+        <span class="ab-dot" id="abDotCdpLiga"></span>
+        <span>CDP Liga: <b id="abTxtCdpLiga">Init</b></span>
+      </div>
+      <div class="ab-slot" id="abSlotMap" title="Mitarbeiter_IDS_Final_komplett.xlsx (VO-ID / CCS-ID / Stack)">
+        <span class="ab-dot" id="abDotMap"></span>
+        <span>Mapping: <b id="abTxtMap">offen</b></span>
+      </div>
+      <div class="ab-slot" id="abSlotKabel" title="ESL Export Vodafone Kabel">
+        <span class="ab-dot" id="abDotKabel"></span>
+        <span>Kabel: <b id="abTxtKabel">0</b></span>
+      </div>
+      <div class="ab-slot" id="abSlotMobile" title="ESL Export Vodafone Mobile">
+        <span class="ab-dot" id="abDotMobile"></span>
+        <span>Mobile: <b id="abTxtMobile">0</b></span>
+      </div>
+      <div class="ab-slot" id="abSlotUm" title="ESL Export Vodafone UM">
+        <span class="ab-dot" id="abDotUm"></span>
+        <span>UM: <b id="abTxtUm">0</b></span>
+      </div>
+      <div class="ab-slot" id="abSlotLiga" title="CCS Ligaliste (Agenten-KPIs, Calls, AHT, ACW, CS, TNPS, AQ)">
+        <span class="ab-dot" id="abDotLiga"></span>
+        <span>Ligaliste: <b id="abTxtLiga">0</b></span>
+      </div>
+    </div>
+
+    <div class="ab-actions">
+      <button type="button" class="ab-btn primary" id="abBtnLiveHarvest" onclick="window.rcApiTriggerLiveHarvest()" title="Sofortigen Live-Abruf von ESL-Portal &amp; Ligaliste im Hintergrund-Browser ausloesen (ohne Handgriff)">
+        Jetzt Live-Abruf (CDP)
+      </button>
+      <button type="button" class="ab-btn green" id="abBtnGDrive" onclick="window.rcApiLoadGDriveLatest()" title="Neuesten ESL-Stunden-Report aus Google Drive (G:\Meine Ablage\ESL_Stunden_Reporte_Automated) laden">
+        GDrive Stunden-Report
+      </button>
+      <button type="button" class="ab-btn" id="abBtnRefLoad" onclick="window.rcApiLoadReference()" title="Gespeicherte Referenz- und Auto-Exporte aus Test Excels neu einlesen">
+        Bestand neu laden
+      </button>
+      <label class="ab-dropzone" id="abDropzone" title="Optionaler Notfall-Import: Excel-Dateien anklicken oder ablegen">
+        + Manuell
+        <input type="file" id="abFileInput" multiple accept=".xlsx,.xls,.csv,.tsv,.txt,.json" style="display:none">
+      </label>
+      <button type="button" class="ab-btn" onclick="window.rcApiOpenModal('apitool')" title="Architektur &amp; Status des vollautomatischen CDP-Harvesters anzeigen">
+        Status / Info
+      </button>
+      <div class="ab-toggles">
+        <label title="Setzt das neueste Datum einer geladenen Excel-Datei automatisch auf das heutige Datum, damit die Live-Arena auch Vortags-/Test-Exporte sofort live anzeigt">
+          <input type="checkbox" id="abChkHeute" checked onchange="window.rcApiReprocessAll()">
+          <span>Datum auf Heute</span>
+        </label>
+        <label title="Synchronisiert alle 15 Sekunden vollautomatisch mit dem lokalen CDP-Harvester-Server">
+          <input type="checkbox" id="abChkWatch" checked onchange="window.rcApiToggleWatch(this.checked)">
+          <span>Auto-Sync (15s)</span>
+        </label>
+      </div>
+      <span id="abStatusMsg" style="color:var(--st-green);font-weight:700;font-size:11.5px;min-width:130px;text-align:right;">Bereit</span>
+      <button type="button" class="ab-btn" onclick="window.rcApiBridgeToggle(true)" title="Steuerleiste einklappen (Wandmonitor-Modus)">
+        Ausblenden
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal fuer Liga-TSV-Paste & APITool-Konfiguration -->
+<div id="rcApiModalBackdrop" onclick="if(event.target===this)window.rcApiCloseModal()">
+  <div class="ab-modal">
+    <div class="ab-modal-head">
+      <span id="abModalTitle">APITool &amp; Excel-Bridge</span>
+      <button type="button" class="ab-btn" onclick="window.rcApiCloseModal()">Schliessen</button>
+    </div>
+    <div class="ab-modal-body" id="abModalContent"></div>
+  </div>
+</div>
+
+<!-- Attrappen-Formular fuer esl_live_arena_v22.js (verhindert Login-Warnung bei Offline-/Excel-Betrieb) -->
+<form id="filterForm" action="/apitool-noop" style="display:none">
+  <input type="text" class="hasDatepicker" name="filterForm:von" value="">
+  <input type="text" class="hasDatepicker" name="filterForm:bis" value="">
+</form>
+<div id="data" style="display:none">Statistik liefert kein Ergebnis</div>
+
+<!-- Lokales SheetJS (sofort verfuegbar, verhindert CDN-Wartezeit) -->
+<script src="./node_modules/xlsx/dist/xlsx.full.min.js"></script>
+
+<script>
+(function () {
+  'use strict';
+
+  // Automatische Popup-Oeffnung der Ligaliste unterbinden, da Daten ueber Excel / APITool kommen
+  try {
+    localStorage.setItem('rcLigaOeffnenAus', '1');
+    localStorage.removeItem('rcAlleProjekteAus');
+  } catch (e) {}
+  window.rcAutoKpiOff = true;
+
+  // Speicher fuer die Roh-Matrizen (ungefiltert nach Datum), damit "Datum auf Heute" jederzeit umschaltbar ist
+  const rawStore = {
+    kabel: null,
+    mobile: null,
+    um: null,
+    ligaKpis: null,
+    fileStamps: {}
+  };
+
+  function pad2(n) { return String(n).padStart(2, '0'); }
+  function heuteIso() {
+    const d = new Date();
+    return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate());
+  }
+  function heuteDe() {
+    const d = new Date();
+    return pad2(d.getDate()) + '.' + pad2(d.getMonth() + 1) + '.' + d.getFullYear();
+  }
+
+  // Datumsformate im ESL-Export auf YYYY-MM-DD normieren
+  function erkenneTagIso(val) {
+    if (val == null || val === '') return null;
+    if (typeof val === 'number' && val > 25000 && val < 80000) {
+      const d = new Date(Math.round((val - 25569) * 86400 * 1000));
+      return d.getUTCFullYear() + '-' + pad2(d.getUTCMonth() + 1) + '-' + pad2(d.getUTCDate());
+    }
+    const s = String(val).trim();
+    let m = s.match(/^(\d{4})[-/](\d{2})[-/](\d{2})/);
+    if (m) return m[1] + '-' + m[2] + '-' + m[3];
+    m = s.match(/^(\d{2})\.(\d{2})\.(\d{4})/);
+    if (m) return m[3] + '-' + m[2] + '-' + m[1];
+    return null;
+  }
+
+  // Ersetzt das neueste Datum einer ESL-Matrix durch heuteIso(), Uhrzeit bleibt erhalten
+  function mapMatrixDatumAufHeute(rows, aktiv) {
+    if (!rows || rows.length < 2) return rows;
+    const kopf = rows[0].map(x => String(x == null ? '' : x).toLowerCase().trim());
+    const iDat = kopf.indexOf('datum');
+    if (iDat === -1 || !aktiv) return rows.map(r => r ? r.slice() : r);
+
+    const heute = heuteIso();
+    let maxTag = '';
+    for (let i = 1; i < rows.length; i++) {
+      const r = rows[i];
+      if (!r) continue;
+      const tag = erkenneTagIso(r[iDat]);
+      if (tag && tag > maxTag) maxTag = tag;
+    }
+    if (!maxTag || maxTag === heute) return rows.map(r => r ? r.slice() : r);
+
+    const out = [rows[0].slice()];
+    for (let i = 1; i < rows.length; i++) {
+      const r = rows[i];
+      if (!r) continue;
+      const copy = r.slice();
+      const raw = String(copy[iDat] == null ? '' : copy[iDat]).trim();
+      const tag = erkenneTagIso(copy[iDat]);
+      if (tag === maxTag) {
+        const zeitMatch = raw.match(/(\s+\d{1,2}:\d{2}(?::\d{2})?)$/);
+        copy[iDat] = heute + (zeitMatch ? zeitMatch[1] : '');
+      }
+      out.push(copy);
+    }
+    return out;
+  }
+
+  function setBridgeStatus(msg, farbe) {
+    const el = document.getElementById('abStatusMsg');
+    if (el) {
+      el.textContent = msg;
+      el.style.color = farbe || 'var(--st-green)';
+    }
+    const pillTxt = document.getElementById('abPillText');
+    if (pillTxt) pillTxt.textContent = msg;
+  }
+
+  function updateBridgeBadges() {
+    const mapCount = window.rcWcaMapping && window.rcWcaMapping.ccsMap
+      ? Object.keys(window.rcWcaMapping.ccsMap).length : 0;
+    const setSlot = (slotId, dotId, txtId, ok, label) => {
+      const s = document.getElementById(slotId);
+      const d = document.getElementById(dotId);
+      const t = document.getElementById(txtId);
+      if (s) s.classList.toggle('loaded', !!ok);
+      if (d) d.className = 'ab-dot' + (ok ? ' ok' : '');
+      if (t) t.textContent = label;
+    };
+
+    setSlot('abSlotMap', 'abDotMap', 'abTxtMap', mapCount > 0, mapCount > 0 ? (mapCount + ' IDs') : 'offen');
+
+    ['kabel', 'mobile', 'um'].forEach(key => {
+      const cap = key.charAt(0).toUpperCase() + key.slice(1);
+      const pd = (window.rcProjektDaten || {})[key];
+      const n = pd && pd.data && pd.data.length > 1 ? (pd.data.length - 1) : 0;
+      setSlot('abSlot' + cap, 'abDot' + cap, 'abTxt' + cap, n > 0, n > 0 ? (n + ' Z.') : '0');
+    });
+
+    const ligaCount = window.rcKpiData ? Object.keys(window.rcKpiData).length : 0;
+    setSlot('abSlotLiga', 'abDotLiga', 'abTxtLiga', ligaCount > 0, ligaCount > 0 ? (ligaCount + ' Ag.') : '0');
+
+    const pillDot = document.getElementById('abPillDot');
+    if (pillDot) {
+      const anyOk = mapCount > 0 || ligaCount > 0 || (window.rcProjektDaten && (window.rcProjektDaten.kabel || window.rcProjektDaten.mobile || window.rcProjektDaten.um));
+      pillDot.className = 'ab-dot' + (anyOk ? ' ok' : '');
+    }
+  }
+
+  // ------------------------------------------------------------------
+  // 1) MITARBEITER-MAPPING PARSER (Mitarbeiter_IDS_Final_komplett.xlsx)
+  // ------------------------------------------------------------------
+  function parseMitarbeiterWorkbook(wb) {
+    const sheetName = wb.SheetNames.find(n => /^daten$/i.test(n)) || wb.SheetNames[0];
+    const rows = XLSX.utils.sheet_to_json(wb.Sheets[sheetName], { header: 1 });
+    if (!rows || rows.length < 2) return false;
+
+    const head = (rows[0] || []).map(x => String(x == null ? '' : x).toLowerCase().trim());
+    const idx = name => head.indexOf(name);
+    let iStd = idx('standort'), iTeam = idx('team'), iCcs = idx('ccs_user'), iName = idx('namen'), iStack = idx('stack');
+    if (iStd === -1) iStd = 0;
+    if (iTeam === -1) iTeam = 1;
+    if (iCcs === -1) iCcs = 2;
+    if (iName === -1) iName = 3;
+    if (iStack === -1) iStack = 4;
+
+    const voCols = [];
+    head.forEach((h, i) => { if (/^vo_id/i.test(h)) voCols.push(i); });
+    if (!voCols.length) {
+      for (let c = 5; c <= 12; c++) voCols.push(c);
+    }
+
+    const voMap = {}, ccsMap = {}, stackMap = {};
+    for (let r = 1; r < rows.length; r++) {
+      const row = rows[r];
+      if (!row || !row.length) continue;
+      const std = String(row[iStd] == null ? '' : row[iStd]).trim();
+      const team = String(row[iTeam] == null ? '' : row[iTeam]).trim();
+      const ccs = String(row[iCcs] == null ? '' : row[iCcs]).trim();
+      const rawName = String(row[iName] == null ? '' : row[iName]).trim();
+      const name = rawName ? rawName.replace(/([a-z\u00e4\u00f6\u00fc\u00df])([A-Z\u00c4\u00d6\u00dc])/g, '$1 $2') : '';
+      const stack = String(row[iStack] == null ? '' : row[iStack]).trim();
+
+      if (team && stack) stackMap[team] = stack;
+      if (ccs) ccsMap[ccs] = { name: name || ('ID ' + ccs), standort: std, team: team };
+
+      voCols.forEach(c => {
+        const vo = String(row[c] == null ? '' : row[c]).trim();
+        if (vo) voMap[vo] = { name: name || ('VO ' + vo), standort: std, team: team, ccsId: ccs };
+      });
+    }
+
+    window.rcWcaMapping = { voMap, ccsMap, standortMap: {}, stackMap };
+    try {
+      localStorage.setItem('rcWcaMapping', JSON.stringify(window.rcWcaMapping));
+    } catch (e) {}
+    if (typeof window.rcRepairEslHistory === 'function') {
+      try { window.rcRepairEslHistory(); } catch (e) {}
+    }
+    if (typeof window.rcStackAnkerNeu === 'function') {
+      try { window.rcStackAnkerNeu(); } catch (e) {}
+    }
+    updateBridgeBadges();
+    return Object.keys(ccsMap).length;
+  }
+
+  // ------------------------------------------------------------------
+  // 2) ESL EXPORT PARSER (Kabel / Mobile / UM automatisch erkennen)
+  // ------------------------------------------------------------------
+  function erkenneEslProjekt(rows, dateiName) {
+    const fn = String(dateiName || '').toLowerCase();
+    if (/212911|kabel/i.test(fn)) return 'kabel';
+    if (/212922|mobile|mobilfunk/i.test(fn)) return 'mobile';
+    if (/212931|_um\b|\bum\b/i.test(fn)) return 'um';
+
+    const head = (rows[0] || []).map(x => String(x == null ? '' : x).toLowerCase().trim());
+    if (head.includes('osf_id') && head.includes('produktgruppe')) return 'mobile';
+    if (head.includes('produktgrupe')) return 'kabel';
+    if (!head.includes('produktgrupe') && !head.includes('produktgruppe') && head.includes('produktmerkmal')) return 'um';
+
+    // Fallback ueber VO-Nummern im Mitarbeiter-Mapping
+    const iVo = head.indexOf('vo_nummer');
+    const map = window.rcWcaMapping;
+    if (iVo !== -1 && map && map.voMap && map.stackMap) {
+      const counts = { kabel: 0, mobile: 0, um: 0 };
+      for (let i = 1; i < Math.min(rows.length, 300); i++) {
+        const vo = String((rows[i] || [])[iVo] || '').trim();
+        const m = map.voMap[vo];
+        const st = m && m.team ? String(map.stackMap[m.team] || '').toUpperCase() : '';
+        if (/^(VKD|ONEC)/.test(st)) counts.kabel++;
+        else if (/^MF/.test(st)) counts.mobile++;
+        else if (/^VUM/.test(st)) counts.um++;
+      }
+      if (counts.mobile > counts.kabel && counts.mobile > counts.um) return 'mobile';
+      if (counts.um > counts.kabel && counts.um > counts.mobile) return 'um';
+    }
+    return 'kabel';
+  }
+
+  function speichereUndVerarbeiteEsl(projektKey, rawRows) {
+    rawStore[projektKey] = rawRows;
+    const aufHeute = !!(document.getElementById('abChkHeute') && document.getElementById('abChkHeute').checked);
+    const rows = mapMatrixDatumAufHeute(rawRows, aufHeute);
+
+    window.rcProjektDaten = window.rcProjektDaten || {};
+    window.rcProjektDaten[projektKey] = {
+      data: rows,
+      zeit: Date.now(),
+      pruefung: 'ok',
+      pruefText: 'APITool/Excel (' + (rows.length - 1) + ' Zeilen)'
+    };
+
+    window.rcEslFehlserie = 0;
+    window.rcEslFehlgrund = '';
+    window.rcEslLastOk = Date.now();
+
+    if (typeof window.rcVerarbeiteAlle === 'function') {
+      window.rcVerarbeiteAlle(true);
+    } else if (typeof window.processDataStream === 'function') {
+      window.processDataStream(rows);
+    }
+    updateBridgeBadges();
+  }
+
+  // ------------------------------------------------------------------
+  // 3) LIGALISTE PARSER (.xls / .xlsx / TSV-Text / JSON)
+  //    Unterstuetzt Sheet1 & Sheet2 sowie Promille- und Prozent-Skala
+  // ------------------------------------------------------------------
+  function parseTimeSec(val) {
+    if (val == null || val === '') return null;
+    if (typeof val === 'number') {
+      return val < 1 && val > 0 ? Math.round(val * 86400) : Math.round(val);
+    }
+    const s = String(val).trim();
+    const p = s.split(':').map(x => parseFloat(x.replace(',', '.')));
+    if (p.some(isNaN)) return null;
+    if (p.length === 3) return Math.round(p[0] * 3600 + p[1] * 60 + p[2]);
+    if (p.length === 2) return Math.round(p[0] * 60 + p[1]);
+    return null;
+  }
+
+  function parseNum(val) {
+    if (val == null || val === '') return null;
+    if (typeof val === 'number') return isFinite(val) ? val : null;
+    const s = String(val).trim().replace('%', '').replace(/\s+/g, '').replace(',', '.');
+    if (!s || s === '-' || s === '--') return null;
+    const n = parseFloat(s);
+    return isFinite(n) ? n : null;
+  }
+
+  function ligaAusMatrixUniversal(matrix) {
+    if (!matrix || matrix.length < 2) return [];
+    const norm = s => String(s == null ? '' : s).replace(/\s+/g, ' ').trim();
+    const normLow = s => norm(s).toLowerCase();
+
+    let rLeaf = -1;
+    for (let r = 0; r < Math.min(12, matrix.length); r++) {
+      const row = (matrix[r] || []).map(normLow);
+      if (row.includes('agentenname') && (row.includes('ccs-id') || row.includes('team'))) {
+        rLeaf = r;
+        break;
+      }
+    }
+    if (rLeaf < 0) return [];
+
+    const rGrp = rLeaf > 0 ? rLeaf - 1 : 0;
+    const grpRaw = matrix[rGrp] || [];
+    const leaf = (matrix[rLeaf] || []).map(norm);
+    const nCols = Math.max(grpRaw.length, leaf.length);
+
+    const grp = [];
+    let lastG = '';
+    for (let c = 0; c < nCols; c++) {
+      const g = norm(grpRaw[c]);
+      if (g) lastG = g;
+      grp[c] = lastG;
+    }
+
+    const col = {
+      std: null, team: null, name: null, ccs: null, datum: null,
+      acd: {}, acw: {}, aht: {}, acht: {},
+      aq: {}, cs: {}, csDds: {}, tnps: {}, fq: {}, dds: {}, ftf: {}, totFix: {}, ff7: {}, wq: {},
+      promCs: null, detCs: null, neutCs: null,
+      promTnps: null, detTnps: null, neutTnps: null
+    };
+
+    const gMap = {
+      'acd': 'acd',
+      'acw': 'acw',
+      'aht': 'aht',
+      'acht': 'acht',
+      'auflegerquote': 'aq',
+      'cs': 'cs',
+      'cs deep detractor %': 'csDds',
+      'tnps': 'tnps',
+      'tnps antwortquote %': 'fq',
+      'tnps deep detractor %': 'dds',
+      'first-time-fix': 'ftf',
+      'total-fix': 'totFix',
+      'final fix 7': 'ff7',
+      'weiterl.-quote skill<>': 'wq'
+    };
+
+    for (let c = 0; c < nCols; c++) {
+      const l = (leaf[c] || '').toLowerCase();
+      const g = (grp[c] || '').toLowerCase();
+
+      if (l === 'standort' && col.std == null) col.std = c;
+      else if (l === 'team' && col.team == null) col.team = c;
+      else if (l === 'agentenname' && col.name == null) col.name = c;
+      else if (l === 'ccs-id' && col.ccs == null) col.ccs = c;
+      else if (l === 'datum' && col.datum == null) col.datum = c;
+
+      const key = gMap[g];
+      if (key) {
+        if ((l === 'z\u00e4hler' || l === 'zaehler') && col[key].z == null) col[key].z = c;
+        else if (l === 'nenner' && col[key].n == null) col[key].n = c;
+        else if (l === 'kennzahl' && col[key].k == null) col[key].k = c;
+      }
+
+      if (l === 'kennzahl' || l === g) {
+        if (g === 'promotoren') { if (col.promCs == null) col.promCs = c; else if (col.promTnps == null) col.promTnps = c; }
+        else if (g === 'detraktoren') { if (col.detCs == null) col.detCs = c; else if (col.detTnps == null) col.detTnps = c; }
+        else if (g === 'neutrale') { if (col.neutCs == null) col.neutCs = c; else if (col.neutTnps == null) col.neutTnps = c; }
+      }
+    }
+
+    // Pruefen, ob die Quoten in Promille (ligalisten.xls: 1000 = 100.0%) oder Prozent vorliegen
+    let maxQuoteVal = 0;
+    for (let r = rLeaf + 1; r < Math.min(matrix.length, rLeaf + 80); r++) {
+      const row = matrix[r] || [];
+      [col.cs.k, col.aq.k, col.ftf.k].forEach(idx => {
+        if (idx != null) {
+          const v = parseNum(row[idx]);
+          if (v != null && v > maxQuoteVal) maxQuoteVal = v;
+        }
+      });
+    }
+    const teiler = maxQuoteVal > 100.5 ? 10 : 1;
+
+    const kpis = [];
+    for (let r = rLeaf + 1; r < matrix.length; r++) {
+      const row = matrix[r] || [];
+      const ccsId = col.ccs != null ? norm(row[col.ccs]) : '';
+      const rawName = col.name != null ? norm(row[col.name]) : '';
+      if (!ccsId || !rawName || !/^\d+$/.test(ccsId)) continue;
+      if (/^(gesamt|summe|total|durchschnitt)/i.test(rawName)) continue;
+
+      const agentName = rawName.replace(/([a-z\u00e4\u00f6\u00fc\u00df])([A-Z\u00c4\u00d6\u00dc])/g, '$1 $2');
+      const callsAht = col.aht.n != null ? parseNum(row[col.aht.n]) : null;
+      const callsAcw = col.acw.n != null ? parseNum(row[col.acw.n]) : null;
+      const callsAcd = col.acd.n != null ? parseNum(row[col.acd.n]) : null;
+      const callCount = (callsAht != null ? callsAht : (callsAcw != null ? callsAcw : callsAcd)) || 0;
+
+      const quote = b => {
+        if (!b || b.k == null) return null;
+        if (b.n != null) {
+          const n = parseNum(row[b.n]);
+          if (n == null || n <= 0) return null;
+        }
+        const v = parseNum(row[b.k]);
+        if (v == null) return null;
+        // Falls Excel 0..1 Dezimalwerte liefert (z.B. 0.857 statt 85.7)
+        if (teiler === 1 && maxQuoteVal <= 1.0 && v <= 1.0 && v >= 0 && b !== col.tnps) {
+          return Math.round(v * 1000) / 10;
+        }
+        return v / teiler;
+      };
+
+      // Spezialfall TNPS Antwortquote % in manchen .xls Exporten: Zähler steht in .z, Nenner=0, Basis=callCount
+      let fqVal = quote(col.fq);
+      if (fqVal == null && col.fq.z != null && callCount > 0) {
+        const fz = parseNum(row[col.fq.z]);
+        if (fz != null && fz >= 0) fqVal = Math.round((fz / callCount) * 1000) / 10;
+      }
+
+      const zaehler = b => (b && b.z != null) ? parseNum(row[b.z]) : null;
+      const detCs = col.detCs != null ? parseNum(row[col.detCs]) : null;
+
+      kpis.push({
+        ccsId,
+        agentName,
+        standort: col.std != null ? norm(row[col.std]) : '',
+        team: col.team != null ? norm(row[col.team]) : '',
+        datum: col.datum != null ? norm(row[col.datum]) : '',
+        callCount,
+        acdSec: col.acd.k != null ? parseTimeSec(row[col.acd.k]) : null,
+        acwSec: col.acw.k != null ? parseTimeSec(row[col.acw.k]) : null,
+        ahtSec: col.aht.k != null ? parseTimeSec(row[col.aht.k]) : null,
+        achtSec: col.acht.k != null ? parseTimeSec(row[col.acht.k]) : null,
+        auflegerquote: quote(col.aq),
+        cs: quote(col.cs),
+        csDds: quote(col.csDds),
+        tnps: quote(col.tnps),
+        fq: fqVal,
+        dds: quote(col.dds),
+        ftf: quote(col.ftf),
+        totalFix: quote(col.totFix),
+        ff7: quote(col.ff7),
+        wq: quote(col.wq),
+        aqZ: zaehler(col.aq),
+        csZ: zaehler(col.cs),
+        tnpsZ: zaehler(col.tnps),
+        fqZ: zaehler(col.fq),
+        ddsZ: zaehler(col.dds),
+        ftfZ: zaehler(col.ftf),
+        promCs: col.promCs != null ? parseNum(row[col.promCs]) : null,
+        detCs: detCs,
+        neutCs: col.neutCs != null ? parseNum(row[col.neutCs]) : null,
+        promTnps: col.promTnps != null ? parseNum(row[col.promTnps]) : null,
+        detTnps: col.detTnps != null ? parseNum(row[col.detTnps]) : null,
+        neutTnps: col.neutTnps != null ? parseNum(row[col.neutTnps]) : null,
+        det: detCs,
+        timestamp: new Date().toISOString()
+      });
+    }
+    return kpis;
+  }
+
+  function sendeLigaKpis(kpis) {
+    if (!kpis || !kpis.length) return 0;
+    rawStore.ligaKpis = kpis;
+    window.rcLigaNichtLive = null;
+    window.rcLigaStoerung = null;
+    window.postMessage({
+      type: 'KPI_BATCH',
+      payload: kpis,
+      vollstaendig: true,
+      liveDaterange: 'intraday'
+    }, '*');
+    setTimeout(updateBridgeBadges, 120);
+    return kpis.length;
+  }
+
+  // ------------------------------------------------------------------
+  // 4) STUNDEN-REPORT PARSER (ESL-Report-*-reporting.xlsx aus Google Drive)
+  //    Wandelt "Vertrieb Reporting" + "Qualitaet Reporting" in Live-Daten um
+  // ------------------------------------------------------------------
+  function parseStundenReportWorkbook(wb) {
+    const vSheet = wb.Sheets['Vertrieb Reporting'];
+    const qSheet = wb.Sheets['Qualitaet Reporting'];
+    if (!vSheet && !qSheet) return false;
+
+    const map = window.rcWcaMapping || { voMap: {}, ccsMap: {}, stackMap: {} };
+    const normName = s => String(s == null ? '' : s).toLowerCase().replace(/[^a-z0-9\u00e4\u00f6\u00fc\u00df]/g, '');
+
+    // Index Name -> { ccsId, voId, standort, team }
+    const byName = {};
+    Object.keys(map.ccsMap || {}).forEach(ccs => {
+      const m = map.ccsMap[ccs];
+      if (m && m.name) byName[normName(m.name)] = { ccsId: ccs, name: m.name, standort: m.standort || 'Alanya', team: m.team || '' };
+    });
+    Object.keys(map.voMap || {}).forEach(vo => {
+      const m = map.voMap[vo];
+      if (m && m.name) {
+        const k = normName(m.name);
+        if (!byName[k]) byName[k] = { ccsId: m.ccsId || vo, name: m.name, standort: m.standort || 'Alanya', team: m.team || '' };
+        if (!byName[k].voId) byName[k].voId = vo;
+      }
+    });
+
+    const heute = heuteIso();
+    const synthRows = [
+      ['datum', 'standort', 'team', 'vo_nummer', 'kunde', 'produktgrupe', 'produktmerkmal', 'produkt', 'ergebnis', 'anzahl', 'sis_angesprochen', 'sis_nicht_moeglich_grund', 'id']
+    ];
+    let rowId = 900000;
+
+    if (vSheet) {
+      const vRows = XLSX.utils.sheet_to_json(vSheet, { header: 1 });
+      let curTeam = '';
+      for (let r = 0; r < vRows.length; r++) {
+        const row = vRows[r] || [];
+        const c0 = String(row[0] == null ? '' : row[0]).trim();
+        if (!c0) continue;
+        const tmMatch = c0.match(/^TEAM\s*-\s*([^\s\u2014-]+)/i);
+        if (tmMatch) {
+          curTeam = tmMatch[1].trim();
+          continue;
+        }
+        if (/^(STACK|Zeitraum|Gesamt|Summe)/i.test(c0) || String(row[1] || '').toUpperCase() === 'CALLS') continue;
+        if (/^(VKD-|ONEC-|MF-|VUM-)/i.test(c0) && !curTeam) continue;
+
+        const info = byName[normName(c0)] || {};
+        const vo = info.voId || info.ccsId || ('SYN_' + normName(c0).slice(0, 10));
+        const std = info.standort || 'AL';
+        const team = curTeam || info.team || 'VKD-TECH';
+
+        const kont = parseInt(row[2]) || 0;
+        const ansp = parseInt(row[3]) || 0;
+        const kip = parseInt(row[6]) || 0;
+        const mob = parseInt(row[7]) || 0;
+        const env = parseInt(row[8]) || 0;
+        const ptv = parseInt(row[9]) || 0;
+        const dsl = parseInt(row[10]) || 0;
+        const vvl = parseInt(row[11]) || 0;
+
+        const salesList = [];
+        for (let i = 0; i < kip; i++) salesList.push(['KIP', 'GigaZuhause Kabel']);
+        for (let i = 0; i < mob; i++) salesList.push(['MOB', 'GigaMobil']);
+        for (let i = 0; i < env; i++) salesList.push(['Energie', 'Vodafone Energie']);
+        for (let i = 0; i < ptv; i++) salesList.push(['TV', 'GigaTV']);
+        for (let i = 0; i < dsl; i++) salesList.push(['DSL / FIBER', 'GigaZuhause DSL']);
+        for (let i = 0; i < vvl; i++) salesList.push(['VVL_KIP', 'VVL Kabel']);
+
+        const totalRows = Math.max(kont, ansp, salesList.length);
+        for (let k = 0; k < totalRows; k++) {
+          const rid = String(++rowId);
+          const istAnsp = k < ansp ? 'ja' : 'nein';
+          const sale = salesList[k];
+          if (sale) {
+            synthRows.push([heute + ' 12:00:00', std, team, vo, 'Kunde ' + rid, sale[0], 'BCR-Relevant', sale[1], 'angenommen', 1, istAnsp, '', rid]);
+          } else {
+            synthRows.push([heute + ' 12:00:00', std, team, vo, 'Kunde ' + rid, 'KIP', 'BCR-Relevant', 'Beratung', 'abgelehnt', 0, istAnsp, '', rid]);
+          }
+        }
+      }
+    }
+
+    const kpis = [];
+    if (qSheet) {
+      const qRows = XLSX.utils.sheet_to_json(qSheet, { header: 1 });
+      let curTeam = '';
+      for (let r = 0; r < qRows.length; r++) {
+        const row = qRows[r] || [];
+        const c0 = String(row[0] == null ? '' : row[0]).trim();
+        if (!c0) continue;
+        const tmMatch = c0.match(/^TEAM\s*-\s*([^\s\u2014-]+)/i);
+        if (tmMatch) {
+          curTeam = tmMatch[1].trim();
+          continue;
+        }
+        if (/^(STACK|Zeitraum|Gesamt|Summe)/i.test(c0) || String(row[1] || '').toUpperCase() === 'CALLS') continue;
+        if (/^(VKD-|ONEC-|MF-|VUM-)/i.test(c0) && !curTeam) continue;
+
+        const info = byName[normName(c0)] || {};
+        const ccsId = String(info.ccsId || ('99' + (r + 1000)));
+        const calls = parseNum(row[1]) || 0;
+        const ahtSec = parseTimeSec(row[2]);
+        const pct = v => {
+          const n = parseNum(v);
+          if (n == null) return null;
+          return n <= 1.0 && n >= 0 ? Math.round(n * 1000) / 10 : n;
+        };
+        const tnpsRaw = parseNum(row[4]);
+        const detr = parseNum(row[9]);
+
+        kpis.push({
+          ccsId,
+          agentName: c0,
+          standort: info.standort || 'Alanya',
+          team: curTeam || info.team || '',
+          datum: heuteDe(),
+          callCount: calls,
+          acdSec: null,
+          acwSec: null,
+          ahtSec: ahtSec,
+          achtSec: null,
+          auflegerquote: pct(row[8]),
+          cs: pct(row[3]),
+          csDds: null,
+          tnps: tnpsRaw,
+          fq: pct(row[5]),
+          dds: pct(row[6]),
+          ftf: pct(row[7]),
+          totalFix: null,
+          ff7: null,
+          wq: null,
+          aqZ: null, csZ: null, tnpsZ: null, fqZ: null, ddsZ: null, ftfZ: null,
+          promCs: null, detCs: detr, neutCs: null,
+          promTnps: null, detTnps: detr, neutTnps: null,
+          det: detr,
+          timestamp: new Date().toISOString()
+        });
+      }
+    }
+
+    if (synthRows.length > 1) {
+      rawStore.mobile = null;
+      rawStore.um = null;
+      if (window.rcProjektDaten) {
+        delete window.rcProjektDaten.mobile;
+        delete window.rcProjektDaten.um;
+      }
+      speichereUndVerarbeiteEsl('kabel', synthRows);
+    }
+    if (kpis.length > 0) {
+      sendeLigaKpis(kpis);
+    }
+    return { eslRows: synthRows.length - 1, kpiAgents: kpis.length };
+  }
+
+  // ------------------------------------------------------------------
+  // 5) UNIVERSELLER DATEI-DISPATCHER (erkennt automatisch jede Datei)
+  // ------------------------------------------------------------------
+  async function verarbeiteDateiBuffer(buffer, fileName) {
+    const fn = String(fileName || '');
+    if (/\.json$/i.test(fn)) {
+      const txt = new TextDecoder('utf-8').decode(buffer);
+      const j = JSON.parse(txt);
+      const arr = Array.isArray(j) ? j : (j && Array.isArray(j.payload) ? j.payload : []);
+      if (arr.length) {
+        sendeLigaKpis(arr);
+        return 'Ligaliste JSON (' + arr.length + ' Agenten)';
+      }
+      return 'JSON leer';
+    }
+
+    if (/\.(tsv|txt)$/i.test(fn)) {
+      const txt = new TextDecoder('utf-8').decode(buffer);
+      const matrix = txt.split(/\r?\n/).filter(l => l.trim()).map(l => l.split('\t'));
+      const kpis = ligaAusMatrixUniversal(matrix);
+      if (kpis.length) {
+        sendeLigaKpis(kpis);
+        return 'Ligaliste TSV (' + kpis.length + ' Agenten)';
+      }
+    }
+
+    const wb = XLSX.read(new Uint8Array(buffer), { type: 'array' });
+
+    // A) Google-Drive ESL-Stunden-Report?
+    if (wb.SheetNames.includes('Vertrieb Reporting') || wb.SheetNames.includes('Qualitaet Reporting')) {
+      const res = parseStundenReportWorkbook(wb);
+      return 'Stunden-Report (' + res.eslRows + ' Kontakte, ' + res.kpiAgents + ' Agenten)';
+    }
+
+    // B) Mitarbeiter-Mapping?
+    const firstRows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1 });
+    const firstHead = ((firstRows && firstRows[0]) || []).map(x => String(x == null ? '' : x).toLowerCase().trim());
+    if (wb.SheetNames.includes('Daten') || firstHead.includes('ccs_user') || firstHead.includes('vo_id1')) {
+      const n = parseMitarbeiterWorkbook(wb);
+      return 'Mapping (' + n + ' Mitarbeiter)';
+    }
+
+    // C) Ligaliste (.xls / .xlsx)? Alle Blaetter pruefen (Sheet1, Sheet2, ...)
+    let bestLiga = [];
+    for (const sName of wb.SheetNames) {
+      const m = XLSX.utils.sheet_to_json(wb.Sheets[sName], { header: 1, raw: true, defval: null });
+      const k = ligaAusMatrixUniversal(m);
+      if (k.length > bestLiga.length) bestLiga = k;
+    }
+    if (bestLiga.length > 0) {
+      sendeLigaKpis(bestLiga);
+      return 'Ligaliste (' + bestLiga.length + ' Agenten)';
+    }
+
+    // D) ESL Rohdaten-Export (dataTable / Kabel / Mobile / UM)
+    const eslSheet = wb.SheetNames.find(s => /datatable/i.test(s)) || wb.SheetNames[0];
+    const eslRows = XLSX.utils.sheet_to_json(wb.Sheets[eslSheet], { header: 1 });
+    if (eslRows && eslRows.length > 1) {
+      const proj = erkenneEslProjekt(eslRows, fn);
+      speichereUndVerarbeiteEsl(proj, eslRows);
+      return 'ESL ' + proj.toUpperCase() + ' (' + (eslRows.length - 1) + ' Zeilen)';
+    }
+
+    return 'Unbekanntes Format (' + fn + ')';
+  }
+
+  // Alle gespeicherten Rohdaten neu durchreichen (z.B. nach Umschalten von "Datum auf Heute")
+  window.rcApiReprocessAll = function () {
+    ['kabel', 'mobile', 'um'].forEach(key => {
+      if (rawStore[key]) {
+        const aufHeute = !!(document.getElementById('abChkHeute') && document.getElementById('abChkHeute').checked);
+        const rows = mapMatrixDatumAufHeute(rawStore[key], aufHeute);
+        window.rcProjektDaten = window.rcProjektDaten || {};
+        window.rcProjektDaten[key] = {
+          data: rows,
+          zeit: Date.now(),
+          pruefung: 'ok',
+          pruefText: 'APITool/Excel'
+        };
+      }
+    });
+    if (typeof window.rcVerarbeiteAlle === 'function') {
+      window.rcVerarbeiteAlle(true);
+    }
+    if (rawStore.ligaKpis && rawStore.ligaKpis.length) {
+      sendeLigaKpis(rawStore.ligaKpis);
+    }
+    updateBridgeBadges();
+    setBridgeStatus('Neu berechnet (' + new Date().toLocaleTimeString('de-DE') + ')');
+  };
+
+  // ------------------------------------------------------------------
+  // 6) VOLLAUTOMATISCHER BESTANDS-, GDRIVE- & CDP-HARVESTER-ABRUF
+  // ------------------------------------------------------------------
+  async function holeDateiBuffer(url) {
+    const r = await fetch(url, { cache: 'no-store' });
+    if (!r.ok) throw new Error('HTTP ' + r.status + ' bei ' + url);
+    return await r.arrayBuffer();
+  }
+
+  function updateHarvesterBadges(harv) {
+    if (!harv) return;
+    const setHarvSlot = (slotId, dotId, txtId, stObj, labelFn) => {
+      const s = document.getElementById(slotId);
+      const d = document.getElementById(dotId);
+      const t = document.getElementById(txtId);
+      if (!stObj) return;
+      const isOk = stObj.status === 'ok';
+      const isErr = stObj.status === 'error';
+      if (s) {
+        s.classList.toggle('loaded', isOk);
+        s.title = stObj.message || '';
+      }
+      if (d) d.className = 'ab-dot' + (isOk ? ' ok' : (isErr ? ' err' : ''));
+      if (t) t.textContent = labelFn(stObj);
+    };
+
+    setHarvSlot('abSlotCdpEsl', 'abDotCdpEsl', 'abTxtCdpEsl', harv.esl, e => {
+      if (e.status === 'ok') return 'LIVE (' + (e.projekt || 'kabel').toUpperCase() + ')';
+      if (e.status === 'empty') return '0 Heute';
+      if (e.status === 'login') return 'Auto-Login...';
+      if (e.status === 'navigating') return 'Navigiert...';
+      return harv.cdpConnected ? 'Warte...' : 'Port 9222 aus';
+    });
+
+    setHarvSlot('abSlotCdpLiga', 'abDotCdpLiga', 'abTxtCdpLiga', harv.liga, l => {
+      if (l.status === 'ok') return 'LIVE (' + (l.agentCount || 0) + ' Ag.)';
+      if (l.status === 'login') return 'SSO/Token...';
+      return harv.cdpConnected ? 'Warte...' : 'Port 9222 aus';
+    });
+  }
+
+  window.rcApiLoadReference = async function (silent) {
+    try {
+      setBridgeStatus('Lade Live- & Referenz-Bestand ...', 'var(--st-amber)');
+      const ergebnisse = [];
+
+      // Pruefen, ob der lokale APITool & CDP Server laeuft
+      let st = null;
+      try {
+        const rSt = await fetch('/api/status', { cache: 'no-store' });
+        if (rSt.ok) st = await rSt.json();
+      } catch (e) {}
+
+      if (st && st.harvester) {
+        updateHarvesterBadges(st.harvester);
+      }
+
+      const tx = (st && st.testExcels) || {};
+
+      // 1. Mitarbeiter-Mapping zuerst laden (aus Test Excels oder lokal)
+      const mapUrls = [];
+      if (tx.mapping && tx.mapping.url) mapUrls.push([tx.mapping.url, tx.mapping.name, tx.mapping.mtimeMs]);
+      mapUrls.push(['./Mitarbeiter_IDS_Final_komplett.xlsx', 'Mitarbeiter_IDS_Final_komplett.xlsx', 0]);
+      for (const [mUrl, mName, mTime] of mapUrls) {
+        try {
+          const bMap = await holeDateiBuffer(mUrl);
+          ergebnisse.push(await verarbeiteDateiBuffer(bMap, mName));
+          if (mTime) rawStore.fileStamps[mName] = mTime;
+          break;
+        } catch (e) {}
+      }
+
+      // 2. Drei ESL-Projekte laden (bevorzugt Auto_ESL_<projekt>.xlsx oder Kabel/Mobile/UM aus Test Excels)
+      const eslSlots = [
+        tx.eslKabel ? [tx.eslKabel.url, tx.eslKabel.name, tx.eslKabel.mtimeMs] : ['/api/test-excels/Kabel.xlsx', 'Kabel.xlsx', 0],
+        tx.eslMobile ? [tx.eslMobile.url, tx.eslMobile.name, tx.eslMobile.mtimeMs] : ['/api/test-excels/Mobile.xlsx', 'Mobile.xlsx', 0],
+        tx.eslUm ? [tx.eslUm.url, tx.eslUm.name, tx.eslUm.mtimeMs] : ['/api/test-excels/UM.xlsx', 'UM.xlsx', 0]
+      ];
+      for (const [url, name, mtime] of eslSlots) {
+        try {
+          const buf = await holeDateiBuffer(url);
+          ergebnisse.push(await verarbeiteDateiBuffer(buf, name));
+          if (mtime) rawStore.fileStamps[name] = mtime;
+        } catch (e) {
+          console.warn('[APITool Bridge] ESL-Datei uebersprungen:', name, e.message);
+        }
+      }
+
+      // 3. Ligaliste laden: Zuerst Live-KPIs vom CDP-Harvester (/api/live-kpis) pruefen!
+      let ligaLoaded = false;
+      try {
+        const rLive = await fetch('/api/live-kpis', { cache: 'no-store' });
+        if (rLive.ok) {
+          const jLive = await rLive.json();
+          if (jLive && jLive.ok && Array.isArray(jLive.payload) && jLive.payload.length > 0) {
+            sendeLigaKpis(jLive.payload);
+            rawStore.lastLigaHarvestMs = jLive.timestampMs || Date.now();
+            ergebnisse.push('CDP Ligaliste Live (' + jLive.payload.length + ' Agenten)');
+            ligaLoaded = true;
+          }
+        }
+      } catch (e) {}
+
+      // Fallback auf Ligalisten.xlsx (Test Excels) + ./ligalisten.xls
+      if (!ligaLoaded) {
+        let kpisMain = [], kpisTest = [];
+        try {
+          const bL1 = await holeDateiBuffer('./ligalisten.xls');
+          const wb1 = XLSX.read(new Uint8Array(bL1), { type: 'array' });
+          for (const s of wb1.SheetNames) {
+            const k = ligaAusMatrixUniversal(XLSX.utils.sheet_to_json(wb1.Sheets[s], { header: 1, raw: true, defval: null }));
+            if (k.length > kpisMain.length) kpisMain = k;
+          }
+        } catch (e) {}
+        const testLigaUrl = (tx.ligaliste && tx.ligaliste.url) || '/api/test-excels/Ligalisten.xlsx';
+        try {
+          const bL2 = await holeDateiBuffer(testLigaUrl);
+          const wb2 = XLSX.read(new Uint8Array(bL2), { type: 'array' });
+          for (const s of wb2.SheetNames) {
+            const k = ligaAusMatrixUniversal(XLSX.utils.sheet_to_json(wb2.Sheets[s], { header: 1, raw: true, defval: null }));
+            if (k.length > kpisTest.length) kpisTest = k;
+          }
+          if (tx.ligaliste && tx.ligaliste.mtimeMs) {
+            rawStore.fileStamps[tx.ligaliste.name] = tx.ligaliste.mtimeMs;
+          }
+        } catch (e) {}
+
+        if (kpisTest.length || kpisMain.length) {
+          const mergedMap = {};
+          kpisMain.forEach(k => { mergedMap[k.ccsId] = k; });
+          kpisTest.forEach(k => { mergedMap[k.ccsId] = Object.assign({}, mergedMap[k.ccsId] || {}, k); });
+          const merged = Object.values(mergedMap);
+          sendeLigaKpis(merged);
+          ergebnisse.push('Ligaliste (' + merged.length + ' Agenten)');
+        }
+      }
+
+      // Alle aktuellen Dateistempel merken, damit Auto-Sync nur echte Aenderungen nachlaedt
+      if (tx.all && Array.isArray(tx.all)) {
+        tx.all.forEach(f => { rawStore.fileStamps[f.name] = f.mtimeMs; });
+      }
+
+      if (!ergebnisse.length) {
+        setBridgeStatus('Warte auf CDP-Harvester ...', 'var(--st-amber)');
+        return;
+      }
+
+      aktiviereDashboardMultiProjekt();
+      setBridgeStatus('Aktiv: ' + new Date().toLocaleTimeString('de-DE'), 'var(--st-green)');
+    } catch (err) {
+      console.error('[APITool Bridge] Fehler beim Bestands-Laden:', err);
+      setBridgeStatus('Fehler: ' + err.message, 'var(--st-red)');
+    }
+  };
+
+  window.rcApiLoadGDriveLatest = async function () {
+    try {
+      setBridgeStatus('Lade neuesten GDrive Stunden-Report ...', 'var(--st-amber)');
+      const r = await fetch('/api/gdrive-latest', { cache: 'no-store' });
+      if (!r.ok) throw new Error('Kein Stunden-Report in Google Drive gefunden');
+      const buf = await r.arrayBuffer();
+      const info = await verarbeiteDateiBuffer(buf, 'ESL-Report-Latest.xlsx');
+      setBridgeStatus(info, 'var(--st-green)');
+    } catch (e) {
+      setBridgeStatus('GDrive: ' + e.message, 'var(--st-amber)');
+    }
+  };
+
+  // Sofortigen CDP-Harvester-Lauf im Hintergrund-Browser anstossen
+  window.rcApiTriggerLiveHarvest = async function (projektKey) {
+    const btn = document.getElementById('abBtnLiveHarvest');
+    try {
+      if (btn) btn.disabled = true;
+      const ziel = projektKey || window.rcAktivProjekt || 'kabel';
+      setBridgeStatus('CDP Live-Abruf (' + ziel.toUpperCase() + ' + Liga) laeuft ...', 'var(--st-amber)');
+      const r = await fetch('/api/harvest-now?projekt=' + encodeURIComponent(ziel), {
+        method: 'POST',
+        cache: 'no-store'
+      });
+      const res = await r.json();
+      if (res && res.harvester) updateHarvesterBadges(res.harvester);
+      await pruefeOrdnerUpdates(true);
+      const msg = (res && res.ok)
+        ? ('Live-Abruf OK (' + new Date().toLocaleTimeString('de-DE') + ')')
+        : ('CDP Status: ' + ((res && res.harvester && res.harvester.esl && res.harvester.esl.message) || 'warte auf Portal'));
+      setBridgeStatus(msg, (res && res.ok) ? 'var(--st-green)' : 'var(--st-amber)');
+      return res;
+    } catch (e) {
+      setBridgeStatus('CDP-Abruf Fehler: ' + e.message, 'var(--st-red)');
+      return { ok: false, error: e.message };
+    } finally {
+      if (btn) btn.disabled = false;
+    }
+  };
+
+  // ------------------------------------------------------------------
+  // 7) AUTO-SYNC (15s Takt ueber lokalen APITool & CDP-Server)
+  // ------------------------------------------------------------------
+  let watchTimer = null;
+  async function pruefeOrdnerUpdates(forceReloadAuto) {
+    try {
+      const r = await fetch('/api/status', { cache: 'no-store' });
+      if (!r.ok) return;
+      const st = await r.json();
+      const tag = document.getElementById('abModeTag');
+      if (tag) {
+        const cdpOn = !!(st.harvester && st.harvester.cdpConnected);
+        tag.textContent = cdpOn ? 'CDP AUTO-HARVESTER AKTIV' : 'SERVER AKTIV (KEIN CDP)';
+        tag.style.color = cdpOn ? 'var(--st-green)' : 'var(--st-amber)';
+        tag.style.borderColor = cdpOn ? 'rgba(61,214,140,0.5)' : 'rgba(255,184,77,0.5)';
+      }
+
+      if (st.harvester) {
+        updateHarvesterBadges(st.harvester);
+
+        // A) Hat der CDP Ligaliste-Harvester neue Live-KPIs geliefert?
+        const ligaLast = st.harvester.liga && st.harvester.liga.lastSuccess;
+        if (ligaLast && (forceReloadAuto || ligaLast !== rawStore.lastLigaHarvestMs)) {
+          rawStore.lastLigaHarvestMs = ligaLast;
+          try {
+            const rKpi = await fetch('/api/live-kpis', { cache: 'no-store' });
+            if (rKpi.ok) {
+              const jKpi = await rKpi.json();
+              if (jKpi && jKpi.ok && Array.isArray(jKpi.payload) && jKpi.payload.length) {
+                sendeLigaKpis(jKpi.payload);
+              }
+            }
+          } catch (_) {}
+        }
+      }
+
+      // B) Hat der CDP ESL-Harvester (oder Test Excels Ordner) eine Datei aktualisiert?
+      const files = (st.testExcels && st.testExcels.all) || [];
+      let geaendert = false;
+      for (const f of files) {
+        if (/\.json$/i.test(f.name)) continue;
+        const prev = rawStore.fileStamps[f.name];
+        const isAutoEsl = /^auto_esl_/i.test(f.name);
+        if ((prev && prev !== f.mtimeMs) || (forceReloadAuto && isAutoEsl)) {
+          const buf = await holeDateiBuffer(f.url);
+          await verarbeiteDateiBuffer(buf, f.name);
+          geaendert = true;
+        }
+        rawStore.fileStamps[f.name] = f.mtimeMs;
+      }
+
+      if (geaendert) {
+        setBridgeStatus('Auto-Sync: ' + new Date().toLocaleTimeString('de-DE'), 'var(--st-green)');
+      }
+    } catch (e) {
+      // Offline / file:// Betrieb ohne lokalen Server: kein Fehler loggen
+    }
+  }
+
+  window.rcApiToggleWatch = function (an) {
+    if (watchTimer) { clearInterval(watchTimer); watchTimer = null; }
+    if (an) {
+      watchTimer = setInterval(() => pruefeOrdnerUpdates(false), 15000);
+      pruefeOrdnerUpdates(false);
+    }
+  };
+
+  // ------------------------------------------------------------------
+  // 8) DASHBOARD-HOOKS (verbindet Dashboard-Knoepfe mit CDP-Harvester)
+  // ------------------------------------------------------------------
+  function aktiviereDashboardMultiProjekt() {
+    window.rcAlleProjekteModus = true;
+    const box = document.getElementById('rcProjWahl');
+    if (box) box.style.display = '';
+    window.rcEslFehlserie = 0;
+    window.rcEslFehlgrund = '';
+    window.rcEslLastOk = Date.now();
+  }
+
+  function installiereDashboardBridgeHooks() {
+    if (window.rcLiveInterval) {
+      clearInterval(window.rcLiveInterval);
+      window.rcLiveInterval = null;
+    }
+    if (window.rcHistInterval) {
+      clearInterval(window.rcHistInterval);
+      window.rcHistInterval = null;
+    }
+
+    // "Jetzt"-Knopf im Dashboard loest sofortigen CDP-Live-Harvest im Hintergrund aus
+    window.rcJetztAktualisieren = async function (melden) {
+      const sag = melden || function (t) { if (window.rcToast) window.rcToast(t, 4000); };
+      const t0 = Date.now();
+      await window.rcApiTriggerLiveHarvest(window.rcAktivProjekt || 'kabel');
+      window.rcApiReprocessAll();
+      const ligaN = window.rcKpiData ? Object.keys(window.rcKpiData).length : 0;
+      const eslN = (window.rcLetzterDatenstrom || []).length;
+      const sek = Math.round((Date.now() - t0) / 1000);
+      const msg = 'Live-Harvester synchronisiert (' + sek + 's): ' + Math.max(0, eslN - 1) + ' ESL-Zeilen, ' + ligaN + ' Liga-Agenten.';
+      sag(msg);
+      return {
+        liga: { ok: true, agenten: ligaN },
+        esl: { ok: true },
+        sekunden: sek
+      };
+    };
+
+    // Wenn im Dashboard das Projekt (Kabel / Mobile / UM) gewechselt oder abgefragt wird:
+    window.rcProjektAbruf = async function (key) {
+      await window.rcApiTriggerLiveHarvest(key);
+      const pd = (window.rcProjektDaten || {})[key];
+      const n = pd && pd.data ? Math.max(0, pd.data.length - 1) : 0;
+      window.rcEslLastOk = Date.now();
+      return { ok: true, zeilen: n, pruefung: 'ok', text: 'CDP Auto-Harvester' };
+    };
+
+    window.rcFrischHolen = async function (scope, melden) {
+      if (melden) melden('CDP Auto-Harvester aktualisiert ESL & Ligaliste ...');
+      await window.rcApiTriggerLiveHarvest(window.rcAktivProjekt || 'kabel');
+      return {
+        ok: true,
+        projekte: {
+          kabel: { ok: true, frisch: true },
+          mobile: { ok: true, frisch: true },
+          um: { ok: true, frisch: true }
+        },
+        liga: { ok: true, agenten: Object.keys(window.rcKpiData || {}).length },
+        fehler: [],
+        sekunden: 0,
+        text: 'CDP Auto-Harvester aktuell'
+      };
+    };
+
+    aktiviereDashboardMultiProjekt();
+    updateBridgeBadges();
+  }
+
+  // ------------------------------------------------------------------
+  // 9) OPTIONALER MANUELLER DATEI-IMPORT & INFO-MODAL
+  // ------------------------------------------------------------------
+  async function handleFileList(fileList) {
+    const files = Array.from(fileList || []);
+    if (!files.length) return;
+    setBridgeStatus('Verarbeite ' + files.length + ' Datei(en) ...', 'var(--st-amber)');
+
+    files.sort((a, b) => {
+      const am = /mitarbeiter|mapping|ids/i.test(a.name) ? 0 : 1;
+      const bm = /mitarbeiter|mapping|ids/i.test(b.name) ? 0 : 1;
+      return am - bm;
+    });
+
+    const infos = [];
+    for (const f of files) {
+      try {
+        const buf = await f.arrayBuffer();
+        const res = await verarbeiteDateiBuffer(buf, f.name);
+        infos.push(res);
+      } catch (e) {
+        console.error('[APITool Bridge] Datei-Fehler:', f.name, e);
+        infos.push('Fehler: ' + f.name);
+      }
+    }
+    aktiviereDashboardMultiProjekt();
+    setBridgeStatus(infos.join(' | '), 'var(--st-green)');
+  }
+
+  const fileInput = document.getElementById('abFileInput');
+  if (fileInput) {
+    fileInput.addEventListener('change', e => {
+      handleFileList(e.target.files);
+      fileInput.value = '';
+    });
+  }
+
+  const dz = document.getElementById('abDropzone');
+  if (dz) {
+    ['dragenter', 'dragover'].forEach(ev => dz.addEventListener(ev, e => {
+      e.preventDefault();
+      e.stopPropagation();
+      dz.classList.add('dragover');
+    }));
+    ['dragleave', 'drop'].forEach(ev => dz.addEventListener(ev, e => {
+      e.preventDefault();
+      e.stopPropagation();
+      dz.classList.remove('dragover');
+    }));
+    dz.addEventListener('drop', e => {
+      if (e.dataTransfer && e.dataTransfer.files) {
+        handleFileList(e.dataTransfer.files);
+      }
+    });
+  }
+
+  window.addEventListener('dragover', e => e.preventDefault());
+  window.addEventListener('drop', e => {
+    if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length) {
+      e.preventDefault();
+      handleFileList(e.dataTransfer.files);
+    }
+  });
+
+  window.rcApiBridgeToggle = function (zuklappen) {
+    const bar = document.getElementById('rcApiBridgeBar');
+    const pill = document.getElementById('rcApiBridgePill');
+    if (bar) bar.classList.toggle('collapsed', !!zuklappen);
+    if (pill) pill.classList.toggle('visible', !!zuklappen);
+  };
+
+  window.rcApiCloseModal = function () {
+    const m = document.getElementById('rcApiModalBackdrop');
+    if (m) m.classList.remove('open');
+  };
+
+  window.rcApiOpenModal = function (mode) {
+    const m = document.getElementById('rcApiModalBackdrop');
+    const t = document.getElementById('abModalTitle');
+    const c = document.getElementById('abModalContent');
+    if (!m || !t || !c) return;
+
+    if (mode === 'tsv') {
+      t.textContent = 'Ligaliste aus Zwischenablage (TSV / Text) einfuegen';
+      c.innerHTML = [
+        '<p>Markiere in der geoeffneten CCS-Ligaliste oder in Excel die gesamte Tabelle (Strg+A, Strg+C) und fuege sie hier mit Strg+V ein:</p>',
+        '<textarea id="abTsvArea" placeholder="Zeile\tDienstleister\tStandort\tTeam\tAgentenname\tCCS-ID ..."></textarea>',
+        '<div style="margin-top:12px;display:flex;gap:8px;justify-content:flex-end;">',
+        '  <button type="button" class="ab-btn primary" onclick="window.rcApiImportTsv()">Jetzt in Live-Arena laden</button>',
+        '</div>'
+      ].join('\n');
+    } else {
+      t.textContent = 'Vollautomatischer CDP Auto-Harvester & APITool Server (0 Handgriffe)';
+      c.innerHTML = [
+        '<p>Diese Architektur loest alle bisherigen Stabilitaetsprobleme von <code>esl_live</code> vollautomatisch im Hintergrund (kein Drag &amp; Drop, kein Popup-Blocker, kein Einfrieren der Portalseite):</p>',
+        '<h3>1. Ein einziger Doppelklick auf ESL_APITool_Start.cmd</h3>',
+        '<ul>',
+        '  <li>Startet den lokalen Node-Server <code>esl_apitool_server.js</code> auf <code>http://127.0.0.1:8787</code>.</li>',
+        '  <li>Startet Microsoft Edge automatisch mit <code>--remote-debugging-port=9222</code> und deinem gespeicherten <code>EdgeProfil</code> (inkl. Passwörter).</li>',
+        '  <li>Oeffnet automatisch Tab 1 (diese entkoppelte Live-Arena), Tab 2 (<code>esl.regiocom.net</code> als Hintergrund-Worker) und Tab 3 (<code>ccs.vodafone.de</code> Ligaliste als Hintergrund-Worker).</li>',
+        '</ul>',
+        '<h3>2. Was alle 20 Sekunden vollautomatisch im Hintergrund passiert</h3>',
+        '<ul>',
+        '  <li><b>CDP ESL-Harvester</b>: Loggt sich in <code>esl.regiocom.net</code> ein, navigiert ohne das 2-MB-Dashboard-Skript zu <i>Export Projektergebnisse</i>, haelt den JSF <code>ViewState</code> frisch, laedt den echten <code>.xlsx</code>-Export per POST herunter und speichert ihn als <code>Test Excels\\Auto_ESL_&lt;projekt&gt;.xlsx</code>.</li>',
+        '  <li><b>CDP Ligaliste-Harvester</b>: Liest <code>#script_id_secure</code> und <code>#user_id</code> direkt aus dem DOM von <code>liga_listen.rb</code>, fragt <code>get_data.rb</code> fuer alle 3 Baeume (Kabel <code>11405</code>, Mobile <code>11317,11229</code>, UM <code>12090</code>) ab und liefert alle 23 KPIs direkt an <code>/api/live-kpis</code>.</li>',
+        '  <li><b>Entkoppelte Live-Arena</b>: Dieses Fenster holt sich die fertigen Daten alle 15 Sekunden lokal von <code>127.0.0.1:8787</code>. Weder <code>window.opener</code> noch PrimeFaces-IFrames koennen mehr abstuerzen.</li>',
+        '</ul>'
+      ].join('\n');
+    }
+    m.classList.add('open');
+  };
+
+  window.rcApiImportTsv = function () {
+    const ta = document.getElementById('abTsvArea');
+    const txt = ta ? ta.value : '';
+    if (!txt.trim()) return;
+    const matrix = txt.split(/\r?\n/).filter(l => l.trim()).map(l => l.split('\t'));
+    const kpis = ligaAusMatrixUniversal(matrix);
+    if (kpis.length) {
+      sendeLigaKpis(kpis);
+      setBridgeStatus('Liga-TSV geladen (' + kpis.length + ' Agenten)', 'var(--st-green)');
+      window.rcApiCloseModal();
+    } else {
+      alert('Keine Agentenzeilen erkannt. Bitte sicherstellen, dass die Kopfzeilen (Agentenname, CCS-ID) mitkopiert wurden.');
+    }
+  };
+
+  // Nach dem Laden von esl_live_arena_v22.js automatisch Hooks installieren, Bestand laden und 15s-Auto-Sync starten
+  window.addEventListener('DOMContentLoaded', () => {
+    setTimeout(async () => {
+      installiereDashboardBridgeHooks();
+      await window.rcApiLoadReference(true);
+      window.rcApiToggleWatch(true);
+    }, 600);
+  });
+})();
+</script>
+
+<!-- Das originale ESL Live-Arena v22 Dashboard -->
+<script src="./esl_live_arena_v22.js"></script>
+</body>
+</html>

@@ -1,0 +1,76 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Alle Projekte — Offline-Pruefung</title>
+<!-- Fake-Portal: das Dashboard baut sein Overlay nur, wenn es ein filterForm sieht. -->
+<form id="filterForm"><input class="hasDatepicker" name="von"><input class="hasDatepicker" name="bis">
+<button type="submit">Suchen</button><button type="submit">Excel</button></form>
+<pre id="log" style="font:12px monospace"></pre>
+<script>
+// Jede Fehlermeldung des Dashboards mitschneiden (rcLog.error -> console.error).
+window.__fehler = [];
+(function(){ const e = console.error; console.error = function(){ try { window.__fehler.push(Array.prototype.map.call(arguments, function(a){ return a && a.stack ? a.stack : String(a); }).join(' ')); } catch(x){} return e.apply(console, arguments); }; })();
+</script>
+<script src="node_modules/xlsx/dist/xlsx.full.min.js"></script>
+<script>document.write('<scr'+'ipt src="esl_live_arena_v22.js?t='+Date.now()+'"></scr'+'ipt>');</script>
+<script>
+window.__fertig = false;
+function L(s){ document.getElementById('log').textContent += s + '\n'; }
+const p2 = n => String(n).padStart(2,'0');
+function heuteIso(){ const d = new Date(); return d.getFullYear()+'-'+p2(d.getMonth()+1)+'-'+p2(d.getDate()); }
+async function blatt(pfad){
+    const buf = await (await fetch(pfad)).arrayBuffer();
+    const wb = XLSX.read(new Uint8Array(buf), { type:'array' });
+    return XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header:1 });
+}
+// Auf HEUTE datieren, Uhrzeit ueber den Tag verteilt (die Referenzdateien tragen nur das Datum).
+function aufHeute(rows){
+    const iD = rows[0].map(x => String(x).toLowerCase().trim()).indexOf('datum'), h = heuteIso();
+    for (let i = 1; i < rows.length; i++) if (rows[i]) rows[i][iD] = h + ' ' + p2(7 + (i % 3)) + ':' + p2(i % 60) + ':00';
+    return rows;
+}
+function stand(){
+    const s = window.rcLetzteStats || {}, st = s.standortStats || {};
+    let kont = 0; Object.values(st).forEach(x => kont += (x.calls || 0));
+    return 'Standorte ' + Object.keys(st).length + ' · Agenten ' + Object.keys(s.agentStats || {}).length +
+           ' · Kontakte ' + kont + ' · Verkaeufe(rcAllSales) ' + (window.rcAllSales || []).length;
+}
+async function los(){
+    if (!window.processDataStream) { setTimeout(los, 400); return; }
+    const mbuf = await (await fetch('Mitarbeiter_IDS_Final_komplett.xlsx')).arrayBuffer();
+    const mwb = XLSX.read(new Uint8Array(mbuf), { type:'array' });
+    const mrows = XLSX.utils.sheet_to_json(mwb.Sheets['Daten'], { header:1, defval:'' });
+    const H = mrows[0].map(c => String(c).toLowerCase().trim());
+    const iC = H.indexOf('ccs_user'), iN = H.indexOf('namen'), iS = H.indexOf('standort'), iT = H.indexOf('team'), iSt = H.indexOf('stack');
+    const ccsMap = {}, voMap = {}, stackMap = {};
+    for (let i = 1; i < mrows.length; i++) {
+        const r = mrows[i], ccs = String(r[iC]||'').trim(); if (!ccs) continue;
+        const rec = { ccsId: ccs, name: String(r[iN]||'').trim(), team: String(r[iT]||'').trim(), standort: String(r[iS]||'').trim() };
+        ccsMap[ccs] = rec;
+        if (rec.team && r[iSt]) stackMap[rec.team] = String(r[iSt]).trim();
+        for (let k = 5; k < 13; k++) { const vo = String(r[k]||'').trim(); if (vo) voMap[vo] = rec; }
+    }
+    window.rcWcaMapping = { voMap: voMap, ccsMap: ccsMap, standortMap: {}, stackMap: stackMap };
+    const K = aufHeute(await blatt('Excels%20vergleich/Kabel.xlsx'));
+    const M = aufHeute(await blatt('Excels%20vergleich/Mobile.xlsx'));
+    const U = aufHeute(await blatt('Excels%20vergleich/UM.xlsx'));
+    L('Geladen: Kabel ' + (K.length-1) + ', Mobile ' + (M.length-1) + ', UM ' + (U.length-1) + ' Zeilen');
+
+    // 1) Nur Kabel — so wie vor dem Eintreffen der Rahmen
+    let f0 = window.__fehler.length;
+    window.processDataStream(K);
+    L('A) nur Kabel:        ' + stand() + ' · Fehler ' + (window.__fehler.length - f0));
+
+    // 2) Zusammengefuehrt — ueber die ECHTE Funktion, falls ausgestellt, sonst Nachbau
+    window.rcProjektDaten = { kabel:{ data:K, zeit:Date.now() }, mobile:{ data:M, zeit:Date.now() }, um:{ data:U, zeit:Date.now() } };
+    f0 = window.__fehler.length;
+    if (window.rcVerarbeiteAlle) window.rcVerarbeiteAlle();
+    else L('rcVerarbeiteAlle nicht ausgestellt');
+    L('B) alle drei (1.):   ' + stand() + ' · Fehler ' + (window.__fehler.length - f0));
+    f0 = window.__fehler.length;
+    if (window.rcVerarbeiteAlle) window.rcVerarbeiteAlle();
+    L('C) alle drei (2.):   ' + stand() + ' · Fehler ' + (window.__fehler.length - f0));
+    window.__fehler.slice(0, 5).forEach(x => L('   FEHLER: ' + x.slice(0, 600)));
+    window.__fertig = true;
+}
+setTimeout(los, 1200);
+</script>

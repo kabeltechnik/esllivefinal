@@ -334,7 +334,7 @@ pruefe('der Vorgang wird im Fenster gemeldet',
   !!NEUTAB && /Schritt "  Neuer Tab sofort versorgt/.test(NEUTAB),
   'Ohne Meldung ist im Betrieb nicht erkennbar, ob es gegriffen hat.');
 pruefe('die Standmarke wurde mitgezogen',
-  /\$StarterStand = '2026-08-/.test(CMD) && !/2026-08-16 Anker\+2/.test(CMD),
+  /\$StarterStand = '20\d\d-\d\d-\d\d /.test(CMD) && !/2026-08-16 Anker\+2/.test(CMD),
   'Sonst sieht die Ausgabe nach einem Update aus wie vorher.');
 pruefe('die Tab-Schleife des Waechters bleibt als Netz darunter',
   /if \(StelleAutopilotSicher \$t\) \{/.test(CMD));
@@ -401,8 +401,11 @@ pruefe('der Ausfall bleibt kein endgueltiges Aufgeben',
     zu > 0 && ersteNutzung > zu,
     'Sonst steht im Fenster "Pruefung alle  s".');
 }
+// 05.10.: Auffrischen vor der Stundenmail — die Marke muss diesen Stand nennen,
+// nicht mehr den vom 21.08. (sonst ist nach einem Update nicht erkennbar, welche
+// Datei laeuft).
 pruefe('die Standmarke nennt den heutigen Umbau',
-  /\$StarterStand = '2026-08-21 /.test(CMD));
+  /\$StarterStand = '2026-10-05 /.test(CMD) && !/\$StarterStand = '2026-08-21 /.test(CMD));
 
 console.log('');
 console.log('='.repeat(60));

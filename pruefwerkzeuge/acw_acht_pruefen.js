@@ -155,9 +155,9 @@ console.log('');
 console.log('4) Qualitaets-Seite (das, was der Nutzer vermisst hat)');
 
 pruefe('KPI-Kachel "Ø ACW" im Streifen',
-  /Ø ACW · Ziel ≤ 60 s/.test(SRC) && /id="qKpiAcw"/.test(SRC));
+  /Ø ACW ≤ 60 s/.test(SRC) && /id="qKpiAcw"/.test(SRC));
 pruefe('KPI-Kachel "Ø ACHT" im Streifen',
-  /Ø ACHT · Ziel ≤ 60 s/.test(SRC) && /id="qKpiAcht"/.test(SRC));
+  /Ø ACHT ≤ 60 s/.test(SRC) && /id="qKpiAcht"/.test(SRC));
 pruefe('Tabellenspalte ACW mit erklaerendem Titel',
   /title="Nacharbeit je Call \(After Call Work\)">ACW</.test(SRC));
 pruefe('Tabellenspalte ACHT mit erklaerendem Titel',

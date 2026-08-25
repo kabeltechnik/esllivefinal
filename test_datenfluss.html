@@ -1,0 +1,277 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Flugschreiber - Offline-Pruefung</title>
+<!-- Nachgebautes Portal: Hauptseite (Kabel) + zwei Rahmen (Mobile/UM) mit
+     demselben Formularaufbau wie das ESL. Ein Schein-Server (fetch-Attrappe je
+     Fenster) liefert je Szenario Excel / leeres Excel / HTML / ViewExpired.
+     Die Abruf-Funktion unten folgt holeExcelVomServer bzw. rcRahmenExport
+     (Such-Postback, frischer ViewState, Export-POST) und legt wie das Dashboard
+     die geparste Tabelle in rcProjektDaten ab. Der Flugschreiber wird aus
+     esl_live_arena_v22.js HERAUSGESCHNITTEN (nicht nachgebaut) und allein
+     gestartet. Geprueft wird, ob er alles mitschneidet UND richtig benennt.
+     ?gegenprobe=vs|heute baut ihn absichtlich kaputt - die zugehoerige
+     Pruefung MUSS dann durchfallen. -->
+<form id="filterForm" action="/fake/sis_vodafone.xhtml">
+  <span class="ui-calendar"><input class="hasDatepicker" name="filterForm:von_input"></span>
+  <span class="ui-calendar"><input class="hasDatepicker" name="filterForm:bis_input"></span>
+  <div class="ui-selectonemenu"><label class="ui-selectonemenu-label">Export Projektergebnisse</label>
+    <select name="filterForm:stat_input"><option value="">Bitte Abfrage waehlen</option><option value="7" selected>Export Projektergebnisse</option></select></div>
+  <button type="submit" id="filterForm:suchen" name="filterForm:suchen">Suchen</button>
+  <button type="submit" id="filterForm:excel" name="filterForm:excel">Excel</button>
+  <input type="hidden" name="javax.faces.ViewState" value="-111:222">
+</form>
+<button id="rcBtnTestKnopf">Testknopf</button>
+<pre id="log" style="font:12px monospace"></pre>
+<script src="node_modules/xlsx/dist/xlsx.full.min.js"></script>
+<script>
+// Das echte fetch fuer Dateien der Pruefseite - VOR jeder Attrappe sichern
+window.fetch_echt = window.fetch.bind(window);
+window.__fertig = false;
+function L(s){ document.getElementById('log').textContent += s + '\n'; }
+const p2 = n => String(n).padStart(2,'0');
+function tagIso(minus){ const d = new Date(Date.now() - (minus||0) * 86400000); return d.getFullYear()+'-'+p2(d.getMonth()+1)+'-'+p2(d.getDate()); }
+function heuteDe(){ const d = new Date(); return p2(d.getDate())+'.'+p2(d.getMonth()+1)+'.'+d.getFullYear(); }
+document.querySelectorAll('.hasDatepicker').forEach(i => i.value = heuteDe());
+
+// Szenario je Seite: was liefert der Schein-Server?
+window.SZ = { Kabel:{ suche:'ok', export:'excel', heute:5 }, Mobile:{ suche:'ok', export:'excel', heute:3 }, UM:{ suche:'ok', export:'excel', heute:2 } };
+const KOPF = { Kabel:['datum','standort','team','vo_nummer','kunde','produktgrupe','produktmerkmal','produkt','ergebnis','anzahl','sis_angesprochen','sis_nicht_moeglich_grund','id'],
+               Mobile:['datum','standort','team','vo_nummer','kunde','osf_id','produktgruppe','produktmerkmal','produkt','ergebnis','anzahl','sis_angesprochen','sis_nicht_moeglich_grund','id'],
+               UM:['datum','standort','team','vo_nummer','kunde','produktmerkmal','produkt','ergebnis','anzahl','sis_angesprochen','sis_nicht_moeglich_grund','Winback','Bundesland','Postleitzahl','id'] };
+let lauf = 0;
+function xlsx(q, heute, gestern){
+    const k = KOPF[q], rows = [k], iD = 0, iId = k.length - 1;
+    for (let i = 0; i < heute + gestern; i++) {
+        const r = k.map(() => 'x');
+        r[iD] = (i < heute ? tagIso(0) : tagIso(1)) + ' 08:' + p2(i) + ':00';
+        r[iId] = String(1000 + i + lauf * 7 + (q === 'Kabel' ? 0 : q === 'Mobile' ? 50000 : 90000));   // Datenstand aendert sich je Lauf
+        rows.push(r);
+    }
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rows), 'dataTable');
+    return XLSX.write(wb, { type:'array', bookType:'xlsx' });
+}
+function scheinServer(W, q){
+    return function(input, init){
+        const body = init && init.body, sz = window.SZ[q];
+        const ajax = body && body.get && body.get('javax.faces.partial.ajax') === 'true';
+        let daten, typ = 'text/html';
+        if (ajax) {
+            typ = 'text/xml';
+            daten = sz.suche === 'abgelaufen'
+                ? '<?xml version="1.0"?><partial-response><error><error-name>javax.faces.application.ViewExpiredException</error-name><error-message><![CDATA[viewId:/sis.xhtml]]></error-message></error></partial-response>'
+                : '<?xml version="1.0"?><partial-response><changes><update id="data"><![CDATA[<table><tr data-ri="0"></tr><tr data-ri="1"></tr></table>]]></update>' +
+                  '<update id="j_id1:javax.faces.ViewState:0"><![CDATA[-111:' + (300 + lauf) + ']]></update></changes></partial-response>';
+        } else if (sz.export === 'excel') { daten = xlsx(q, sz.heute, 2); typ = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'; }
+        else if (sz.export === 'leer') { daten = xlsx(q, 0, 0); typ = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'; }
+        else daten = '<html><head><title>ESL</title></head><body><div class="ui-messages-error">Bitte Abfrage waehlen!</div></body></html>';
+        return Promise.resolve(new W.Response(daten, { status:200, headers:{ 'content-type':typ } }));
+    };
+}
+// Abruf wie holeExcelVomServer / rcRahmenExport. Liefert die geparste Tabelle
+// (wie das Dashboard sie in rcProjektDaten ablegt) oder null bei HTML.
+async function abruf(W){
+    const d = W.document, form = d.getElementById('filterForm');
+    if (!form) return null;
+    const buttons = Array.from(form.querySelectorAll('button[type="submit"], input[type="submit"]'));
+    const sb = buttons.find(b => /suchen|aktualisieren|filtern|anzeigen/.test((b.innerText||b.value||'').toLowerCase()));
+    const sid = sb.id, sd = new W.FormData(form);
+    sd.append(sid, sid); sd.append('javax.faces.partial.ajax','true'); sd.append('javax.faces.source', sid);
+    sd.append('javax.faces.partial.execute','filterForm data'); sd.append('javax.faces.partial.render','filterForm data');
+    const rs = await W.fetch(form.action, { method:'POST', body:sd, headers:{ 'Faces-Request':'partial/ajax' } });
+    const txt = await rs.text();
+    const vs = txt.match(/<update id="[^"]*javax\.faces\.ViewState[^"]*"><!\[CDATA\[(.*?)\]\]><\/update>/);
+    if (vs) d.querySelectorAll('input[name="javax.faces.ViewState"]').forEach(i => i.value = vs[1]);
+    const fd = new W.FormData(form), eb = buttons.find(b => /excel/i.test(b.innerText));
+    fd.append(eb.id, eb.id);
+    const r = await W.fetch(form.action, { method:'POST', body:fd });
+    const buf = await r.arrayBuffer(), b = new Uint8Array(buf, 0, 2);
+    if (!(b[0] === 0x50 && b[1] === 0x4b)) return null;
+    const wb = XLSX.read(new Uint8Array(buf), { type:'array' });
+    return XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header:1 });
+}
+const RAHMEN_HTML = '<form id="filterForm" action="/fake/sis_x.xhtml"><span class="ui-calendar"><input class="hasDatepicker" name="filterForm:von_input" value="' + heuteDe() + '"></span>' +
+    '<span class="ui-calendar"><input class="hasDatepicker" name="filterForm:bis_input" value="' + heuteDe() + '"></span>' +
+    '<div class="ui-selectonemenu"><label class="ui-selectonemenu-label">Export Projektergebnisse</label><select name="filterForm:stat_input"><option value="">Bitte</option><option value="9" selected>Export Projektergebnisse</option></select></div>' +
+    '<button type="submit" id="filterForm:suchen">Suchen</button><button type="submit" id="filterForm:excel">Excel</button>' +
+    '<input type="hidden" name="javax.faces.ViewState" value="-555:666"></form><div id="frmMainMenu"></div>';
+const LOGIN_HTML = '<title>Anmeldung</title><form id="loginForm"><input name="u"><input type="password" name="p"></form>';
+function rahmen(key){
+    return new Promise(res => {
+        const f = document.createElement('iframe');
+        f.setAttribute('data-rc-projekt', key);
+        f.style.cssText = 'width:10px;height:10px;opacity:0';
+        f.addEventListener('load', function eins(){ f.removeEventListener('load', eins); res(f); });
+        f.srcdoc = RAHMEN_HTML;
+        document.body.appendChild(f);
+    });
+}
+const warte = ms => new Promise(r => setTimeout(r, ms));
+window.__gefallen = [];
+function pruefe(name, ok, info){ L((ok ? 'OK    ' : 'FEHLT ') + name + (ok ? '' : '   ' + (info || ''))); if (!ok) { window.__ok = false; window.__gefallen.push(name); } }
+
+(async function(){
+    window.__ok = true;
+    const T_START = Date.now();
+    ['rcFlussMitschnitt_v1', 'rcFlussPuls_v1'].forEach(k => { try { localStorage.removeItem(k); } catch(e){} });
+    // Dashboard-Attrappe: nur die Fenster-Eigenschaften, die der Flugschreiber liest
+    window.rcAlleProjekteModus = true; window.rcLiveInterval = 1; window.rcLiveRunde = 0;
+    window.rcSessionState = { alive:true, lastReset:true };
+    window.rcRahmen = { mobile:{ bereit:true }, um:{ bereit:true } };
+    window.rcProjektDaten = {};
+    window.rcLogBuf = ['08:00:00 i Start'];
+    const pdsEcht = function(d){ window.rcLetzteStats = { standortStats:{ AL:{ calls: Math.max(0, d.length - 1) } }, agentStats:{} }; window.rcAllSales = []; };
+    window.processDataStream = pdsEcht;
+    window.fetch = scheinServer(window, 'Kabel');
+    const fM = await rahmen('mobile'), fU = await rahmen('um');
+    fM.contentWindow.fetch = scheinServer(fM.contentWindow, 'Mobile');
+    fU.contentWindow.fetch = scheinServer(fU.contentWindow, 'UM');
+
+    // ---- Flugschreiber aus dem ECHTEN Dashboard schneiden ----
+    const v22 = await (await fetch_echt('esl_live_arena_v22.js?t=' + Date.now())).text();
+    const a = v22.indexOf('    function rcFlugschreiberStarten(){'), e = v22.indexOf('    try { rcFlugschreiberStarten(); }');
+    pruefe('Flugschreiber im Dashboard gefunden', a > 0 && e > a, a + '/' + e);
+    let src = v22.slice(a, e);
+    const GP = new URLSearchParams(location.search).get('gegenprobe') || '';
+    const GP_ZIEL = { vs:'Verlauf: ViewState als Pruefsumme, nie roh', heute:'Befund: Kabel-Zeilen von heute fallen auf 0' }[GP] || '';
+    if (GP === 'vs') src = src.replace('function vsKurz(v){', 'function vsKurz(v){ return String(v);');
+    if (GP === 'heute') src = src.replace('function tagVon(raw){', 'function tagVon(raw){ return null;');
+    if (GP && src.indexOf(GP === 'vs' ? 'return String(v);' : 'function tagVon(raw){ return null;') === -1) L('GEGENPROBE NICHT EINGEBAUT');
+    (0, eval)(src + '\nrcFlugschreiberStarten();');
+    pruefe('Flugschreiber gestartet', window.rcFluss && window.rcFluss.aktiv);
+    pruefe('fetch der Hauptseite angeklemmt', window.fetch.__rcFluss === true);
+    pruefe('fetch im Rahmen Mobile angeklemmt', fM.contentWindow.fetch.__rcFluss === true);
+    pruefe('processDataStream angeklemmt', window.processDataStream.__rcFluss === true);
+
+    // Ein Takt reihum wie rcLiveTick: je Projekt Abruf, Tabelle ablegen, zusammengefuehrt auswerten
+    function zusammen(){
+        const k = window.rcProjektDaten.kabel ? window.rcProjektDaten.kabel.data : [['datum','id']];
+        let out = k.slice();
+        [['mobile','M-'], ['um','U-']].forEach(([key, pr]) => {
+            const d = window.rcProjektDaten[key]; if (!d) return;
+            d.data.slice(1).forEach(z => out.push([z[0]].concat(z.slice(1, -1)).concat([pr + z[z.length - 1]])));
+        });
+        return out;
+    }
+    async function runde(){
+        lauf++;
+        for (const [key, W] of [['kabel', window], ['mobile', fM.contentWindow], ['um', fU.contentWindow]]) {
+            const tab = await abruf(W);
+            if (tab) window.rcProjektDaten[key] = { data: tab, zeit: Date.now() + lauf * 10 + (key === 'kabel' ? 0 : key === 'mobile' ? 1 : 2) };
+            window.processDataStream(zusammen());
+        }
+        await warte(150);
+    }
+    await runde(); await runde(); await runde();
+    window.SZ.Kabel.export = 'leer'; await runde(); await runde();
+    window.SZ.Kabel.export = 'html'; await runde();
+    window.SZ.Mobile.suche = 'abgelaufen'; await runde();
+
+    // Fehler auf der Seite, im Rahmen, als Promise
+    setTimeout(() => { throw new Error('Testfehler Flugschreiber'); }, 0);
+    Promise.reject(new Error('Testablehnung Flugschreiber'));
+    // Die werfende Funktion muss IM Rahmen entstehen - ein Fehler wird dem Fenster
+    // gemeldet, dessen Code ihn wirft, nicht dem, dessen setTimeout ihn startet.
+    fM.contentWindow.eval("setTimeout(function(){ throw new Error('Rahmenfehler Mobile'); }, 0)");
+    // Liga-Paket und Bedienung
+    window.postMessage({ type:'KPI_BATCH', payload:[{}, {}, {}], vollstaendig:true, liveDaterange:'intraday', projekt:'kabel', standorteInDaten:['AL'] }, '*');
+    document.getElementById('rcBtnTestKnopf').click();
+    await warte(300);
+    // Haenger: Hauptthread 6 s blockieren
+    const sichtbarBeimBlock = document.visibilityState === 'visible';
+    const tb = Date.now(); while (Date.now() - tb < 6000) {}
+    await warte(1500);
+
+    // UM-Rahmen landet auf der Anmeldemaske
+    await new Promise(res => { fU.addEventListener('load', function eins(){ fU.removeEventListener('load', eins); res(); }); fU.srcdoc = LOGIN_HTML; });
+    await warte(1300);
+    window.rcRahmen.um = { bereit:false, fehler:2, grund:'Export liefert HTML statt Excel' };
+    window.rcLogBuf.push('08:10:00 W Testwarnung ESL-Abruf scheitert');
+    // Zustandswechsel werden erst nach der Anlaufphase (15 s) beobachtet
+    while (Date.now() - T_START < 17500) await warte(250);
+    window.rcSessionState = { alive:false, lostAt:'08:15:00', lostReason:'Testgrund ViewExpired' };
+    await warte(1500);
+    const testErg = await window.rcFluss.test();
+    pruefe('Sofortmessung liefert Zeilen', Array.isArray(testErg) && testErg.length >= 3, JSON.stringify(testErg));
+    pruefe('Sofortmessung Kabel-Export ohne Suche ausgewertet', (testErg || []).some(z => /^Kabel Export OHNE vorherige Suche: HTML/.test(z)), JSON.stringify(testErg));
+    pruefe('Sofortmessung zaehlt den Inhalt (Mobile)', (testErg || []).some(z => /^Mobile Export OHNE vorherige Suche: \d+ Zeilen, heute \d+/.test(z)), JSON.stringify(testErg));
+
+    // Bericht: Download abfangen (ohne Dashboard gibt es kein rcLogbuch -> eigene Datei)
+    let berichtText = null;
+    const klickEcht = HTMLAnchorElement.prototype.click;
+    HTMLAnchorElement.prototype.click = function(){
+        if (this.download && /^ESL-Flugschreiber-/.test(this.download)) { fetch_echt(this.href).then(r => r.text()).then(t => { berichtText = t; }); return; }
+        return klickEcht.call(this);
+    };
+    const name = window.rcFluss.bericht();
+    for (let i = 0; i < 20 && berichtText == null; i++) await warte(100);
+    pruefe('Bericht als Datei', /^ESL-Flugschreiber-\d{8}-\d{4}\.txt$/.test(name), name);
+    const T = berichtText || '';
+    window.__bericht = T;
+    pruefe('Befund: Kabel-Zeilen von heute fallen auf 0', /Kabel: .*Zeilen von HEUTE fallen ab .* auf 0/.test(T));
+    pruefe('Befund: HTML-Grund "Bitte Abfrage"', /HTML \("Bitte Abfrage waehlen"/.test(T));
+    pruefe('Befund: Suche abgelaufen (Mobile)', /Mobile: .*Suche ABGELAUFEN/.test(T));
+    pruefe('Verlauf: Kabel-Exporte zusammengefasst (x5 Excel)', /x5 +Kabel +Export +Excel/.test(T));
+    pruefe('Verlauf: Kabel-Inhalt aus der Tabelle (x3 mit Daten)', /x3 +Kabel +Daten +\d+->\d+ Zeilen|x3 +Kabel +Daten +\d+ Zeilen/.test(T));
+    pruefe('Verlauf: Datenstand wechselt', /Kabel +Daten .*Datenstand 2x neu/.test(T));
+    pruefe('Verlauf: Rahmen-Inhalt mit Kabel verglichen', /Mobile +Daten .*gleiche Datensaetze wie Kabel: 0%/.test(T));
+    pruefe('Verlauf: gesendeter Zeitraum', /von_input=\d\d\.\d\d\.\d{4}/.test(T));
+    pruefe('Verlauf: gesendete Statistik', /Statistik Export Projektergebnisse/.test(T));
+    pruefe('Verlauf: ViewState als Pruefsumme, nie roh', /VS L\w{4}\/A\w{4}/.test(T) && T.indexOf('-111:') === -1 && T.indexOf('-555:') === -1);
+    pruefe('Verlauf: Suche zaehlt Tabellenzeilen', /Suche +ok .*Tabelle 2 Zeilen/.test(T));
+    pruefe('Verlauf: Rahmen auf Anmeldemaske', /UM +Rahmen +Seite geladen .*ANMELDEMASKE/.test(T));
+    pruefe('Verlauf: Aufbau-Grund des Rahmens', /UM +Aufbau +NICHT bereit, Fehler 2 - Export liefert HTML statt Excel/.test(T));
+    pruefe('Verlauf: Warnung aus dem Logbuch', /Warnung +08:10:00 Testwarnung/.test(T));
+    pruefe('Verlauf: Auswertung mit Projekt-Aufteilung', /Auswertung +\d+ Zeilen hinein \(Kabel \d+, Mobile \d+, UM \d+, davon heute \d+\)/.test(T));
+    pruefe('Verlauf: JS-Fehler der Seite', /Kabel +JS-FEHLER +.*Testfehler Flugschreiber/.test(T));
+    pruefe('Verlauf: Promise-Fehler', /PROMISE +Testablehnung Flugschreiber/.test(T));
+    pruefe('Verlauf: JS-Fehler im Rahmen', /Mobile +JS-FEHLER +.*Rahmenfehler Mobile/.test(T));
+    pruefe('Verlauf: Haenger (Takt)', sichtbarBeimBlock ? /HAENGER +SEITE HING \(Takt blockiert\)/.test(T) : /HAENGER +Taktluecke bei verborgener Seite/.test(T));
+    // Lange Aufgaben meldet der Browser nur bei SICHTBARER Seite - ist das Pruef-
+    // fenster verborgen, laesst sich diese eine Pruefung nicht messen (nicht: bestanden).
+    if (sichtbarBeimBlock) pruefe('Verlauf: Haenger (lange Aufgabe)', /HAENGER +lange Aufgabe [67](\.\d)? s \| Hauptseite/.test(T));
+    else L('NICHT MESSBAR Verlauf: Haenger (lange Aufgabe) - Pruefseite war verborgen');
+    pruefe('Verlauf: Liga-Paket', /Liga +Paket +3 Agenten, vollstaendig, Zeitraum intraday/.test(T));
+    pruefe('Verlauf: Bedienung', /Bedienung +rcBtnTestKnopf/.test(T));
+    pruefe('Verlauf: Sitzung als Zustandswechsel', /Wechsel +ESL-Sitzung: TOT \(Testgrund ViewExpired\)/.test(T));
+    pruefe('Befund: Sitzung TOT', /Sitzung als TOT gemeldet: .*Testgrund/.test(T));
+    pruefe('Verlauf: Sofortmessung markiert', /Export\(TEST\)/.test(T) && /Die SITZUNG zeigt auf/.test(T));
+    pruefe('Zustand: Rahmen mit Zeitraum und Statistik', /Rahmen Mobile: srcdoc .*Zeitraum \d\d\.\d\d\.\d{4} bis \d\d\.\d\d\.\d{4} \| Statistik Export Projektergebnisse/.test(T));
+    pruefe('Logbuch angehaengt', /--- LOGBUCH DES DASHBOARDS ---/.test(T) && /08:00:00 i Start/.test(T));
+    let gespeichert = [];
+    try { gespeichert = JSON.parse(localStorage.getItem('rcFlussMitschnitt_v1') || '[]'); } catch(e){}
+    pruefe('Mitschnitt im localStorage', gespeichert.length > 10 && !JSON.stringify(gespeichert).includes('"sig"'), gespeichert.length);
+
+    // Re-Inject: die neue Fassung uebernimmt, ohne doppelt anzuklemmen
+    const erste = window.rcFluss;
+    (0, eval)(src + '\nrcFlugschreiberStarten();');
+    pruefe('Re-Inject: alte Fassung abgeklemmt', erste.aktiv === false && window.rcFluss !== erste && window.rcFluss.aktiv === true);
+    pruefe('Re-Inject: fetch nur EINMAL umwickelt', window.fetch.__rcFluss === true && !window.fetch.__roh.__rcFluss);
+    pruefe('Re-Inject: processDataStream nur EINMAL umwickelt', window.processDataStream.__roh === pdsEcht);
+
+    // Stop gibt alles zurueck
+    window.rcFluss.stop(true);
+    pruefe('Stop: fetch zurueckgegeben', !window.fetch.__rcFluss);
+    pruefe('Stop: processDataStream zurueckgegeben', window.processDataStream === pdsEcht);
+    pruefe('Stop: Rahmen-fetch zurueckgegeben', !fM.contentWindow.fetch.__rcFluss);
+
+    // Absturz-Erkennung: letzter Puls 5 Min alt, kein "Seite wird verlassen" -> beim Start gemeldet
+    try { localStorage.setItem('rcFlussPuls_v1', String(Date.now() - 300000)); } catch(e){}
+    (0, eval)(src + '\nrcFlugschreiberStarten();');
+    const T2 = window.rcFluss.text();
+    pruefe('Neustart setzt den Mitschnitt fort', /setzt Mitschnitt fort/.test(T2));
+    pruefe('Neustart erkennt: Seite war weg', /HAENGER +Seite war weg 5 Min \| letztes Lebenszeichen/.test(T2) && /Seite war zwischendurch WEG/.test(T2));
+    // Normales Neuladen (mit "Seite wird verlassen") meldet KEINEN Absturz
+    window.dispatchEvent(new Event('pagehide'));
+    window.rcFluss.stop(true);
+    try { localStorage.setItem('rcFlussPuls_v1', String(Date.now() - 300000)); } catch(e){}
+    (0, eval)(src + '\nrcFlugschreiberStarten();');
+    const T3 = window.rcFluss.text();
+    pruefe('Gegenprobe: nach normalem Verlassen KEIN "Seite war weg"', (T3.match(/Seite war weg/g) || []).length === (T2.match(/Seite war weg/g) || []).length);
+    window.rcFluss.stop(true);
+    ['rcFlussMitschnitt_v1', 'rcFlussPuls_v1'].forEach(k => { try { localStorage.removeItem(k); } catch(e){} });
+    if (GP) L('GEGENPROBE ' + GP + ': ' + (window.__gefallen.indexOf(GP_ZIEL) !== -1 ? 'FAELLT WIE ERWARTET DURCH' : 'NICHT ERKANNT - die Pruefung prueft nichts'));
+    else L(window.__ok ? 'ALLE PRUEFUNGEN BESTANDEN' : 'ES FEHLT ETWAS');
+    window.__fertig = true;
+})().catch(e => { L('ABBRUCH: ' + (e && e.stack || e)); window.__ok = false; window.__fertig = true; });
+</script>

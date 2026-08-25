@@ -89,7 +89,11 @@ function baueXLStub(){
 // direkt VOR rcBuildReportingSheets und wird am Stueck mitgenommen.
 const registryBlock = src.slice(src.indexOf('const RC_KENNZAHLEN_V'), src.indexOf('function rcBuildReportingSheets('));
 if (registryBlock.length < 100 || registryBlock.length > 20000) { console.log('FEHLGESCHLAGEN: Registry-Block nicht sauber schneidbar (' + registryBlock.length + ' Zeichen)'); process.exit(1); }
+// Seit 05.10. rechnen rcAggAusRows und rcBuildAggSheets ueber die zentrale
+// Stack-Regel und das Blatt "Ohne Stack" — die echten Funktionen dazu kommen
+// aus dem gemeinsamen Baustein (_stack_regel.js), nicht aus einem Nachbau.
 const quelltext =
+    require('./_stack_regel.js').quelltextBlatt(src) + '\n' +
     registryBlock + '\n' +
     schneideAus(src, 'function rcAggAusRows(') + '\n' +
     schneideAus(src, 'function rcBuildReportingSheets(') + '\n' +
@@ -115,7 +119,7 @@ function baueUmgebung(){
 const zeile = (o) => Object.assign({
     team: '', name: '', calls: 0, standort: '', ccs: '', ahtSec: null, hasEsl: true,
     ansp: 0, kont: 0, mob: 0, kip: 0, bnt: 0, vvl: 0, detr: null, prodG: null, prodGBcr: null,
-    aq: null, cs: null, tnps: null, fq: null, dds: null, ftf: null
+    cs: null, tnps: null, fq: null, dds: null, ftf: null
 }, o);
 const ROWS = [
     zeile({ name: 'A Eins', ccs: '1', team: 'VKD-TECH-83', standort: 'AL', calls: 100, ahtSec: 600,
@@ -123,7 +127,7 @@ const ROWS = [
         prodG: { 'KIP BNT': 4, 'Mobilfunk BNT': 10, 'ENV BNT': 3, 'PTV BNT': 2, 'DSL Glasfaser BNT': 1, 'KIP VVL': 5 },
         prodGBcr: { 'KIP BNT': 4, 'Mobilfunk BNT': 8 },
         cs: { z: 45, n: 50 }, tnps: { z: 10, n: 40 }, fq: { z: 5, n: 0 },   // fq: Nenner 0 -> NICHT poolen!
-        dds: { z: 2, n: 40 }, ftf: { z: 30, n: 40 }, aq: { z: 1, n: 100 }, detr: 3 }),
+        dds: { z: 2, n: 40 }, ftf: { z: 30, n: 40 }, aq: { z: 1, n: 100 }, detr: 3 }),   // aq wird ignoriert (30.10.): steht bewusst als Gegenprobe da
     zeile({ name: 'B Zwei', ccs: '2', team: 'VKD-TECH-83', standort: 'AL', calls: 50, ahtSec: 300,
         ansp: 10, kont: 20, kip: 1, mob: 2, bnt: 4, vvl: 1,
         prodG: { 'KIP BNT': 1, 'Mobilfunk BNT': 2, 'ENV BNT': 1, 'KIP VVL': 1 },
@@ -169,16 +173,27 @@ pruef('Agenten tragen ihre {z,n}-Paare unveraendert (fuer MA-Bloecke)',
 // ===========================================================================
 abschnitt('2. Kaskade: welche Blaetter je Filter');
 // ===========================================================================
-function baue(scope){
+// Seit 30.10. sind ab Werk nur acht Blaetter an. Die Kaskade-Pruefungen brauchen ALLE Ebenen,
+// also wird der Dialog-Zustand "alles zugeschaltet" uebergeben; mit werk=true laeuft der Werkszustand.
+const ALLE = { blaetter: { produkte:true, analyseAgenten:true, reportingQ:true, standorte:true, stacks:true,
+    ligaStandorte:true, ligaTeams:true, entwicklung:true } };
+function baue(scope, werk){
     const { XL, blaetter } = baueXLStub();
     const a2 = U.rcAggAusRows(DATA);
     a2.trendScope = scope;
-    U.rcBuildAggSheets(XL, {}, false, a2, 'TESTTITEL');
+    U.rcBuildAggSheets(XL, {}, false, a2, 'TESTTITEL', werk ? undefined : ALLE);
     return blaetter;
 }
 const namen = bl => bl.map(b => b.name);
 
 const ohneFilter = baue({ std: 'ALL', stack: 'ALL', team: 'ALL' });
+{
+    const n = namen(baue({ std: 'ALL', stack: 'ALL', team: 'ALL' }, true));
+    pruef('Werkszustand (ohne Auswahl): Qualitaet Reporting, Standorte, Stacks, Liga-Blaetter, Entwicklung fehlen',
+        !['Qualitaet Reporting','Standorte','Stacks','Liga Standorte','Liga Teams','Entwicklung'].some(x => n.includes(x)), n.join(','));
+    pruef('Werkszustand: Vertrieb Reporting, Struktur, Teams, Agenten bleiben',
+        ['Vertrieb Reporting','Struktur','Teams','Agenten'].every(x => n.includes(x)), n.join(','));
+}
 {
     const n = namen(ohneFilter);
     pruef('ohne Filter: alle Ebenen da (Standorte, Stacks, Teams, Agenten)',
@@ -266,6 +281,11 @@ abschnitt('3. Inhalt der Reporting-Blaetter');
     const kopf = qr.find(r => r[1] === 'CALLS');
     pruef('QUALITAET-Blatt traegt KEINE Vertriebs-Spalten (KIP/MOB/VVL/ANSPR)',
         kopf && !kopf.some(c => /KIP|MOB|VVL|ANSPR|GESAMT/.test(String(c))), kopf && kopf.join(','));
+    // AQ ist raus (Nutzer-Entscheidung 30.10.). Die Testzeile A Eins traegt weiter aq {z:1,n:100} als Gegenprobe:
+    // die Eingabe darf ankommen, im Blatt steht sie nicht — Kopf endet auf FTF %, DETR.
+    pruef('QUALITAET-Blatt: Kopf ohne AQ (…, DDS %, FTF %, DETR.), trotz aq-Daten in der Eingabe',
+        kopf && kopf.join('|') === '|CALLS|AHT|CS %|TNPS|FQ %|DDS %|FTF %|DETR.' && alZ && alZ.length === kopf.length && alZ[8] === 4,   // Detraktoren AL: 3 + 1
+        kopf && kopf.join('|') + ' / AL-Detra ' + (alZ && alZ[8]));
 }
 
 // ===========================================================================
@@ -301,9 +321,18 @@ abschnitt('4. Schlanke Reporting-Mappe (nur die Block-Blaetter)');
     const { XL, blaetter } = baueXLStub();
     const a = U.rcAggAusRows(DATA);
     a.trendScope = { std:'ALL', stack:'ALL', team:'ALL' };
-    U.rcBuildReportingSheets(XL, {}, false, a, 'T', 'qualitaet');
-    pruef("nur='qualitaet' baut ausschliesslich das Qualitaets-Blatt",
+    U.rcBuildReportingSheets(XL, {}, false, a, 'T', 'qualitaet', undefined, ALLE);
+    pruef("nur='qualitaet' baut ausschliesslich das Qualitaets-Blatt (Blatt zugeschaltet)",
         blaetter.length === 1 && blaetter[0].name === 'Qualitaet Reporting', blaetter.map(b=>b.name).join(','));
+}
+{
+    // Im vollen Bericht ist Qualitaet Reporting ab Werk AUS (30.10.) — nur die schlanke Mappe
+    // (weder nur noch wahl) baut beide Bloecke, siehe weiter oben.
+    const { XL, blaetter } = baueXLStub();
+    const a = U.rcAggAusRows(DATA);
+    a.trendScope = { std:'ALL', stack:'ALL', team:'ALL' };
+    U.rcBuildReportingSheets(XL, {}, false, a, 'T', 'qualitaet');
+    pruef("nur='qualitaet' ohne Auswahl baut im Werkszustand NICHTS", blaetter.length === 0, blaetter.map(b=>b.name).join(','));
 }
 {
     // Leere Datenlage darf keine kaputte Mappe erzeugen: SheetJS wirft beim
@@ -460,7 +489,7 @@ abschnitt('6. rcExportReportingAlle FUNKTIONAL (echte Funktion, Stubs drumherum)
             const calls = [111, 222, 333][idx];
             return { rows: [ { team:'T', name:'A', calls, standort:'AL', ccs:'1', hasEsl:true, ansp:5,
                                kont:10, kip:1, mob:1, bnt:2, vvl:0, ahtSec:300,
-                               aq:null, cs:{z:1,n:2}, tnps:null, fq:null, dds:null, ftf:null, detr:null } ],
+                               cs:{z:1,n:2}, tnps:null, fq:null, dds:null, ftf:null, detr:null } ],
                      label:'Test', von, bis, tageListe:['2026-08-06'], tageMitDaten:1, tageGesamt:1 };
         },
         U.rcAggAusRows,

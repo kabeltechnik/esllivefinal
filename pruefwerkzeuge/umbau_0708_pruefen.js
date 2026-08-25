@@ -195,7 +195,10 @@ pruef('keine Schriftgroesse unter 10px mehr', zuKlein.length === 0, zuKlein.join
 pruef('Zoom-Obergrenze auf 3.0 angehoben', /RC_ZOOM_MAX = 3\.0/.test(code));
 pruef('Zoom-Automatik vorhanden', /function rcZoomAutoWert\(\)/.test(code));
 pruef('  ... richtet sich nach der Fensterbreite', /const b = window\.innerWidth \|\| RC_ZOOM_BASIS/.test(code));
-pruef('  ... ist ab Werk an', /localStorage\.getItem\('rcZoomAuto'\) !== '0'/.test(code));
+// Seit 05.10. ab Werk AUS (Nutzer-Vorgabe: "immer auf 100 % Zoom und nicht 150") —
+// funktional geprueft in zoom_pruefen.js, Abschnitt 2b.
+pruef('  ... ist ab Werk AUS (nur ein ausdrueckliches "1" schaltet sie an)',
+  /localStorage\.getItem\('rcZoomAuto'\) === '1'/.test(code) && !/localStorage\.getItem\('rcZoomAuto'\) !== '0'/.test(code));
 pruef('der Hand-Regler schaltet die Automatik ab',
   /const rcZoomBy = d => \{ try \{ localStorage\.setItem\('rcZoomAuto', '0'\)/.test(code));
 pruef('Fenstergroesse wird nachgezogen', /addEventListener\('resize'/.test(code));

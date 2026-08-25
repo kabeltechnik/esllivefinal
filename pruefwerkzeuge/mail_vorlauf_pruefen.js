@@ -10,7 +10,7 @@
  * Warum das ueberhaupt schiefging: Der ESL-Export ist nach 20 Sekunden da, die
  * Ligaliste braucht laenger — sie laeuft in einem ZWEITEN Tab, der sich erst bei
  * Microsoft anmelden muss, und der KPI-Crawler sendet danach im 3-Minuten-Takt.
- * Wird der Report vorher gebaut, stehen CS, TNPS, AHT, AQ und FQ leer da. Das
+ * Wird der Report vorher gebaut, stehen CS, TNPS, AHT und FQ leer da. Das
  * Blatt sieht trotzdem vollstaendig aus — dem Empfaenger faellt es nicht auf.
  *
  * DIE TEUERSTE FALLE dabei ist nicht die Wartezeit, sondern WO geprueft wird:

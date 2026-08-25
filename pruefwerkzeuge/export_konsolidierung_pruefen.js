@@ -164,9 +164,12 @@ pruef('das Stacks-Blatt rechnet NICHT mehr ueber teamsAlle',
 const umgebung = {
     window: { rcWcaMapping: { stackMap: { 'VKD-TECH-52': 'VKD_Tech', 'VKD-TECH-51': 'VKD_Tech' } } }
 };
+// rcAggAusRows holt den Stack seit 05.10. ueber die zentrale Regel (Mapping, sonst
+// Anker) — die echten Funktionen dafuer muessen mit in den ausgewerteten Quelltext.
 const aggFn = new Function('window', 'classify',
-    schneide('rcAggAusRows') + '; return rcAggAusRows;')(umgebung.window,
-    new Function('return ' + schneide('classify'))());
+    require('./_stack_regel.js').quelltext(code) + '\n' + schneide('rcAggAusRows') + '; return rcAggAusRows;')(umgebung.window,
+    // classify nutzt seit 28.09. die Geraete-Regel (RC_KEIN_VERTRIEB + rcIstGeraet)
+    new Function(code.match(/const RC_KEIN_VERTRIEB = [^\n]+/)[0] + '\n' + schneide('rcIstGeraet') + '\nreturn ' + schneide('classify'))());
 
 const rows = [
     // Berlin, Team 52 — 100 Calls, 10 Kontakte, 1 KIP BNT
@@ -349,8 +352,12 @@ pruef('ungemappte Agenten werden gesammelt', /const ohneMapping = \[\]/.test(koe
 pruef('… mit VO-Nummer, ESL-Team und Standort',
     /ohneMapping\.push\(\{ vo: voRaw, eslTeam: teamRaw, standort: code \}\)/.test(koerperParse));
 pruef('… und auf window gelegt', /window\.rcOhneMapping = ohneMapping\.slice\(\)/.test(koerperParse));
+// Seit 05.10. entprellt (der Parser laeuft alle 20 s — vorher stand dieselbe Zeile
+// bei jedem Lauf im Logbuch) und zusaetzlich SICHTBAR: Zaehler in der Kopfleiste.
 pruef('… und gemeldet, wenn welche fehlen',
-    /if \(ohneMapping\.length\)[\s\S]{0,160}rcLog\.warn/.test(koerperParse));
+    /if \(ohneMapping\.length && window\.rcLueckenGemeldet !== lueckenSig\)[\s\S]{0,260}rcLog\.warn/.test(koerperParse));
+pruef('… und in der Kopfleiste sichtbar gemacht (Zaehler "ohne Stack")',
+    /window\.rcOhneStack = window\.rcZuordnungLuecken\.filter\(/.test(koerperParse) && /rcOhneStackChip\(\)/.test(koerperParse));
 
 // rcStandRows: BEIDE Mapping-Wege schlagen den Live-Agenten. Stuende la.team
 // davor, erbte ein ungemappter Agent dort wieder seinen ESL-Rohnamen, obwohl
