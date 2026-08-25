@@ -180,7 +180,8 @@ abschnitt('C) Takt-Waechter — FUNKTIONAL gegen die echte Funktion');
 const blockStart = dash.indexOf('var RC_DRIFT_LUECKE_MS');
 const blockEnde  = dash.indexOf('window.rcDrift = rcDrift;') + 'window.rcDrift = rcDrift;'.length;
 pruef('der Waechter-Block laesst sich ausschneiden', blockStart > 0 && blockEnde > blockStart);
-const block = dash.slice(blockStart, blockEnde);
+// Dazu der echte Dienst-Schalter (27.10.) — rcDriftNachholen fragt ihn; ohne Marke wie bisher.
+const block = dash.slice(blockStart, blockEnde) + '\n' + require('./_stack_regel.js').schneide(dash, 'function rcDienstModus(');
 
 function bau(opt) {
     opt = opt || {};
@@ -190,7 +191,7 @@ function bau(opt) {
     const jetztRef = { mono: 0 };
     let jetztAkt = 0;
     const umgebung = new Function(
-        'window', 'document', 'rcLog', 'rcQuellenWatchTick', 'holeExcelVomServer',
+        'window', 'document', 'rcLog', 'rcQuellenWatchTick', 'holeExcelVomServer', 'rcLiveTick',
         'rcJetztAktualisieren', 'setInterval', 'pad2', 'performanceNow',
         block +
         '\n; return { pruefen: rcDriftPruefen, reset: rcDriftZuruecksetzen, bilanz: rcDrift };'
@@ -200,6 +201,7 @@ function bau(opt) {
         { log: t => log.push('log:' + t), warn: t => log.push('warn:' + t) },
         function(){},                       // rcQuellenWatchTick
         function(){},                       // holeExcelVomServer
+        function(){},                       // rcLiveTick (Live-Takt seit 27.09., reihum bei allen Projekten)
         function(){ jetztAkt++; return Promise.resolve({ sekunden: 3, esl:{ok:true}, liga:{ok:true} }); },
         function(){ return 99; },           // setInterval
         n => String(n).padStart(2, '0'),

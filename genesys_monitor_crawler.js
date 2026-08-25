@@ -859,6 +859,30 @@
   window.rcGmHoleStruktur = holeStruktur;
   window.rcGmHoleWerte = holeWerte;
 
+  // ---------- Wachhalter (05.10.) ----------
+  // Der Monitor-Tab liegt im Betrieb im Hintergrund. Edge legt verborgene Tabs
+  // schlafen ("Schlafende Tabs"): Zeitgeber und Netzabrufe stehen dann, bis der
+  // Tab wieder vorn liegt. Haelt die Seite einen Web Lock, friert Edge sie
+  // nicht ein — an echtem Edge 154 gemessen (pruefwerkzeuge/schlaf_messen.mjs).
+  // Der Lock wird nie zurueckgegeben und faellt mit der Seite; ein Re-Inject
+  // laesst den vorhandenen stehen.
+  (function wachhalten() {
+    if (window.__rcWachLock) return;
+    try {
+      if (!(navigator.locks && navigator.locks.request)) {
+        console.warn('[GM] Wachhalter nicht moeglich (keine Web Locks) — liegt der Tab im Hintergrund, kann Edge ihn einfrieren.');
+        return;
+      }
+      var name = 'rc_wach_gm_' + Date.now() + '_' + Math.round(performance.now() * 1000);
+      window.__rcWachLock = { name: name, seit: Date.now() };
+      navigator.locks.request(name, function () { return new Promise(function () {}); })
+        .catch(function (e) {
+          window.__rcWachLock = null;
+          console.warn('[GM] Wachhalter: Web Lock nicht bekommen (' + (e && e.message ? e.message : e) + ').');
+        });
+    } catch (e) { window.__rcWachLock = null; }
+  })();
+
   console.log('%c[Genesys-Monitor-Crawler v' + VERSION + '] bereit', 'color:#E60000;font-weight:bold;font-size:13px');
   if (!Object.keys(RC_GM.katalog).length) {
     console.log('Noch kein Katalog — ich lerne die Qualitaeten jetzt selbst an.\n' +

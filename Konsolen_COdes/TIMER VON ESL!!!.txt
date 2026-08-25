@@ -1,0 +1,104 @@
+var timeStrings=['00','01','02','03','04','05','06','07','08','09',
+                 '10','11','12','13','14','15','16','17','18','19',
+                 '20','21','22','23','24','25','26','27','28','29',
+                 '30','31','32','33','34','35','36','37','38','39',
+                 '40','41','42','43','44','45','46','47','48','49',
+                 '50','51','52','53','54','55','56','57','58','59']; 
+
+/**
+ *  Constructor with parameters
+ * 
+ * @param {type} count
+ * @param {type} repeat
+ * @returns {Timer}
+ */
+function Timer(count, repeat) {
+    this.startCount = count || 0;
+    this.interval = repeat || 1000;
+    this.isPaused = false;
+    this.intervalID = 0;
+    this.jsfId = "";
+    this.format = "ms";
+}
+
+// init function
+Timer.prototype.init = function() {
+    this.alert();
+};
+
+// set timer time
+Timer.prototype.setTime = function(time) {
+    this.count = time;
+    this.printTime();
+};
+
+// print time
+Timer.prototype.printTime = function() {
+    try {
+        document.getElementById(this.jsfId).innerHTML = this.formatCount(this.count);
+    } catch (ex) {
+    }
+};
+
+// start the timer
+Timer.prototype.start = function(e) {
+    //clear interval
+    clearInterval(this.intervalID);
+    this.count = e || this.startCount;
+    //print time
+    this.printTime();
+
+    //setInterval method sets the interval for repeating the function
+    var self = this;
+    this.intervalID = setInterval(function() {
+        this.startCount > 0 ? self.count -= 1 : self.count += 1;
+        if (self.count >= 0) {
+            self.printTime();
+        } else {
+            self.stop();
+        }
+    }, this.interval);
+};
+
+// stop timer
+Timer.prototype.stop = function() {
+    clearInterval(this.intervalID);
+    this.isPaused = false;
+    this.count = this.startCount;
+    this.printTime();
+};
+
+// pause timer
+Timer.prototype.pause = function(a) {
+    clearInterval(this.intervalID);
+    this.isPaused = true;
+    this.count = a || this.count;
+    this.printTime();
+};
+
+// unpause timer
+Timer.prototype.unpause = function() {
+    this.isPaused = false;
+    this.start(this.count);
+};
+
+// format counter to string
+Timer.prototype.formatCount = function(d) {
+    var sec = Number(d);
+    if (this.format === "hms") {
+        return timeStrings[Math.floor(sec / 3600)] + ':' + timeStrings[Math.floor(sec % 3600 / 60)] + ':' + timeStrings[Math.floor(sec % 60)];
+    } else {
+        return timeStrings[Math.floor(sec % 3600 / 60)] + ':' + timeStrings[Math.floor(sec % 60)];
+    }
+};
+
+var processTimer;
+
+$(function() {
+    if (typeof processTimer === "undefined") {
+        processTimer = new Timer(0, 1000);
+        processTimer.jsfId = "processTimer";
+        processTimer.format = "hms";
+    }
+    processTimer.stop();
+});

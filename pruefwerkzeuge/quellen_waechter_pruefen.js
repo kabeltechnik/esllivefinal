@@ -115,14 +115,16 @@ pruef('  ... und beendet sich selbst, sobald die Sitzung wieder steht',
   /clearInterval\(window\.rcSessionRetryInterval\)/.test(dash));
 pruef('der Live-Takt wird weiterhin gestoppt (kein Haemmern gegen die Login-Seite)',
   /clearInterval\(window\.rcLiveInterval\)/.test(dash));
+// Seit 27.10. mit Lieferzeit: im Dienst-Betrieb ist der Erfolg so alt wie die
+// Lieferung des Dienstes, nicht wie ihr Einspeisen (rcEslErfolg(zeit)).
 pruef('rcEslLastOk wird beim ERFOLGREICHEN Abruf gesetzt',
-  /window\.rcEslLastOk = Date\.now\(\);/.test(dash));
+  /window\.rcEslLastOk = (zeit \|\| )?Date\.now\(\);/.test(schneide(dash, 'function rcEslErfolg(')));
 // Bewusst NICHT in processDataStream: das wird auch bei jedem Filterwechsel
 // mit dem ALTEN Datenstrom gerufen und wuerde eine tote Quelle als frisch
 // ausweisen — genau der Fehler, den der Waechter finden soll.
 pruef('  ... und NICHT in processDataStream (Filterwechsel ist kein Abruf)',
-  dash.indexOf('window.rcEslLastOk = Date.now();') > dash.indexOf('window.processDataStream = function'),
-  'Position');
+  (b => b.length > 1000 && !/rcEslLastOk\s*=(?!=)/.test(b))(schneide(dash, 'window.processDataStream = function')),
+  'Block');
 
 // ============================================================================
 console.log('\n-- 4b. Der STILLE Stillstand (Live-Befund 08.08.) --');

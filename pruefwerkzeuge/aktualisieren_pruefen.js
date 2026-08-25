@@ -231,7 +231,9 @@ pruef('pollKpis klickt und liest NIE selbst (kein triggerPageRefresh, kein parse
     !/triggerPageRefresh/.test(poll) && !/parseKpiTable/.test(poll));
 pruef('das Replay stellt GENAU daterange/interval um und laeuft am Hook vorbei',
     /p\.set\('daterange', 'intraday'\)/.test(poll) && /p\.set\('interval',\s*'cumulate'\)/.test(poll) &&
-    /window\.__rcFetchRoh \|\| window\.fetch/.test(poll));
+    // Seit 05.10. laeuft der Abruf ueber abrufMitFrist (Frist + Roh-fetch an EINER Stelle).
+    /abrufMitFrist\(cap\.url/.test(poll) &&
+    /window\.__rcFetchRoh \|\| window\.fetch/.test(funktion(craw, 'function abrufMitFrist(')));
 pruef('pollKpis gibt im Normalfall doReplay zurueck',
     /return doReplay\(\);/.test(poll));
 // Seit 17.08. setzt der ehrlich-leer-Zweig zusaetzlich replayLeerFolge zurueck

@@ -81,7 +81,7 @@ async function los(){
         const heute = p(d.getDate())+'.'+p(d.getMonth()+1)+'.'+d.getFullYear();
         let rows;
         try {
-            const buf = await (await fetch('Test%20Excels/Export_20260714_205722.xlsx')).arrayBuffer();
+            const buf = await (await fetch('Test%20Excels/Export_20260928_212911.xlsx')).arrayBuffer();
             const wb = window.XLSX.read(new Uint8Array(buf), { type:'array' });
             rows = window.XLSX.utils.sheet_to_json(wb.Sheets['dataTable'], { header:1, defval:'' });
         } catch(e){ L('ESL-Export nicht ladbar: ' + e.message); return; }

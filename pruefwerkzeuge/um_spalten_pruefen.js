@@ -47,7 +47,10 @@ function schneideFunktion(name){
 
 // ---- Die drei echten Funktionen laden ------------------------------------
 const fensterStub = { };
+// Seit 28.09. brauchen rcProduktGruppe/classify die Geraete-Regel.
+const GERAET_QUELL = src.match(/const RC_KEIN_VERTRIEB = [^\n]+/)[0] + '\n' + schneideFunktion('rcIstGeraet');
 const geladen = new Function('window', 'rcLog',
+    GERAET_QUELL + '\n' +
     schneideFunktion('rcProduktGruppe') + '\n' +
     schneideFunktion('rcIstPotentialTracking') + '\n' +
     schneideFunktion('classify') + '\n' +
@@ -294,12 +297,25 @@ pruef('set() liefert jetzt einen Wahrheitswert zurueck (sonst waere hatGruppe im
 // ACHTUNG: hier NICHT gegen "nackt" pruefen — der Kommentar-Entferner ersetzt
 // jede Zeichenkette durch "" und damit auch den gesuchten Typnamen.
 // Jeder in handleKpiMessage behandelte Typ muss in der Whitelist stehen.
-const whitelist = (src.match(/window\.__rcKpiMsgHandler\s*=\s*function[\s\S]{0,900}?\n    \};/) || [''])[0];
-const behandelt = ['KPI_BATCH', 'KPI_UPDATE', 'RC_HARVEST_RANGE_DONE', 'RC_LIVE_NOW_DONE'];
+const whitelist = (src.match(/window\.__rcKpiMsgHandler\s*=\s*function[\s\S]{0,2500}?\n    \};/) || [''])[0];
+// Die Liste wird seit 05.10. aus handleKpiMessage GELESEN statt abgetippt: die
+// abgetippte Fassung kannte KPI_QUELLE_TOT nicht — und genau der Typ fehlte im
+// Tor (die Sitzungs-Meldung des Crawlers kam seit 08.08. nie an).
+const hkmA = src.indexOf('function handleKpiMessage(d){');
+const hkmE = src.indexOf('// Kanal 1: BroadcastChannel', hkmA);
+const hkm = hkmA !== -1 && hkmE > hkmA ? src.slice(hkmA, hkmE) : '';
+const behandelt = Array.from(new Set((hkm.match(/d\.type === '([A-Z_]+)'/g) || []).map(x => x.replace(/^.*'([A-Z_]+)'$/, '$1'))));
+pruef('handleKpiMessage behandelt mindestens sechs Nachrichten-Typen (aus dem Code gelesen)',
+    behandelt.length >= 6 && behandelt.indexOf('KPI_QUELLE_TOT') !== -1 && behandelt.indexOf('KPI_HINWEIS') !== -1,
+    behandelt.join(', '));
 behandelt.forEach(t => pruef('Empfaenger-Whitelist laesst ' + t + ' durch',
     whitelist.indexOf("'" + t + "'") !== -1));
 pruef('Gegenprobe: ein NICHT gelisteter Typ wird als fehlend erkannt',
     whitelist.indexOf("'RC_GIBT_ES_NICHT'") === -1);
+// Gegenprobe an der Bauart bis 05.10.: sie liess KPI_QUELLE_TOT nicht durch.
+const torAlt = "if (d && (d.type === 'KPI_BATCH' || d.type === 'KPI_UPDATE' || d.type === 'RC_HARVEST_RANGE_DONE' || d.type === 'RC_LIVE_NOW_DONE')) {";
+pruef('Gegenprobe: das alte Tor haette KPI_QUELLE_TOT verschluckt (so war es seit 08.08.)',
+    behandelt.some(t => torAlt.indexOf("'" + t + "'") === -1) && torAlt.indexOf("'KPI_QUELLE_TOT'") === -1);
 
 // =========================================================================
 console.log('\n' + (fehl === 0

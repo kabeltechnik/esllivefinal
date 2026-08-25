@@ -128,7 +128,7 @@ selbst ein Befund für Phase 1, nicht stillschweigend zu ignorieren.
    **`test_dashboard_offline.html` und `test_league_demo.html` gibt es NICHT mehr** (nur noch im
    Commit; `git checkout HEAD -- <datei>` holt sie zurück, falls jemand sie wirklich braucht).
 8. **Vor dem Lesen von Code**: `graphify query "<Frage>"` statt `esl_live_arena_v22.js` komplett zu
-   lesen (die Datei hat **25106 Zeilen** und wächst). Anker über **Funktionsnamen** per `grep -n`
+   lesen (die Datei hat **28318 Zeilen** und wächst). Anker über **Funktionsnamen** per `grep -n`
    setzen, nicht über notierte Zeilennummern — die altern innerhalb von Tagen.
 9. **Farbpalette: `VODAFONE_DESIGN.md` ist verbindlich.** Zustände dreistufig — ok `#008A00`,
    warn `#EB9700`, breach `#E60000`. Standortfarben ausschließlich über `rcChartFarbe(code, i)`

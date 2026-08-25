@@ -1,0 +1,895 @@
+<div class="t-Body">
+  <div id="BRW" class=""> 
+
+</div>
+  <span id="APEX_SUCCESS_MESSAGE" data-template-id="212917471913985484_S" class="apex-page-success u-hidden"></span><span id="APEX_ERROR_MESSAGE" data-template-id="212917471913985484_E" class="apex-page-error u-hidden"></span>
+  <div class="t-Body-wrap">
+    <div class="t-Body-col t-Body-col--main">
+      <div class="t-Login-container">
+      <div class="container">
+<div class="row">
+<div class="col col-12 apex-col-auto">
+<div class="t-Login-region t-Form--stretchInputs t-Form--labelsAbove " id="R218321059515819728">
+  <div class="t-Login-header">
+    <span class="t-Login-logo fa fa-bar-chart"></span>
+    <h1 class="t-Login-title" id="login_heading">SimpleStats</h1>
+  </div>
+  <div class="t-Login-body">
+    <div class="t-Form-fieldContainer t-Form-fieldContainer--hiddenLabel rel-col  apex-item-wrapper apex-item-wrapper--text-field apex-item-wrapper--has-icon" id="P101_USERNAME_CONTAINER"><div class="t-Form-labelContainer t-Form-labelContainer--hiddenLabel col col-null">
+<label for="P101_USERNAME" id="P101_USERNAME_LABEL" class="t-Form-label u-VisuallyHidden">username</label>
+</div><div class="t-Form-inputContainer col col-null"><div class="t-Form-itemWrapper"><input type="text" id="P101_USERNAME" name="P101_USERNAME" placeholder="username" class="text_field apex-item-text apex-item-has-icon" value="" size="40" maxlength="100" data-trim-spaces="NONE"><span class="apex-item-icon fa fa-user" aria-hidden="true"></span></div><span id="P101_USERNAME_error_placeholder" class="a-Form-error" data-template-id="213003608043985528_ET"></span></div></div><div class="t-Form-fieldContainer t-Form-fieldContainer--hiddenLabel rel-col  apex-item-wrapper apex-item-wrapper--password apex-item-wrapper--has-icon" id="P101_PASSWORD_CONTAINER"><div class="t-Form-labelContainer t-Form-labelContainer--hiddenLabel col col-null">
+<label for="P101_PASSWORD" id="P101_PASSWORD_LABEL" class="t-Form-label u-VisuallyHidden">password</label>
+</div><div class="t-Form-inputContainer col col-null"><div class="t-Form-itemWrapper"><input type="password" name="P101_PASSWORD" size="40" maxlength="100" value="" id="P101_PASSWORD" placeholder="password" class="password apex-item-text apex-item-has-icon" onkeypress="return apex.submit({request:'P101_PASSWORD',submitIfEnter:event})"><span class="apex-item-icon fa fa-key" aria-hidden="true"></span></div><span id="P101_PASSWORD_error_placeholder" class="a-Form-error" data-template-id="213003608043985528_ET"></span></div></div>
+  </div>
+  <div class="t-Login-buttons">
+    <button onclick="apex.submit({request:'LOGIN',validate:true});" class="t-Button t-Button--hot " type="button" id="B218321364553819730"><span class="t-Button-label">Log In</span></button>
+  </div>
+  <div class="t-Login-links">
+    
+  </div>
+  
+</div>
+</div>
+</div><div class="row">
+<div class="col col-12 apex-col-auto">
+<div id="MSG" class=""> 
+
+</div>
+</div>
+</div>
+</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+---
+
+<div class="t-Login-region t-Form--stretchInputs t-Form--labelsAbove " id="R218321059515819728">
+  <div class="t-Login-header">
+    <span class="t-Login-logo fa fa-bar-chart"></span>
+    <h1 class="t-Login-title" id="login_heading">SimpleStats</h1>
+  </div>
+  <div class="t-Login-body">
+    <div class="t-Form-fieldContainer t-Form-fieldContainer--hiddenLabel rel-col  apex-item-wrapper apex-item-wrapper--text-field apex-item-wrapper--has-icon" id="P101_USERNAME_CONTAINER"><div class="t-Form-labelContainer t-Form-labelContainer--hiddenLabel col col-null">
+<label for="P101_USERNAME" id="P101_USERNAME_LABEL" class="t-Form-label u-VisuallyHidden">username</label>
+</div><div class="t-Form-inputContainer col col-null"><div class="t-Form-itemWrapper"><input type="text" id="P101_USERNAME" name="P101_USERNAME" placeholder="username" class="text_field apex-item-text apex-item-has-icon" value="" size="40" maxlength="100" data-trim-spaces="NONE"><span class="apex-item-icon fa fa-user" aria-hidden="true"></span></div><span id="P101_USERNAME_error_placeholder" class="a-Form-error" data-template-id="213003608043985528_ET"></span></div></div><div class="t-Form-fieldContainer t-Form-fieldContainer--hiddenLabel rel-col  apex-item-wrapper apex-item-wrapper--password apex-item-wrapper--has-icon" id="P101_PASSWORD_CONTAINER"><div class="t-Form-labelContainer t-Form-labelContainer--hiddenLabel col col-null">
+<label for="P101_PASSWORD" id="P101_PASSWORD_LABEL" class="t-Form-label u-VisuallyHidden">password</label>
+</div><div class="t-Form-inputContainer col col-null"><div class="t-Form-itemWrapper"><input type="password" name="P101_PASSWORD" size="40" maxlength="100" value="" id="P101_PASSWORD" placeholder="password" class="password apex-item-text apex-item-has-icon" onkeypress="return apex.submit({request:'P101_PASSWORD',submitIfEnter:event})"><span class="apex-item-icon fa fa-key" aria-hidden="true"></span></div><span id="P101_PASSWORD_error_placeholder" class="a-Form-error" data-template-id="213003608043985528_ET"></span></div></div>
+  </div>
+  <div class="t-Login-buttons">
+    <button onclick="apex.submit({request:'LOGIN',validate:true});" class="t-Button t-Button--hot " type="button" id="B218321364553819730"><span class="t-Button-label">Log In</span></button>
+  </div>
+  <div class="t-Login-links">
+    
+  </div>
+  
+</div>
+
+---
+
+Request URL
+https://vs0592.intra.regiocom.net/ords/f?p=80002:1:2140815194749:::::
+Request method
+GET
+Status code
+200 OK
+Remote address
+172.16.31.118:443
+Referrer policy
+strict-origin-when-cross-origin
+cache-control
+no-store
+connection
+Keep-Alive
+content-type
+text/html;charset=utf-8
+date
+Sun, 18 Oct 2026 18:02:29 GMT
+expires
+Sun, 27 Jul 1997 13:00:00 GMT
+keep-alive
+timeout=5, max=96
+pragma
+no-cache
+server
+Apache/2.4.6 (Red Hat Enterprise Linux) OpenSSL/1.0.2k-fips
+transfer-encoding
+chunked
+x-content-type-options
+nosniff
+x-frame-options
+DENY
+x-xss-protection
+1; mode=block
+accept
+text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7
+accept-encoding
+gzip, deflate, br, zstd
+accept-language
+de-DE,de;q=0.9,en-US;q=0.8,en;q=0.7
+connection
+keep-alive
+cookie
+ORA_WWV_APP_80002=ORA_WWV-eAlVnd5M6tegJHNhKXuH5AHA
+host
+vs0592.intra.regiocom.net
+referer
+https://vs0592.intra.regiocom.net/ords/f?p=80002:LOGIN:2140815194749:::::
+sec-ch-ua
+"Google Chrome";v="153", "Not_A Brand";v="8", "Chromium";v="153"
+sec-ch-ua-mobile
+?0
+sec-ch-ua-platform
+"Windows"
+sec-fetch-dest
+document
+sec-fetch-mode
+navigate
+sec-fetch-site
+same-origin
+sec-fetch-user
+?1
+upgrade-insecure-requests
+1
+user-agent
+Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36
+
+---
+
+apex.lang.addMessages({
+"APEX.IG.HELP.DOWNLOAD_TITLE":"Hilfe zu \u0022Download\u0022"
+,"APEX.IG.HELP.FILTER_TITLE":"Hilfe zu Filter"
+,"APEX.IG.HELP.FLASHBACK_TITLE":"Hilfe zu \u0022Flashback\u0022"
+,"APEX.IG.HELP.GROUP_BY_TITLE":"Hilfe zu \u0022Gruppieren nach\u0022"
+,"APEX.IG.HELP.HIGHLIGHT_TITLE":"Hilfe zu \u0022Markieren\u0022"
+,"APEX.IG.HELP.REPORT_TITLE":"Hilfe zu \u0022Bericht\u0022\u000A"
+,"APEX.IG.HELP.SORT_TITLE":"Hilfe zu \u0022Sortieren\u0022"
+,"APEX.IG.HELP.SUBSCRIPTION_TITLE":"Hilfe zu \u0022Abonnement\u0022"
+,"APEX.IG.HIDE":"Ausblenden"
+,"APEX.IG.HIGHLIGHT":"Markierung"
+,"APEX.IG.HIGH_COLUMN":"Hoch"
+,"APEX.IG.HORIZONTAL":"Horizontal"
+,"APEX.IG.HOURS":"Stunden"
+,"APEX.IG.ICON":"Symbol"
+,"APEX.IG.ICON_VIEW":"Symbolansicht"
+,"APEX.IG.IN":"in"
+,"APEX.IG.INACTIVE_SETTING":"Inaktive Einstellung"
+,"APEX.IG.INACTIVE_SETTINGS":"Inaktive Einstellungen"
+,"APEX.IG.INVALID_COLUMN_FILTER_TYPE":"Spaltenfiltertyp \u0022\u00250\u0022 wird f\u00FCr Spalte \u0022\u00251\u0022 nicht unterst\u00FCtzt."
+,"APEX.IG.INVALID_DATE_FORMAT":"Ung\u00FCltiges Datumsformat"
+,"APEX.IG.INVALID_FILTER_COLUMN":"Interaktives Grid unterst\u00FCtzt nicht das Definieren eines Filters f\u00FCr Spalte \u00250."
+,"APEX.IG.INVALID_FILTER_OPERATOR":"\u00250 ist kein g\u00FCltiger Filtertyp zum Definieren eines Filters f\u00FCr ein interaktives Grid."
+,"APEX.IG.INVALID_SETTING":"Ung\u00FCltige Einstellung"
+,"APEX.IG.INVALID_SETTINGS":"Ung\u00FCltige Einstellungen"
+,"APEX.IG.INVALID_SORT_BY":"\u0022Sortieren nach\u0022 wurde auf \u00250 festgelegt, es wurde jedoch keine Spalte f\u00FCr \u00250 ausgew\u00E4hlt."
+,"APEX.IG.INVALID_VALUE":"Ung\u00FCltiger Wert"
+,"APEX.IG.INVISIBLE":"Nicht angezeigt"
+,"APEX.IG.IN_THE_LAST":"in den letzten"
+,"APEX.IG.IN_THE_NEXT":"in den n\u00E4chsten"
+,"APEXIR_HIGHLIGHT":"Markierung"
+,"APEXIR_NEW_CATEGORY_LABEL":"Neue Kategorie"
+,"APEXIR_PIVOT":"Pivot"
+,"CREATE_TO_DO":"To-do erstellen"
+,"DATA.LOAD.CHOOSE_FILE":"Datei ausw\u00E4hlen"
+,"DATA.LOAD.CONFIGURATION_SAVED":"Konfiguration gespeichert."
+,"DATA.LOAD.DRAG_DROP_FILE_HERE":"Datei per Drag-and-Drop hier ablegen oder"
+,"DATA.LOAD.FILE_FORMATS":"Unterst\u00FCtzte Formate: CSV, XLSX, TXT, XML, JSON"
+,"APEX.IG.IS_NOT_NULL":"ist nicht leer"
+,"APEX.IG.IS_NULL":"ist leer"
+,"APEX.IG.LABEL":"Label"
+,"APEX.IG.LABEL_COLUMN":"Label"
+,"APEX.IG.LAST":"Letzte"
+,"APEX.IG.LAST.DAY":"Letzter Tag"
+,"APEX.IG.LAST.HOUR":"Letzte Stunde"
+,"APEX.IG.LAST.MINUTE":"Letzte Minute"
+,"APEX.IG.LAST.MONTH":"Letzter Monat"
+,"APEX.IG.LAST.WEEK":"Letzte Woche"
+,"APEX.IG.LAST.X_DAYS":"Letzte \u00250 Tage"
+,"APEX.IG.LAST.X_HOURS":"Letzte \u00250 Stunden"
+,"APEX.IG.LAST.X_MINUTES":"Letzte \u00250 Minuten"
+,"APEX.IG.LAST.X_MONTHS":"Letzte \u00250 Monate"
+,"APEX.IG.LAST.X_WEEKS":"Letzte \u00250 Wochen"
+,"APEX.IG.LAST.X_YEARS":"Letzte \u00250 Jahre"
+,"APEX.IG.LAST.YEAR":"Letztes Jahr"
+,"APEX.IG.LAYOUT_ALIGN":"Zellenausrichtung"
+,"APEX.IG.LAYOUT_USEGROUPFOR":"Gruppe verwenden f\u00FCr"
+,"APEX.IG.LESS_THAN":"kleiner als"
+,"APEX.IG.LESS_THAN_OR_EQUALS":"kleiner\u002Fgleich"
+,"APEX.IG.LINE":"Zeile"
+,"APEX.IG.LINE_WITH_AREA":"Linien\u002FFl\u00E4chen"
+,"APEX.IG.LISTAGG":"Listagg"
+,"APEX.IG.LOW_COLUMN":"Niedrig"
+,"APEX.IG.MAILADDRESSES_COMMASEP":"Trennen Sie mehrere Adressen durch Komma"
+,"APEX.IG.MATCHES_REGULAR_EXPRESSION":"entspricht regul\u00E4rem Ausdruck"
+,"APEX.IG.MAX":"Maximal"
+,"APEX.IG.MAX_OVERALL":"Gesamth\u00F6chstwert"
+,"APEX.IG.MEDIAN":"Medianwert"
+,"APEX.IG.MEDIAN_OVERALL":"Gesamtmittelwert"
+,"APEX.IG.MIN":"Minimal"
+,"APEX.IG.MINUTES":"Minuten"
+,"APEX.IG.MINUTES_AGO":"Minuten zur\u00FCck"
+,"APEX.IG.MIN_OVERALL":"Gesamtmindestwert"
+,"APEX.IG.MONTHS":"Monaten"
+,"APEX.IG.MORE_DATA_FOUND":"Die Daten enthalten mehr als \u00250 Zeilen; dies \u00FCberschreitet den zul\u00E4ssigen H\u00F6chstwert. Wenden Sie zus\u00E4tzliche Filter an, um die Ergebnisse anzuzeigen."
+,"APEX.IG.MULTIIG_PAGE_REGION_STATIC_ID_REQUIRED":"Die statische Regions-ID muss angegeben werden, da die Seite mehrere interaktive Grids enth\u00E4lt."
+,"APEX.IG.NAME":"Name"
+,"APEX.IG.NAMED_REPORT":"Benannter Bericht"
+,"APEX.IG.NEXT.DAY":"N\u00E4chster Tag"
+,"APEX.IG.NEXT.HOUR":"N\u00E4chste Stunde"
+,"APEX.IG.NEXT.MINUTE":"N\u00E4chste Minute"
+,"APEX.IG.NEXT.MONTH":"N\u00E4chster Monat"
+,"APEX.IG.NEXT.WEEK":"N\u00E4chste Woche"
+,"APEX.IG.NEXT.X_DAYS":"N\u00E4chste \u00250 Tage"
+,"APEX.IG.NEXT.X_HOURS":"N\u00E4chste \u00250 Stunden"
+,"APEX.IG.NEXT.X_MINUTES":"N\u00E4chste \u00250 Minuten"
+,"APEX.IG.NEXT.X_MONTHS":"N\u00E4chste \u00250 Monate"
+,"APEX.IG.NEXT.X_WEEKS":"N\u00E4chste \u00250 Wochen"
+,"APEX.IG.NEXT.X_YEARS":"N\u00E4chste \u00250 Jahre"
+,"APEX.IG.NEXT.YEAR":"N\u00E4chstes Jahr"
+,"APEX.IG.NOT_BETWEEN":"nicht zwischen"
+,"APEX.IG.NOT_EQUALS":"ist nicht gleich"
+,"APEX.IG.NOT_EXIST":"Region mit ID \u00250 ist keine interaktive Rasterregion oder ist in Anwendung \u00251 nicht vorhanden."
+,"APEX.IG.NOT_IN":"nicht in"
+,"APEX.IG.NOT_IN_THE_LAST":"nicht in den letzten"
+,"APEX.IG.NOT_IN_THE_NEXT":"nicht in den n\u00E4chsten"
+,"APEX.IG.NO_DATA_FOUND":"Keine Daten gefunden"
+,"APEX.IG.NULLS":"Nullwerte"
+,"APEX.IG.NUMBER":"Numerisch"
+,"APEX.IG.OFF":"Aus"
+,"APEX.IG.ON":"Ein"
+,"APEX.IG.ONE_MINUTE_AGO":"vor 1 Minute"
+,"APEX.IG.OPEN_COLORPICKER":"Farbauswahl \u00F6ffnen: \u00250"
+,"APEX.IG.OPEN_COLUMN":"\u00D6ffnen"
+,"APEX.IG.OPERATOR":"Operator"
+,"APEX.IG.ORIENTATION":"Ausrichtung"
+,"APEX.IG.PIE":"Kreis"
+,"APEX.IG.PIVOT":"Pivot"
+,"APEX.IG.PIVOT_VIEW":"Pivot-Ansicht"
+,"APEX.IG.PLACEHOLDER_INVALUES":"Werte durch \u00250 trennen"
+,"APEX.IG.POLAR":"Polar"
+,"APEX.IG.POSITION_CENTER":"Zentriert"
+,"APEX.IG.POSITION_END":"Ende"
+,"APEX.IG.POSITION_START":"Start"
+,"APEX.IG.PRIMARY":"Primary"
+,"APEX.IG.PRIMARY_DEFAULT":"Prim\u00E4rer Standardwert"
+,"APEX.IG.PRIMARY_REPORT":"Hauptbericht"
+,"APEX.IG.PRINT_ACCESSIBLE.PROMPT":"Barrierefreiheitstags einbeziehen"
+,"APEX.IG.PRINT_ORIENTATION.LOV.HORIZONTAL.D":"Querformat"
+,"APEX.IG.PRINT_ORIENTATION.LOV.VERTICAL.D":"Hochformat"
+,"APEX.IG.PRINT_ORIENTATION.PROMPT":"Seitenausrichtung"
+,"APEX.IG.PRINT_PAGE_SIZE.LOV.A3.D":"A3"
+,"APEX.IG.PRINT_PAGE_SIZE.LOV.A4.D":"A4"
+,"APEX.IG.PRINT_PAGE_SIZE.LOV.CUSTOM.D":"Benutzerdefiniert"
+,"APEX.IG.PRINT_PAGE_SIZE.LOV.LEGAL.D":"Legal"
+,"APEX.IG.PRINT_PAGE_SIZE.LOV.LETTER.D":"Letter"
+,"APEX.IG.PRINT_PAGE_SIZE.LOV.TABLOID.D":"Tabloid"
+,"APEX.IG.PRINT_PAGE_SIZE.PROMPT":"Seitengr\u00F6\u00DFe"
+,"APEX.IG.RADAR":"Radar"
+,"APEX.IG.RANGE":"Bereich"
+,"APEX.IG.REFRESH":"Aktualisieren"
+,"APEX.IG.REFRESH_ROW":"Zeile aktualisieren"
+,"APEX.IG.REFRESH_ROWS":"Zeilen aktualisieren"
+,"APEX.IG.REGION_NOT_EXIST":"Interaktive Grid-Region ist nicht in Anwendung \u00250, Seite \u00251 und Region \u00252 vorhanden."
+,"APEX.IG.REMOVE_CONTROL":"\u00250 entfernen"
+,"APEX.IG.REPORT":"Bericht"
+,"APEX.IG.REPORT.DELETED":"Bericht gel\u00F6scht"
+,"APEX.IG.REPORT.SAVED.ALTERNATIVE":"Alternativer Bericht f\u00FCr alle Benutzer gespeichert"
+,"APEX.IG.REPORT.SAVED.DEFAULT":"Standardbericht f\u00FCr alle Benutzer gespeichert"
+,"APEX.IG.REPORT.SAVED.PRIVATE":"Privater Bericht gespeichert"
+,"APEX.IG.REPORT.SAVED.PUBLIC":"\u00D6ffentlicher Bericht f\u00FCr alle Benutzer gespeichert"
+,"APEX.IG.REPORT_ALIAS_DOES_NOT_EXIST":"Gespeichertes interaktives Grid mit Name \u00250 ist nicht vorhanden."
+,"APEX.IG.REPORT_DATA_AS_OF.X.MINUTES_AGO":"Bericht f\u00FCr Daten erstellen - Stand vor \u00250 Minuten"
+,"APEX.IG.REPORT_DATA_AS_OF_ONE_MINUTE_AGO":"Bericht f\u00FCr Daten erstellen - Stand vor 1 Minute"
+,"APEX.IG.REPORT_DOES_NOT_EXIST":"Interaktiver Grid-Bericht ist nicht vorhanden."
+,"APEX.IG.REPORT_EDIT":"Bericht - Bearbeiten"
+,"APEX.IG.REPORT_ID_DOES_NOT_EXIST":"Gespeichertes interaktives Grid mit ID \u00250 ist nicht vorhanden."
+,"APEX.IG.REPORT_SAVE_AS":"Bericht - Speichern unter"
+,"APEX.IG.REPORT_SETTINGS":"Berichteinstellungen"
+,"APEX.IG.REPORT_STATIC_ID_DOES_NOT_EXIST":"Gespeichertes interaktives Raster mit statischer ID \u00250 ist nicht vorhanden."
+,"APEX.IG.REPORT_VIEW":"Berichtsansicht"
+,"APEX.IG.RESET":"Zur\u00FCcksetzen"
+,"APEX.IG.REVERT_CHANGES":"\u00C4nderungen wiederherstellen"
+,"APEX.IG.REVERT_ROWS":"Zeilen wiederherstellen"
+,"APEX.IG.ROW":"Zeile"
+,"APEX.IG.ROWS_PER_PAGE":"Zeilen pro Seite"
+,"APEX.IG.ROW_ACTIONS":"Zeilenaktionen"
+,"APEXIR_PIVOT_SORT":"Pivot-Sortierung"
+,"APEXIR_RENAME_DEFAULT_REPORT":"Standardbericht umbenennen"
+,"APEXIR_RENAME_REPORT":"Bericht umbenennen"
+,"APEXIR_REPORT":"Bericht"
+,"APEXIR_RESET":"Zur\u00FCcksetzen"
+,"APEXIR_ROWS_PER_PAGE":"Zeilen pro Seite"
+,"APEXIR_SAVE_DEFAULT_REPORT":"Standardbericht speichern"
+,"APEXIR_SAVE_REPORT":"Bericht speichern"
+,"APEXIR_SAVE_REPORT_DEFAULT":"Bericht speichern *"
+,"APEXIR_SEARCH_COLUMN":"Suchen: \u00250"
+,"APEXIR_SELECT_COLUMNS":"Spalten ausw\u00E4hlen"
+,"APEXIR_SEND":"Senden"
+,"APEXIR_SORT":"Sortierung"
+,"APEXIR_SUBSCRIPTION":"Subscription"
+,"DATA_LOAD.NO_PREVIEW":"Keine Dateivorschau verf\u00FCgbar"
+,"APEX.IG.ROW_ACTIONS_FOR":"Aktionen f\u00FCr Zeile \u00250"
+,"APEX.IG.SAVE":"Speichern"
+,"APEX.IG.SAVED":"gespeichert"
+,"APEX.IG.SAVED_REPORTS":"Gespeicherte Berichte"
+,"APEX.IG.SAVED_REPORT_DEFAULT":"Standard"
+,"APEX.IG.SAVED_REPORT_EXISTS":"Es ist bereits ein gespeicherter Bericht namens \u00250 vorhanden. Geben Sie einen neuen Namen ein."
+,"APEX.IG.SAVED_REPORT_PRIVATE":"Privat"
+,"APEX.IG.SAVED_REPORT_PUBLIC":"\u00D6ffentlich"
+,"APEX.IG.SAVE_AS":"Speichern unter"
+,"APEX.IG.SAVE_REPORT_SETTINGS":"Berichtseinstellungen speichern"
+,"APEX.IG.SCATTER":"Streudiagramm"
+,"APEX.IG.SEARCH":"Suche"
+,"APEX.IG.SEARCH.ALL_COLUMNS":"Suchen: Alle Textspalten"
+,"APEX.IG.SEARCH.COLUMN":"Suchen: \u00250"
+,"APEX.IG.SEARCH.ORACLE_TEXT":"Suche: Volltextsuche"
+,"APEX.IG.SEARCH_FOR.X":"Nach \u0027\u00250\u0027 suchen"
+,"APEX.IG.SELECT":"- Ausw\u00E4hlen -"
+,"APEX.IG.SELECTION":"Auswahl"
+,"APEX.IG.SELECT_1_ROW_IN_MASTER":"1 Zeile in der Masterregion ausw\u00E4hlen"
+,"APEX.IG.SELECT_COLUMNS_TO_SEARCH":"Zu suchende Spalten ausw\u00E4hlen"
+,"APEX.IG.SEL_ACTIONS":"Auswahlaktionen"
+,"APEX.IG.SEL_MODE_CELL":"Zellenauswahl"
+,"APEX.IG.SEL_MODE_ROW":"Zeilenauswahl"
+,"APEX.IG.SEND_AS_EMAIL":"Als E-Mail senden"
+,"APEX.IG.SERIES_COLUMN":"Reihe"
+,"APEX.IG.SHOW":"Anzeigen"
+,"APEX.IG.SHOW_OVERALL_VALUE":"Gesamtwert anzeigen"
+,"APEX.IG.SINGLE_ROW_VIEW":"Single Row-Ansicht"
+,"APEX.IG.SORT":"Sortierung"
+,"APEX.IG.SORT_BY":"Sortieren nach"
+,"APEX.IG.SORT_ONLY_ONE_PER_COLUMN":"Nur eine Sortierung pro Spalte zul\u00E4ssig."
+,"APEX.IG.SRV_CHANGE_MENU":"Men\u00FC \u00E4ndern"
+,"APEX.IG.STACK":"Stapel"
+,"APEX.IG.STARTS_WITH":"beginnt mit"
+,"APEX.IG.STOCK":"Aktien"
+,"APEX.IG.STRETCH_COLUMNS":"Spaltenbreiten dehnen"
+,"APEX.IG.SUBSCRIPTION":"Subscription"
+,"APEX.IG.SUM":"Summe"
+,"APEX.IG.SUMMARY":"Interaktives Grid. Bericht: \u00250, Ansicht: \u00251."
+,"APEX.IG.SUM_OVERALL":"Gesamtsumme"
+,"APEX.IG.TARGET_COLUMN":"Ziel"
+,"APEX.IG.TEXT_COLOR":"Textfarbe"
+,"APEX.IG.TOGGLE":"Ein-\u002Fausschalten"
+,"APEX.IG.TOOLTIP":"QuickInfo"
+,"APEX.IG.TYPE":"Typ"
+,"APEX.IG.UNFREEZE":"Fixierung aufheben"
+,"APEX.IG.UNIT":"Einheit"
+,"APEX.IG.UNSAVED_CHANGES_CONTINUE_CONFIRM":"Es sind nicht gespeicherte \u00C4nderungen vorhanden. M\u00F6chten Sie fortfahren?"
+,"APEX.IG.VALUE":"Wert"
+,"APEX.IG.VALUE_COLUMN":"Wert"
+,"APEX.IG.VALUE_REQUIRED":"Ein Wert ist erforderlich."
+,"APEX.IG.VALUE_TIMESTAMP_TZ":"Wert (Zeitzone darf nicht ge\u00E4ndert werden)"
+,"APEX.IG.VARCHAR2":"Text"
+,"APEX.IG.VERTICAL":"Vertikal"
+,"APEX.IG.VIEW":"Anzeigen"
+,"APEX.IG.VISIBLE":"Angezeigt"
+,"APEX.IG.VOLUME_COLUMN":"Volumen"
+,"APEX.IG.WEEKS":"Wochen"
+,"APEX.IG.WIDTH":"Minimale Spaltenbreite (Pixel)"
+,"APEX.IG.X.BETWEEN.Y.AND.Z":"\u00250 zwischen \u00251 und \u00252"
+,"APEX.IG.X.CONTAINS.Y":"\u00250 enth\u00E4lt \u00251"
+,"APEX.IG.X.DOES_NOT_CONTAIN.Y":"\u00250 enth\u00E4lt nicht \u00251"
+,"APEX.IG.X.DOES_NOT_START_WITH.Y":"\u00250 beginnt nicht mit \u00251"
+,"APEX.IG.X.EQUALS.Y":"\u00250 gleich \u00251"
+,"APEX.IG.X.GREATER_THAN.Y":"\u00250 gr\u00F6\u00DFer als \u00251"
+,"APEX.IG.X.GREATER_THAN_OR_EQUALS.Y":"\u00250 gr\u00F6\u00DFer als oder gleich \u00251"
+,"APEX.IG.X.IN.Y":"\u00250 in \u00251"
+,"APEX.IG.X.IN_THE_LAST.Y.DAYS":"\u00250 in den letzten \u00251  Tagen"
+,"APEX.IG.X.IN_THE_LAST.Y.HOURS":"\u00250 in den letzten \u00251 Stunden"
+,"APEX.IG.X.IN_THE_LAST.Y.MINUTES":"\u00250 in den letzten \u00251 Minuten"
+,"APEX.IG.X.IN_THE_LAST.Y.MONTHS":"\u00250 in den letzten \u00251 Monaten"
+,"APEX.IG.X.IN_THE_LAST.Y.WEEKS":"\u00250 in den letzten \u00251  Wochen"
+,"APEX.IG.X.IN_THE_LAST.Y.YEARS":"\u00250 in den letzten \u00251 Jahren"
+,"APEX.IG.X.IN_THE_LAST_DAY":"\u00250 am letzten Tag"
+,"APEX.IG.X.IN_THE_LAST_HOUR":"\u00250 in der letzten Stunde"
+,"APEX.IG.X.IN_THE_LAST_MINUTE":"\u00250 in der letzten Minute"
+,"APEX.IG.X.IN_THE_LAST_MONTH":"\u00250 im letzten Monat"
+,"APEX.IG.X.IN_THE_LAST_WEEK":"\u00250 in der letzten  Woche"
+,"APEX.IG.X.IN_THE_LAST_YEAR":"\u00250 im letzten Jahr"
+,"APEX.IG.X.IN_THE_NEXT.Y.DAYS":"\u00250 in den n\u00E4chsten \u00251 Tagen"
+,"APEX.IG.X.IN_THE_NEXT.Y.HOURS":"\u00250 in den n\u00E4chsten \u00251 Stunden"
+,"APEX.IG.X.IN_THE_NEXT.Y.MINUTES":"\u00250 in den n\u00E4chsten \u00251 Minuten"
+,"APEX.IG.X.IN_THE_NEXT.Y.MONTHS":"\u00250 in den n\u00E4chsten \u00251 Monaten"
+,"APEX.IG.X.IN_THE_NEXT.Y.WEEKS":"\u00250 in den n\u00E4chsten \u00251 Wochen"
+,"APEX.IG.X.IN_THE_NEXT.Y.YEARS":"\u00250 in den n\u00E4chsten \u00251 Jahren"
+,"APEX.IG.X.IN_THE_NEXT_DAY":"\u00250 am n\u00E4chsten Tag"
+,"APEX.IG.X.IN_THE_NEXT_HOUR":"\u00250 in der n\u00E4chsten Stunde"
+,"APEX.IG.X.IN_THE_NEXT_MINUTE":"\u00250 in der n\u00E4chsten Minute"
+,"APEX.IG.X.IN_THE_NEXT_MONTH":"\u00250 im n\u00E4chsten Monat"
+,"APEX.IG.X.IN_THE_NEXT_WEEK":"\u00250 in der n\u00E4chsten Woche"
+,"APEX.IG.X.IN_THE_NEXT_YEAR":"\u00250 im n\u00E4chsten Jahr"
+,"APEX.IG.X.IS_NOT_NULL":"\u00250 ist nicht leer"
+,"APEX.IG.X.IS_NULL":"\u00250 ist leer"
+,"APEX.IG.X.LESS_THAN.Y":"\u00250 kleiner als \u00251"
+,"APEX.IG.X.LESS_THAN_OR_EQUALS.Y":"\u00250 kleiner als oder gleich \u00251"
+,"APEX.IG.X.LIKE.Y":"\u00250 wie \u00251"
+,"APEX.IG.X.MATCHES_REGULAR_EXPRESSION.Y":"\u00250 entspricht regul\u00E4rem Ausdruck \u00251"
+,"APEX.IG.X.MINUTES_AGO":"vor \u00250 Minuten"
+,"APEX.IG.X.NOT_BETWEEN.Y.AND.Z":"\u00250 nicht zwischen \u00251  und \u00252"
+,"APEX.IG.X.NOT_EQUALS.Y":"\u00250 nicht gleich \u00251"
+,"APEX.IG.X.NOT_IN.Y":"\u00250 nicht in \u00251"
+,"APEX.IG.X.NOT_IN_THE_LAST.Y.DAYS":"\u00250 nicht an den letzten \u00251 Tagen"
+,"APEX.IG.X.NOT_IN_THE_LAST.Y.HOURS":"\u00250 nicht in den letzten \u00251 Stunden"
+,"APEX.IG.X.NOT_IN_THE_LAST.Y.MINUTES":"\u00250 nicht in den letzten \u00251 Minuten"
+,"APEX.IG.X.NOT_IN_THE_LAST.Y.MONTHS":"\u00250 nicht in den letzten \u00251 Monaten"
+,"APEX.IG.X.NOT_IN_THE_LAST.Y.WEEKS":"\u00250 nicht in den letzten \u00251 Wochen"
+,"APEX.IG.X.NOT_IN_THE_LAST.Y.YEARS":"\u00250 nicht in den letzten \u00251 Jahren"
+,"APEX.IG.X.NOT_IN_THE_LAST_DAY":"\u00250 nicht am letzten Tag"
+,"APEX.IG.X.NOT_IN_THE_LAST_HOUR":"\u00250 nicht in der letzten Stunde"
+,"APEX.IG.X.NOT_IN_THE_LAST_MINUTE":"\u00250 nicht in der letzten Minute"
+,"APEX.IG.X.NOT_IN_THE_LAST_MONTH":"\u00250 nicht im letzten Monat"
+,"APEX.IG.X.NOT_IN_THE_LAST_WEEK":"\u00250 nicht in der letzten Woche"
+,"APEX.IG.X.NOT_IN_THE_LAST_YEAR":"\u00250 nicht im letzten Jahr"
+,"APEX.IG.X.NOT_IN_THE_NEXT.Y.DAYS":"\u00250 nicht in den n\u00E4chsten \u00251 Tagen"
+,"APEX.IG.X.NOT_IN_THE_NEXT.Y.HOURS":"\u00250 nicht in den n\u00E4chsten \u00251 Stunden"
+,"APEX.IG.X.NOT_IN_THE_NEXT.Y.MINUTES":"\u00250 nicht in den n\u00E4chsten \u00251 Minuten"
+,"APEX.IG.X.NOT_IN_THE_NEXT.Y.MONTHS":"\u00250 nicht in den n\u00E4chsten \u00251 Monaten"
+,"APEX.IG.X.NOT_IN_THE_NEXT.Y.WEEKS":"\u00250 nicht in den n\u00E4chsten \u00251 Wochen"
+,"APEX.IG.X.NOT_IN_THE_NEXT.Y.YEARS":"\u00250 nicht in den n\u00E4chsten \u00251 Jahren"
+,"APEX.IG.X.NOT_IN_THE_NEXT_DAY":"\u00250 nicht am n\u00E4chsten Tag"
+,"APEX.IG.X.NOT_IN_THE_NEXT_HOUR":"\u00250 nicht in der n\u00E4chsten Stunde"
+,"APEX.IG.X.NOT_IN_THE_NEXT_MINUTE":"\u00250 nicht in der n\u00E4chsten Minute"
+,"APEX.IG.X.NOT_IN_THE_NEXT_MONTH":"\u00250 nicht im n\u00E4chsten Monat"
+,"APEX.IG.X.NOT_IN_THE_NEXT_WEEK":"\u00250 nicht in der n\u00E4chsten Woche"
+,"APEX.IG.X.NOT_IN_THE_NEXT_YEAR":"\u00250 nicht im n\u00E4chsten Jahr"
+,"APEX.IG.X.NOT_LIKE.Y":"\u00250 nicht wie \u00251"
+,"APEX.IG.X.STARTS_WITH.Y":"\u00250 beginnt mit \u00251"
+,"APEX.IG.X_COLUMN":"X"
+,"APEX.IG.YEARS":"Jahren"
+,"APEX.IG.Y_COLUMN":"Y"
+,"APEX.IG.Z_COLUMN":"Z"
+,"APEX.IG_FORMAT_SAMPLE_1":"Montag, 12. Januar 2016"
+,"APEX.IG_FORMAT_SAMPLE_2":"Januar"
+,"APEX.IG_FORMAT_SAMPLE_3":"vor 16 Stunden"
+,"APEX.IG_FORMAT_SAMPLE_4":"in 16 Std."
+,"APEX.ISSUES.ASSIGN":"Zuweisen"
+,"APEX.ISSUES.CARDS":"Karten"
+,"APEX.ISSUES.DELETE":"L\u00F6schen"
+,"APEX.ISSUES.DELETE_COMMENT_CONFIRM":"M\u00F6chten Sie diesen Kommentar wirklich l\u00F6schen?"
+,"APEX.ISSUES.DELETE_ISSUE":"Vorgang l\u00F6schen"
+,"APEX.ISSUES.DELETE_ISSUE_CONFIRM":"M\u00F6chten Sie diesen Vorgang wirklich l\u00F6schen?"
+,"APEX.ISSUES.EDIT":"Bearbeiten"
+,"APEX.ISSUES.EDIT_COMMENT":"Kommentar bearbeiten"
+,"APEX.ISSUES.EDIT_ISSUE":"Vorgang bearbeiten"
+,"APEX.ISSUES.HIDE":"Ausblenden"
+,"APEX.ISSUES.JS.ADD_NOTIFICATION_PREFS":"Voreinstellung f\u00FCr Benutzer hinzuf\u00FCgen"
+,"APEX.ISSUES.JS.ATTACH_FILES":"Dateien anh\u00E4ngen"
+,"APEX.ISSUES.JS.CLOSED":"Geschlossen"
+,"APEX.ISSUES.JS.HEADING":"\u00DCberschrift"
+,"APEX.ISSUES.JS.IS_EMPTY":"ist leer."
+,"APEX.ISSUES.JS.ONE_OF_THESE_FILES_IS":"Eine dieser Dateien ist"
+,"APEX.ISSUES.JS.OPEN":"\u00D6ffnen"
+,"APEX.ISSUES.JS.PERMANENTLY_DELETE_SELECTED":"Auswahl dauerhaft l\u00F6schen"
+,"APEX.ISSUES.JS.PURGE_ALL":"Alle l\u00F6schen"
+,"APEX.ISSUES.JS.RESINSTATE_SELECTED":"Auswahl wiederherstellen"
+,"APEX.ISSUES.JS.RESPONSE_TEMPLATES":"Antwortvorlagen"
+,"APEX.ISSUES.JS.SINGLE_TOO_LARGE":"zu gro\u00DF zum Hochladen. \u003Cbr\u003EDateien m\u00FCssen kleiner sein als"
+,"APEX.ISSUES.JS.SUPPORTED_FILE_TYPES_ARE":"Unterst\u00FCtzte Dateitypen: "
+,"APEX.ISSUES.JS.TEMPLATE":"W\u00E4hlen Sie ein Antworttemplate aus"
+,"APEX.ISSUES.JS.THIS_FILE_IS":"Diese Datei ist"
+,"APEX.ISSUES.JS.UNSUPPORTED_FILE_TYPE":"kein unterst\u00FCtzter Dateityp."
+,"APEX.ISSUES.MENU.ASSIGNEES":"Beauftragte"
+,"APEX.ISSUES.MENU.LABELS":"Labels"
+,"APEX.ISSUES.MENU.MILESTONES":"Meilensteine"
+,"APEX.ISSUES.MENU.STATUS":"Status"
+,"APEX.ISSUES.PURGE_BUTTON":"Alle l\u00F6schen"
+,"APEX.ISSUES.REPLACE_COMMENT_CONFIRM":"M\u00F6chten Sie Ihren aktuellen Kommentar durch dieses Template ersetzen?"
+,"APEX.ISSUES.UNHIDE":"Einblenden"
+,"APEX.ISSUES.UPDATE_MENU":"Aktualisieren..."
+,"APEX.ITEM.FILE.ACCEPTED_TYPES":"Ung\u00FCltiger Dateityp. Unterst\u00FCtzte Dateitypen: \u00250."
+,"APEX.ITEM.FILE.CHOOSE_FILE":"Datei ausw\u00E4hlen"
+,"APEX.ITEM.FILE.CHOOSE_FILES":"Dateien ausw\u00E4hlen"
+,"APEX.ITEM.FILE.FILES_WITH_COUNT":"\u00250 Dateien"
+,"APEX.ITEM.FILE.MAX_FILE_SIZE":"Datei ist zu gro\u00DF. Maximale Dateigr\u00F6\u00DFe: \u00250."
+,"APEX.ITEM.HELP_TEXT":"Hilfetext: \u00250"
+,"APEX.ITEM_TYPE.CHECKBOX.CHECKED":"Aktiviert"
+,"APEX.ITEM_TYPE.CHECKBOX.UNCHECKED":"Deaktiviert"
+,"APEX.MARKDOWN.BOLD":"Fett"
+,"APEX.MARKDOWN.IMAGE":"Bild"
+,"APEX.MARKDOWN.INLINE_CODE":"Inline-Code"
+,"APEX.MARKDOWN.INSERT_IMAGE":"Bild einf\u00FCgen"
+,"APEX.MARKDOWN.INSERT_LINK":"Link einf\u00FCgen"
+,"APEX.MARKDOWN.ITALIC":"Kursiv"
+,"APEX.MARKDOWN.LINK":"Link"
+,"APEX.MARKDOWN.LIST":"Liste"
+,"APEX.MARKDOWN.ORDERED_LIST":"Sortierte Liste"
+,"APEX.MARKDOWN.PREVIEW":"Vorschau"
+,"APEX.MARKDOWN.STRIKETHROUGH":"Durchgestrichen"
+,"APEX.MARKDOWN.UNORDERED_LIST":"Unsortierte Liste"
+,"APEX.MENU.CURRENT_MENU":"Aktuell"
+,"APEX.MENU.OVERFLOW_LABEL":"Weitere..."
+,"APEX.MENU.PROCESSING":"Wird geladen"
+,"APEX.POPUP.SEARCH":"Suche"
+,"APEX.POPUP_LOV.FILTER_REQ":"Geben Sie einen Suchbegriff aus mindestens \u00250 Zeichen ein."
+,"APEX.POPUP_LOV.INITIAL_FILTER_REQ":"Geben Sie einen Suchbegriff ein."
+,"APEX.POPUP_LOV.NO_RESULTS":"Keine Ergebnisse gefunden."
+,"APEX.POPUP_LOV.REMOVE_VALUE":"\u00250 entfernen"
+,"APEX.POPUP_LOV.TITLE":"Suchdialog"
+,"APEX.PROCESSING":"Verarbeitung"
+,"APEX.REMOTESQL.OAUTH_IS_RECOMMENDED":"Warnung: Oracle empfiehlt die Verwendung von OAuth-Clientzugangsdaten f\u00FCr die Authentifizierung mit REST-f\u00E4higer SQL."
+,"APEX.RICH_TEXT_EDITOR.ACCESSIBLE_LABEL":"\u00250, Rich Text-Editor"
+,"APEX.RV.DELETE":"L\u00F6schen"
+,"APEX.RV.DUPLICATE":"Duplizieren"
+,"APEX.RV.EXCLUDE_HIDDEN":"Angezeigte Spalten"
+,"APEX.RV.EXCLUDE_NULL":"Nullwerte ausschlie\u00DFen"
+,"APEX.RV.INSERT":"Hinzuf\u00FCgen"
+,"APEX.RV.MOVE_DOWN":"Nach unten"
+,"APEX.RV.MOVE_UP":"Nach oben"
+,"APEX.RV.NEXT_RECORD":"Weiter"
+,"APEX.RV.NOT_GROUPED_LABEL":"Andere Spalten"
+,"APEX.RV.PREV_RECORD":"Zur\u00FCck"
+,"APEX.RV.REC_X":"Zeile \u00250"
+,"APEX.RV.REC_XY":"Zeile \u00250 von \u00251"
+,"APEX.RV.REFRESH":"Aktualisieren"
+,"APEX.RV.REVERT":"\u00C4nderungen wiederherstellen"
+,"APEX.RV.SETTINGS_MENU":"Men\u00FC \u0022Einstellungen\u0022"
+,"APEX.SEARCH.GO_TO_PAGE":"Zur Seite gehen"
+,"APEX.SEARCH.GO_TO_SHARED_COMPONENTS":"Zu \u0022Gemeinsame Komponenten\u0022 navigieren"
+,"APEX.ACTIONS.TOGGLE":"\u00250 umschalten"
+,"APEX.ACTIVE_STATE":"(Aktiv)"
+,"APEX.SESSION.ALERT.CREATE_NEW":"Erneut anmelden"
+,"APEX.SESSION.ALERT.EXPIRED":"Ihre Session wurde beendet"
+,"APEX.SESSION.ALERT.EXTEND":"Verl\u00E4ngern"
+,"APEX.SESSION.ALERT.IDLE_WARN":"Ihre Session endet um \u00250. M\u00F6chten Sie sie verl\u00E4ngern?"
+,"APEX.SESSION.ALERT.MAX_WARN":"Ihre Session endet um \u00250 und kann nicht verl\u00E4ngert werden. Speichern Sie Ihre Arbeit jetzt, damit keine Daten verloren gehen"
+,"APEX.SUCCESS_MESSAGE_HEADING":"Erfolgsmeldung"
+,"CA.CREATING.APPLICATION":"Anwendung wird erstellt ..."
+,"CA.CUSTOM_THEME":"Benutzerdefiniertes Theme"
+,"APEX.CALENDAR.EVENT_DESCRIPTION":"Ereignisbeschreibung"
+,"APEX.CALENDAR.EVENT_END":"Enddatum"
+,"APEX.CALENDAR.EVENT_ID":"Ereignis-ID"
+,"APEX.CALENDAR.EVENT_START":"Startdatum"
+,"APEX.CALENDAR.EVENT_TITLE":"Ereignistitel"
+,"APEX.CLIPBOARD.COPIED":"In Zwischenablage kopiert."
+,"APEX.CLOSE_NOTIFICATION":"Benachrichtigung schlie\u00DFen"
+,"APEX.COMBOBOX.LIST_OF_VALUES":"Werteliste"
+,"APEX.COMBOBOX.SHOW_ALL_VALUES":"Liste \u00F6ffnen f\u00FCr: \u00250"
+,"APEX.COMPLETED_STATE":"(Abgeschlossen)"
+,"APEX.CORRECT_ERRORS":"Korrigieren Sie die Fehler, bevor Sie speichern."
+,"APEX.DATEPICKER.ICON_TEXT":"Popup-Kalender: \u00250"
+,"APEX.DIALOG.CANCEL":"Abbrechen"
+,"APEX.DIALOG.CLOSE":"Schlie\u00DFen"
+,"APEX.DIALOG.HELP":"Hilfe"
+,"APEX.DIALOG.OK":"OK"
+,"APEX.DIALOG.SAVE":"Speichern"
+,"APEX.TABS.NEXT":"Weiter"
+,"APEX.TABS.PREVIOUS":"Zur\u00FCck"
+,"APEX.TB.TOOLBAR":"Symbolleiste"
+,"APEX.UI.BACK_TO_TOP":"Seitenanfang"
+,"APEX.UI.ENABLED":"Aktiviert"
+,"APEX.WAIT_UNTIL_PAGE_LOADED":"Warten Sie, bis die Seite vollst\u00E4ndig geladen ist, und wiederholen Sie den Vorgang."
+,"APEX.WARN_ON_UNSAVED_CHANGES":"Diese Seite enth\u00E4lt nicht gespeicherte \u00C4nderungen."
+,"APEX.WEBSRC.HIDE_COLUMNS":"Ausgew\u00E4hlte Spalten ausblenden"
+,"APEX.WEBSRC.SHOW_COLUMNS":"Ausgew\u00E4hlte Spalten anzeigen"
+,"CA.DELETE.PAGE.CONFIRM.MSG":"M\u00F6chten Sie diese Seite wirklich l\u00F6schen?"
+,"APEX.ERROR.TECHNICAL_INFO":"Technische Informationen (nur f\u00FCr Entwickler sichtbar)"
+,"APEX.ERROR_MESSAGE_HEADING":"Fehlermeldung"
+,"APEX.FS.BATCH_APPLY":"Anwenden"
+,"APEX.FS.CHART_BAR":"Balkendiagramm"
+,"APEX.FS.CHART_OTHERS":"Sonstige"
+,"APEX.FS.CHART_PIE":"Tortendiagramm"
+,"APEX.FS.CHART_TITLE":"Diagramm"
+,"APEX.FS.CHART_VALUE_LABEL":"Anzahl"
+,"APEX.FS.CLEAR":"L\u00F6schen"
+,"APEX.FS.CLEAR_ALL":"Alle l\u00F6schen"
+,"APEX.FS.CLEAR_VALUE":"\u00250 l\u00F6schen"
+,"APEX.FS.FILTER":"\u00250 filtern"
+,"APEX.FS.GO":"Los"
+,"APEX.FS.INPUT_CURRENT_LABEL":"gleich \u00250"
+,"APEX.FS.INPUT_CURRENT_LABEL_CONTAINS":"enth\u00E4lt \u00250"
+,"APEX.FS.INPUT_CURRENT_LABEL_GT":"gr\u00F6\u00DFer als \u00250"
+,"APEX.FS.INPUT_CURRENT_LABEL_GTE":"gr\u00F6\u00DFer oder gleich \u00250"
+,"APEX.FS.INPUT_CURRENT_LABEL_LT":"kleiner als \u00250"
+,"APEX.FS.INPUT_CURRENT_LABEL_LTE":"kleiner oder gleich \u00250"
+,"APEX.FS.INPUT_CURRENT_LABEL_STARTSWITH":"beginnt mit \u00250"
+,"APEX.FS.RANGE_CURRENT_LABEL":"\u00250 bis \u00251"
+,"APEX.FS.RANGE_CURRENT_LABEL_OPEN_HI":"\u00DCber \u00250"
+,"APEX.FS.RANGE_CURRENT_LABEL_OPEN_LO":"Unter \u00250"
+,"APEX.FS.REMOVE_CHART":"Diagramm entfernen"
+,"APEX.FS.SHOW_CHART":"\u0022Diagramm\u0022 anzeigen"
+,"APEX.FS.SHOW_LESS":"Weniger anzeigen"
+,"APEX.FS.SHOW_MORE":"Mehr anzeigen"
+,"APEXIR_AGGREGATE":"Aggregat"
+,"APEXIR_ALL":"Alle"
+,"APEXIR_APPLY":"Anwenden"
+,"APEXIR_CANCEL":"Abbrechen"
+,"APEXIR_CHART":"Diagramm"
+,"CODE_EDITOR.CLOSE":"Schlie\u00DFen"
+,"CODE_EDITOR.FIND":"Suchen"
+,"CODE_EDITOR.FIND_INPUT":"Suchen"
+,"CODE_EDITOR.FIND_NEXT":"Weitersuchen"
+,"CODE_EDITOR.FIND_PREV":"Vorherige suchen"
+,"CODE_EDITOR.HINT":"Automatisch vervollst\u00E4ndigen"
+,"CODE_EDITOR.INDENTATION":"Einzug"
+,"CODE_EDITOR.INDENT_SIZE":"Einzugsgr\u00F6\u00DFe"
+,"CODE_EDITOR.INDENT_WITH_TABS":"Mit Tabulatortaste Leerzeichen einf\u00FCgen"
+,"CODE_EDITOR.MATCH_CASE":"Gro\u00DF-\u002FKleinschreibung beachten"
+,"CODE_EDITOR.MATCH_RE":"Regul\u00E4rer Ausdruck"
+,"CODE_EDITOR.QUERY_BUILDER":"Query Builder"
+,"CODE_EDITOR.REDO":"Wiederholen"
+,"CODE_EDITOR.REPLACE":"Ersetzen"
+,"CODE_EDITOR.REPLACE_ALL":"Alle ersetzen"
+,"CODE_EDITOR.REPLACE_INPUT":"Ersetzen"
+,"CODE_EDITOR.REPLACE_SKIP":"\u00DCberspringen"
+,"CODE_EDITOR.SETTINGS":"Einstellungen"
+,"CODE_EDITOR.SHORTCUT_TITLE":"\u00250 - \u00251"
+,"CODE_EDITOR.SHOW_LINE_NUMBERS":"Zeilennummern anzeigen"
+,"CODE_EDITOR.SHOW_RULER":"Schieberegler anzeigen"
+,"CODE_EDITOR.TAB_SIZE":"Tabulatorweite"
+,"CODE_EDITOR.THEMES":"Theme"
+,"CODE_EDITOR.UNDO":"R\u00FCckg\u00E4ngig"
+,"CODE_EDITOR.USE_PLAIN_TEXT_EDITOR":"Texteditor verwenden"
+,"CODE_EDITOR.VALIDATE":"Validieren"
+,"CODE_EDITOR.VALIDATION_SUCCESS":"Validierung erfolgreich"
+,"APEX.GV.AGG_CONTEXT":"Aggregat."
+,"APEX.GV.BREAK_COLLAPSE":"Gruppenwechsel ausblenden"
+,"APEX.GV.BREAK_CONTEXT":"Kontrollgruppenwechsel."
+,"APEX.GV.BREAK_EXPAND":"Gruppenwechsel einblenden"
+,"APEX.GV.COLUMN_CONTEXT":"Spalte \u00250."
+,"APEX.GV.DELETED_COUNT":"\u00250  Datens\u00E4tze gel\u00F6scht"
+,"APEX.GV.DUP_REC_ID":"Identit\u00E4t duplizieren"
+,"APEX.GV.FIRST_PAGE":"Erster"
+,"APEX.GV.GROUP_CONTEXT":"Gruppenheader."
+,"APEX.GV.HEADER_CONTEXT":"Header."
+,"APEX.GV.LAST_PAGE":"Letzte"
+,"APEX.GV.LOAD_MORE":"Weitere Zeilen laden"
+,"APEX.GV.NEXT_PAGE":"Weiter"
+,"APEX.GV.PAGE_RANGE":"Seitenzeilen"
+,"APEX.GV.PAGE_RANGE_XY":"\u00250 - \u00251"
+,"APEX.GV.PAGE_RANGE_XYZ":"\u00250 - \u00251 von \u00252"
+,"APEX.GV.PAGE_SELECTION":"Seitenauswahl"
+,"APEX.GV.PREV_PAGE":"Zur\u00FCck"
+,"APEX.GV.ROW_ADDED":"Hinzugef\u00FCgt"
+,"APEX.GV.ROW_CHANGED":"Ge\u00E4ndert"
+,"APEX.GV.ROW_COLUMN_CONTEXT":"Zeile \u00250, Spalte \u00251."
+,"APEX.GV.ROW_CONTEXT":"Zeile \u00250."
+,"APEX.GV.ROW_DELETED":"Gel\u00F6scht"
+,"APEX.GV.ROW_HEADER":"Zeilenheader "
+,"APEX.GV.SELECTION_CELL_COUNT":"\u00250 Zellen ausgew\u00E4hlt"
+,"APEX.GV.SELECTION_COUNT":"\u00250 Zeilen ausgew\u00E4hlt"
+,"APEX.GV.SELECT_ALL":"Alle ausw\u00E4hlen"
+,"APEX.GV.SELECT_PAGE_N":"Seite \u00250"
+,"APEX.GV.SELECT_ROW":"Zeile ausw\u00E4hlen"
+,"APEX.GV.SORTED_ASCENDING":"Aufsteigend sortiert \u00250"
+,"APEX.GV.SORTED_DESCENDING":"Absteigend sortiert \u00250"
+,"APEX.GV.SORT_ASCENDING":"Aufsteigend sortieren"
+,"APEX.GV.SORT_ASCENDING_ORDER":"Aufsteigend sortieren \u00250"
+,"APEX.GV.SORT_DESCENDING":"Absteigend sortieren"
+,"APEX.GV.SORT_DESCENDING_ORDER":"Absteigend sortieren\u00250"
+,"APEX.GV.SORT_OFF":"Nicht sortieren"
+,"APEX.GV.TOTAL_PAGES":"Gesamt \u00250"
+,"APEX.ICON_LIST.GRID_DIM":"Grid-Auswahlliste \u00250 Spalten \u00251 Zeilen. Verwenden Sie die Pfeiltasten"
+,"APEX.ICON_LIST.LIST_DIM":"Auswahlliste \u00250 Zeilen. Verwenden Sie die Pfeiltasten"
+,"APEX.IG.ACC_LABEL":"Interaktives Raster \u00250"
+,"APEX.IG.ACTIONS":"Aktionen"
+,"APEX.IG.ADD":"Hinzuf\u00FCgen"
+,"APEX.IG.ADD_ROW":"Zeile hinzuf\u00FCgen"
+,"APEX.IG.AGGREGATE":"Aggregat"
+,"APEX.IG.AGGREGATION":"Aggregation"
+,"APEX.IG.ALL":"Alle"
+,"APEX.IG.ALL_TEXT_COLUMNS":"Alle Textspalten"
+,"APEX.IG.ALTERNATIVE":"Alternative"
+,"APEX.IG.AND":"und"
+,"APEX.IG.APPROX_COUNT_DISTINCT":"Eindeutige Reihen z\u00E4hlen - Ungef\u00E4hr"
+,"APEX.IG.APPROX_COUNT_DISTINCT_OVERALL":"Eindeutige z\u00E4hlen - Insgesamt gesch\u00E4tzt"
+,"APEX.IG.AREA":"Fl\u00E4che"
+,"APEX.IG.ASCENDING":"Aufsteigend"
+,"APEX.IG.AUTHORIZATION":"Autorisierung"
+,"APEX.IG.AUTO":"Auto"
+,"APEX.IG.AVG":"Durchschnitt"
+,"APEX.IG.AVG_OVERALL":"Gesamtdurchschnitt"
+,"APEX.IG.AXIS_LABEL_TITLE":"Titel der Labelachse"
+,"APEX.IG.AXIS_VALUE_DECIMAL":"Dezimalstellen"
+,"APEX.IG.AXIS_VALUE_TITLE":"Wert Achsentitel"
+,"APEX.IG.BACKGROUND_COLOR":"Hintergrundfarbe"
+,"APEX.IG.BAR":"Balken"
+,"APEX.IG.BETWEEN":"zwischen"
+,"APEX.IG.BOTH":"Beides"
+,"APEX.IG.BUBBLE":"Blase"
+,"APEX.IG.CANCEL":"Abbrechen"
+,"APEX.IG.CASE_SENSITIVE":"Gro\u00DF-\u002FKleinschreibung beachten"
+,"APEX.IG.CASE_SENSITIVE_WITH_BRACKETS":"(Gro\u00DF-\u002FKleinschreibung beachten)"
+,"APEX.IG.CHANGES_SAVED":"\u00C4nderungen gespeichert"
+,"APEX.IG.CHANGE_VIEW":"Ansicht \u00E4ndern"
+,"APEX.IG.CHART":"Diagramm"
+,"APEX.IG.CHART_MAX_DATAPOINT_CNT":"Ihre Abfrage \u00FCberschreitet die maximal zul\u00E4ssigen \u00250 Datenpunkte pro Diagramm. Wenden Sie einen Filter an, um die Anzahl der Datens\u00E4tze in der Basisabfrage zu reduzieren."
+,"APEX.IG.CHART_VIEW":"Diagrammansicht"
+,"APEX.IG.CLEAR":"L\u00F6schen"
+,"APEX.IG.CLOSE_COLUMN":"Schlie\u00DFen"
+,"APEX.IG.COLORS":"Farben"
+,"APEX.IG.COLOR_BLUE":"Blau"
+,"APEX.IG.COLOR_GREEN":"Gr\u00FCn"
+,"APEX.IG.COLOR_ORANGE":"Orange"
+,"APEX.IG.COLOR_RED":"Rot"
+,"APEX.IG.COLOR_YELLOW":"Gelb"
+,"APEX.IG.COLUMN":"Spalte"
+,"APEX.IG.COLUMNS":"Spalten"
+,"APEX.IG.COLUMN_TYPE":"Spaltenzweck"
+,"APEX.IG.COMPLEX":"Komplex"
+,"APEX.IG.COMPUTE":"Berechnen"
+,"APEX.IG.CONTAINS":"enth\u00E4lt"
+,"APEX.IG.CONTROL_BREAK":"Kontrollgruppenwechsel"
+,"APEX.IG.COPY_CB":"In Zwischenablage kopieren"
+,"APEX.IG.COPY_DOWN":"Nach unten kopieren"
+,"APEX.IG.COUNT":"Anzahl"
+,"APEX.IG.COUNT_DISTINCT":"Nur eindeutige Reihen z\u00E4hlen"
+,"APEX.IG.COUNT_DISTINCT_OVERALL":"Eindeutige z\u00E4hlen - Insgesamt"
+,"APEX.IG.COUNT_OVERALL":"Gesamtanzahl"
+,"APEX.IG.CREATE_X":"\u00250 erstellen"
+,"APEX.IG.DATA":"Daten"
+,"APEX.IG.DATA_TYPE":"Datentyp"
+,"APEX.IG.DATE":"Datum"
+,"APEX.IG.DATE_INVALID_VALUE":"Ung\u00FCltiger Datumswert"
+,"APEX.IG.DAYS":"Tage"
+,"APEX.IG.DEFAULT_SETTINGS":"Standardeinstellungen"
+,"APEX.IG.DEFAULT_TYPE":"Standardtyp"
+,"APEX.IG.DELETE":"L\u00F6schen"
+,"APEX.IG.DELETE_REPORT_CONFIRM":"M\u00F6chten Sie diesen Bericht wirklich l\u00F6schen?"
+,"APEX.IG.DELETE_ROW":"Zeile l\u00F6schen"
+,"APEX.IG.DELETE_ROWS":"Zeilen l\u00F6schen"
+,"APEX.IG.DESCENDING":"Absteigend"
+,"APEX.IG.DETAIL":"Detail"
+,"APEX.IG.DETAIL_VIEW":"Detailansicht"
+,"APEX.IG.DIRECTION":"Richtung"
+,"APEX.IG.DISABLED":"Deaktiviert"
+,"APEX.IG.DOES_NOT_CONTAIN":"enth\u00E4lt nicht"
+,"APEX.IG.DOES_NOT_START_WITH":"beginnt nicht mit"
+,"APEX.IG.DONUT":"Ring"
+,"APEX.IG.DOWNLOAD":"Herunterladen"
+,"APEX.IG.DOWNLOAD_FORMAT":"Format ausw\u00E4hlen"
+,"APEX.IG.DOWNLOAD_FORMAT_NOT_ENABLED":"Downloadformat \u00250 ist nicht aktiviert."
+,"APEX.IG.DOWNLOAD_PLAIN":"Nur Daten"
+,"APEXIR_COLUMNS":"Spalten"
+,"APEXIR_COMPUTE":"Berechnen"
+,"APEXIR_CONTROL_BREAK":"Kontrollgruppenwechsel"
+,"APEXIR_DATA":"Daten"
+,"APEXIR_DELETE":"L\u00F6schen"
+,"APEXIR_DELETE_DEFAULT_REPORT":"Standardbericht l\u00F6schen"
+,"APEXIR_DELETE_REPORT":"Bericht l\u00F6schen"
+,"APEXIR_DOWNLOAD":"Herunterladen"
+,"APEXIR_FILTER":"Filter"
+,"APEXIR_FLASHBACK":"Flashback"
+,"APEXIR_FORMAT":"Formatieren"
+,"APEXIR_GROUP_BY":"Gruppieren nach"
+,"APEX.IG.DUPLICATE_AGGREGATION":"Aggregation duplizieren"
+,"APEX.IG.DUPLICATE_CONTROLBREAK":"Gruppenwechsel duplizieren"
+,"APEX.IG.DUPLICATE_ROW":"Zeile duplizieren"
+,"APEX.IG.DUPLICATE_ROWS":"Doppelte Zeilen"
+,"APEX.IG.EDIT":"Bearbeiten"
+,"APEX.IG.EDIT_CHART":"Diagramm bearbeiten"
+,"APEX.IG.EDIT_GROUP_BY":"\u0022Gruppieren nach\u0022 bearbeiten"
+,"APEX.IG.EMAIL_BCC":"Blindkopie (Bcc)"
+,"APEX.IG.EMAIL_BODY":"Meldung"
+,"APEX.IG.EMAIL_CC":"Kopie (Cc)"
+,"APEX.IG.EMAIL_SENT":"E-Mail wurde gesendet."
+,"APEX.IG.EMAIL_SUBJECT":"Betreff"
+,"APEX.IG.EMAIL_TO":"Empf\u00E4nger (an)"
+,"APEX.IG.ENABLED":"Aktiviert"
+,"APEX.IG.EQUALS":"ist gleich"
+,"APEX.IG.EXAMPLE":"Beispiel"
+,"APEX.IG.EXPRESSION":"Ausdruck"
+,"APEX.IG.FD_TYPE":"Typ"
+,"APEX.IG.FILE_PREPARED":"Datei vorbereitet. Download wird gestartet."
+,"APEX.IG.FILL":"F\u00FCllen"
+,"APEX.IG.FILL_LABEL":"Auswahl f\u00FCllen mit"
+,"APEX.IG.FILL_TITLE":"Auswahl f\u00FCllen"
+,"APEX.IG.FILTER":"Filter"
+,"APEX.IG.FILTERS":"Filter"
+,"APEX.IG.FILTER_WITH_DOTS":"Filtern..."
+,"APEX.IG.FIRST":"Erster"
+,"APEX.IG.FLASHBACK":"Flashback"
+,"APEX.IG.FORMAT":"Formatieren"
+,"APEX.IG.FORMATMASK":"Formatmaske"
+,"APEX.IG.FORMAT_CSV":"CSV"
+,"APEX.IG.FORMAT_HTML":"HTML"
+,"APEX.IG.FORMAT_PDF":"PDF"
+,"APEX.IG.FORMAT_XLSX":"Excel"
+,"APEX.IG.FREEZE":"Fixieren"
+,"APEX.IG.FUNCTIONS_AND_OPERATORS":"Funktionen und Operatoren"
+,"APEX.IG.FUNNEL":"Trichter"
+,"APEX.IG.GO":"Los"
+,"APEX.IG.GREATER_THAN":"gr\u00F6\u00DFer als"
+,"APEX.IG.GREATER_THAN_OR_EQUALS":"gr\u00F6\u00DFer\u002Fgleich"
+,"APEX.IG.GRID":"Grid"
+,"APEX.IG.GRID_VIEW":"Grid-Ansicht"
+,"APEX.IG.GROUP":"Gruppe"
+,"APEX.IG.GROUP_BY":"Gruppieren nach"
+,"APEX.IG.GROUP_BY_VIEW":"Ansicht \u0022Gruppieren nach\u0022"
+,"APEX.IG.HD_TYPE":"Bedingungstyp"
+,"APEX.IG.HEADING":"\u00DCberschrift"
+,"APEX.IG.HEADING_ALIGN":"\u00DCberschriftenausrichtung"
+,"APEX.IG.HELP":"Hilfe"
+,"APEX.IG.HELP.ACTIONS_TITLE":"Hilfe zu interaktivem Grid"
+,"APEX.IG.HELP.AGGREGATE_TITLE":"Hilfe zu \u0022Aggregation\u0022"
+,"APEXIR_GROUP_BY_SORT":"Nach Sortierung gruppieren"
+,"APEXIR_HELP":"Hilfe"
+,"APEX.IG.HELP.CHART_TITLE":"Hilfe zu \u0022Diagramme\u0022"
+,"APEX.IG.HELP.COLUMNS_TITLE":"Hilfe zu Spalten"
+,"APEX.IG.HELP.COMPUTE_TITLE":"Hilfe zu \u0022Berechnen\u0022"
+,"APEX.IG.HELP.CONTROL_BREAK_TITLE":"Hilfe zu \u0022Gruppenwechsel\u0022"
+,"PD.ENABLE_VIEW_WARN":"Um diese Ansicht anzuzeigen, muss die Seite neu geladen werden. M\u00F6chten Sie die Seite jetzt neu laden?"
+,"PD.MESSAGES":"Nachrichten"
+,"PD.PE.PROPERTY.VALUE_VARIES":"Wert variiert"
+,"FLOW.SINGLE_VALIDATION_ERROR":"1 Fehler aufgetreten"
+,"FLOW.VALIDATION_ERROR":"\u00250 Fehler sind aufgetreten"
+,"ITEM.FILE_UPLOAD.CHOOSE_FILE":"Datei ausw\u00E4hlen"
+,"ITEM.FILE_UPLOAD.DRAG_DROP_FILE_HERE":"Datei per Drag-and-Drop hier ablegen oder"
+,"ITEM_TYPE.POPUP_COLOR":"Popup-Farbauswahl"
+,"MAXIMIZE":"Maximieren"
+,"PE.PROPERTY.IG_DOWNLOAD_FORMATS.LOV.XLSX.D":"Excel"
+,"WWV_FLOW_SODA_DEV.FILE_FORMATS":"Laden Sie JSON-, TXT- oder ZIP-Dateien hoch."
+,"WWV_FLOW_BUILDER.REMOTESQL.CODE_COMPLETION_NOT_SUPPORTED":"Codeerg\u00E4nzung wird f\u00FCr Remote-SQL nicht unterst\u00FCtzt."
+,"WWV_FLOW_BUILDER.REMOTESQL.QUERY_BUILDER_NOT_SUPPORTED":"Query Builder wird f\u00FCr Remote-SQL nicht unterst\u00FCtzt."
+,"SL.APP":"Anwendung"
+,"SL.EDIT.PAGE.IN.APP":"Seite \u00250 in Anwendung \u00251 bearbeiten"
+,"SL.GO.TO.APP":"Gehe zu Anwendung \u00250"
+,"SL.MATCH.FOUND":"1 \u00DCbereinstimmung gefunden"
+,"SL.N.MATCHES.FOUND":"\u00250 \u00DCbereinstimmungen gefunden"
+,"SL.NO.MATCH.FOUND":"Keine \u00DCbereinstimmung gefunden"
+,"SL.PAGE":"Seite"
+,"SL.PLACEHOLDER":"Suche"
+,"SL.SEARCH.ALLAPPS":"Alle Anwendungen nach \u00250 durchsuchen"
+,"SL.SEARCH.APP":"Diese Anwendung nach \u00250 durchsuchen"
+,"SL.SEARCH.HELP":"Geben Sie mindestens zwei Buchstaben f\u00FCr die Suche ein"
+,"SL.SEARCH.PAGE":"Seite nach \u00250 durchsuchen"
+,"SL.SEARCH.TEAM.DEV":"Team Development nach \u00250 durchsuchen"
+,"SL.SEARCH.USER":"Benutzer \u00250 suchen"
+,"SL.SEARCH.WP":"Workspace nach \u00250 durchsuchen"
+,"SL.SHARED.COMP.APP":"Gemeinsame Komponenten von Anwendung \u00250"
+,"STATICSEARCH.MINIMUM_LENGTH":"Geben Sie mindestens ein Schl\u00FCsselwort ein, das mindestens zwei Zeichen enth\u00E4lt."
+,"STATICSEARCH.NO_RESULTS_FOUND":"Es konnten keine Ergebnisse gefunden werden, die mit Ihrer Suchabfrage \u00FCbereinstimmen."
+,"TEMPLATE_OPTIONS.ADVANCED":"Erweitert"
+,"TEMPLATE_OPTIONS.COMMON":"Allgemein"
+,"TEMPLATE_OPTIONS.GENERAL":"Allgemein"
+,"WIZARD.CLEAR_CACHE_PROCESS_NAME":"Seite zur\u00FCcksetzen"
+,"WIZARD.FORM.DML_PROCESS_NAME":"Formular \u00250 verarbeiten"
+,"WIZARD.FORM.INIT_PROCESS_NAME":"Formular \u00250 initialisieren"
+,"WIZARD.IG.DML_PROCESS_NAME":"\u00250 - Interaktive Grid-Daten speichern"
+,"WS_NO_FILE_CHOSEN":"Keine Datei ausgew\u00E4hlt"
+});
+apex.locale.init({ "language":"de","resources":"\u002Fi\u002Flibraries\u002Foraclejet\u002F9.1.0\u002Fjs\u002Flibs\u002Foj\u002Fv9.1.0\u002Fresources\u002Fnls\u002F", separators:{"group":".","decimal":","}, currency:{"local":"\u20AC","iso":"EUR","dual":"\u20AC"}, calendar:{ abbrMonthNames: ["Jan","Feb","Mrz","Apr","Mai","Jun","Jul","Aug","Sep","Okt","Nov","Dez"], abbrDayNames: ["Mo","Di","Mi","Do","Fr","Sa","So"]}});
+apex.message.registerTemplates([{
+"markup":"\u003Cdiv class=\u0022t-Body-alert\u0022\u003E\u000A  \u003Cdiv class=\u0022t-Alert t-Alert--defaultIcons t-Alert--success t-Alert--horizontal t-Alert--page t-Alert--colorBG\u0022 id=\u0022t_Alert_Success\u0022 role=\u0022alert\u0022\u003E\u000A    \u003Cdiv class=\u0022t-Alert-wrap\u0022\u003E\u000A      \u003Cdiv class=\u0022t-Alert-icon\u0022\u003E\u000A        \u003Cspan class=\u0022t-Icon\u0022\u003E\u003C\u002Fspan\u003E\u000A      \u003C\u002Fdiv\u003E\u000A      \u003Cdiv class=\u0022t-Alert-content\u0022\u003E\u000A        \u003Cdiv class=\u0022t-Alert-header\u0022\u003E\u000A          \u003Ch2 class=\u0022t-Alert-title\u0022\u003E#SUCCESS_MESSAGE#\u003C\u002Fh2\u003E\u000A        \u003C\u002Fdiv\u003E\u000A      \u003C\u002Fdiv\u003E\u000A      \u003Cdiv class=\u0022t-Alert-buttons\u0022\u003E\u000A        \u003Cbutton class=\u0022t-Button t-Button--noUI t-Button--icon t-Button--closeAlert\u0022 onclick=\u0022apex.jQuery(\u0027#t_Alert_Success\u0027).remove();\u0022 type=\u0022button\u0022 title=\u0022#CLOSE_NOTIFICATION#\u0022\u003E\u003Cspan class=\u0022t-Icon icon-close\u0022\u003E\u003C\u002Fspan\u003E\u003C\u002Fbutton\u003E\u000A      \u003C\u002Fdiv\u003E\u000A    \u003C\u002Fdiv\u003E\u000A  \u003C\u002Fdiv\u003E\u000A\u003C\u002Fdiv\u003E",
+"ids":"212911954602985468_S,212914529283985483_S,212917471913985484_S,212918200577985484_S,212923408139985486_S,212924709733985488_S,212929681480985489_S,218268489896819660_S,218269342930819666_S,218270328768819666_S,218270687445819667_S,218272497323819667_S,218272925724819669_S,218274616718819670_S"
+},
+{
+"markup":"\u003Cdiv class=\u0022t-Body-alert\u0022\u003E\u000A  \u003Cdiv class=\u0022t-Alert t-Alert--defaultIcons t-Alert--success t-Alert--horizontal t-Alert--page t-Alert--colorBG\u0022 id=\u0022t_Alert_Success\u0022 role=\u0022alert\u0022\u003E\u000A    \u003Cdiv class=\u0022t-Alert-wrap\u0022\u003E\u000A      \u003Cdiv class=\u0022t-Alert-icon\u0022\u003E\u000A        \u003Cspan class=\u0022t-Icon\u0022\u003E\u003C\u002Fspan\u003E\u000A      \u003C\u002Fdiv\u003E\u000A      \u003Cdiv class=\u0022t-Alert-content\u0022\u003E\u000A        \u003Cdiv class=\u0022t-Alert-header\u0022\u003E\u000A          \u003Ch2 class=\u0022t-Alert-title\u0022\u003E#SUCCESS_MESSAGE#\u003C\u002Fh2\u003E\u000A        \u003C\u002Fdiv\u003E\u000A      \u003C\u002Fdiv\u003E\u000A      \u003Cdiv class=\u0022t-Alert-buttons\u0022\u003E\u000A        \u003Cbutton class=\u0022t-Button t-Button--noUI t-Button--icon t-Button--closeAlert\u0022 type=\u0022button\u0022 title=\u0022#CLOSE_NOTIFICATION#\u0022\u003E\u003Cspan class=\u0022t-Icon icon-close\u0022\u003E\u003C\u002Fspan\u003E\u003C\u002Fbutton\u003E\u000A      \u003C\u002Fdiv\u003E\u000A    \u003C\u002Fdiv\u003E\u000A  \u003C\u002Fdiv\u003E\u000A\u003C\u002Fdiv\u003E",
+"ids":"212921101853985485_S,212927357572985488_S,212930914452985490_S,218271617493819667_S,218273825628819669_S,218407526299773955_S"
+},
+{
+"markup":"\u003Cdiv class=\u0022t-Body-alert\u0022\u003E\u000A  \u003Cdiv class=\u0022t-Alert t-Alert--defaultIcons t-Alert--warning t-Alert--horizontal t-Alert--page t-Alert--colorBG\u0022 id=\u0022t_Alert_Notification\u0022 role=\u0022alert\u0022\u003E\u000A    \u003Cdiv class=\u0022t-Alert-wrap\u0022\u003E\u000A      \u003Cdiv class=\u0022t-Alert-icon\u0022\u003E\u000A        \u003Cspan class=\u0022t-Icon\u0022\u003E\u003C\u002Fspan\u003E\u000A      \u003C\u002Fdiv\u003E\u000A      \u003Cdiv class=\u0022t-Alert-content\u0022\u003E\u000A        \u003Cdiv class=\u0022t-Alert-body\u0022\u003E\u000A          #MESSAGE#\u000A        \u003C\u002Fdiv\u003E\u000A      \u003C\u002Fdiv\u003E\u000A      \u003Cdiv class=\u0022t-Alert-buttons\u0022\u003E\u000A        \u003Cbutton class=\u0022t-Button t-Button--noUI t-Button--icon t-Button--closeAlert\u0022 onclick=\u0022apex.jQuery(\u0027#t_Alert_Notification\u0027).remove();\u0022 type=\u0022button\u0022 title=\u0022#CLOSE_NOTIFICATION#\u0022\u003E\u003Cspan class=\u0022t-Icon icon-close\u0022\u003E\u003C\u002Fspan\u003E\u003C\u002Fbutton\u003E\u000A      \u003C\u002Fdiv\u003E\u000A    \u003C\u002Fdiv\u003E\u000A  \u003C\u002Fdiv\u003E\u000A\u003C\u002Fdiv\u003E",
+"ids":"212911954602985468_E,212914529283985483_E,212917471913985484_E,212918200577985484_E,212923408139985486_E,212924709733985488_E,212929681480985489_E,218268489896819660_E,218269342930819666_E,218270328768819666_E,218270687445819667_E,218272497323819667_E,218272925724819669_E,218274616718819670_E"
+},
+{
+"markup":"\u003Cdiv class=\u0022t-Body-alert\u0022\u003E\u000A  \u003Cdiv class=\u0022t-Alert t-Alert--defaultIcons t-Alert--warning t-Alert--horizontal t-Alert--page t-Alert--colorBG\u0022 id=\u0022t_Alert_Notification\u0022 role=\u0022alert\u0022\u003E\u000A    \u003Cdiv class=\u0022t-Alert-wrap\u0022\u003E\u000A      \u003Cdiv class=\u0022t-Alert-icon\u0022\u003E\u000A        \u003Cspan class=\u0022t-Icon\u0022\u003E\u003C\u002Fspan\u003E\u000A      \u003C\u002Fdiv\u003E\u000A      \u003Cdiv class=\u0022t-Alert-content\u0022\u003E\u000A        \u003Cdiv class=\u0022t-Alert-body\u0022\u003E\u000A          #MESSAGE#\u000A        \u003C\u002Fdiv\u003E\u000A      \u003C\u002Fdiv\u003E\u000A      \u003Cdiv class=\u0022t-Alert-buttons\u0022\u003E\u000A        \u003Cbutton class=\u0022t-Button t-Button--noUI t-Button--icon t-Button--closeAlert\u0022 type=\u0022button\u0022 title=\u0022#CLOSE_NOTIFICATION#\u0022\u003E\u003Cspan class=\u0022t-Icon icon-close\u0022\u003E\u003C\u002Fspan\u003E\u003C\u002Fbutton\u003E\u000A      \u003C\u002Fdiv\u003E\u000A    \u003C\u002Fdiv\u003E\u000A  \u003C\u002Fdiv\u003E\u000A\u003C\u002Fdiv\u003E",
+"ids":"212921101853985485_E,212927357572985488_E,212930914452985490_E,218271617493819667_E,218273825628819669_E,218407526299773955_E"
+},
+{
+"markup":"\u003Cspan class=\u0022t-Form-error\u0022\u003E#ERROR_MESSAGE#\u003C\u002Fspan\u003E",
+"ids":"213003608043985528_ET,213003714518985529_ET,213003884354985529_ET,213003890979985529_ET,213004064479985529_ET,218309197927819691_ET,218309225247819692_ET,218309359367819692_ET,218309463614819692_ET,218309547415819692_ET"
+}]);
+
+---
+
+Request URL
+https://vs0592.intra.regiocom.net/ords/wwv_flow.js_messages?p_app_id=80002&p_lang=de&p_version=20.2.0.00.20-16602992973763
+Request method
+GET
+Status code
+200 OK (from memory cache)
+Remote address
+172.16.31.118:443
+Referrer policy
+strict-origin-when-cross-origin
+cache-control
+max-age=315360000, immutable
+content-type
+text/javascript; charset=UTF-8
+date
+Sun, 18 Oct 2026 10:54:12 GMT
+server
+Apache/2.4.6 (Red Hat Enterprise Linux) OpenSSL/1.0.2k-fips
+referer
+https://vs0592.intra.regiocom.net/ords/f?p=80002:1:2140815194749:::::

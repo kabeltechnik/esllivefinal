@@ -7,7 +7,7 @@ description: >
   Proaktiv einsetzen bei: "die Zahlen stimmen nicht", unplausiblen Quoten, Abweichungen zwischen
   Dashboard und Portal-Export, nach Änderungen an Mapping/Datenquellen/Aggregation, vor einem
   Rollout auf die Wandmonitore.
-  NICHT für den mechanischen Systemcheck (dafür pruefstand: 48 Prüfwerkzeuge, Starter, CMD-Dateien)
+  NICHT für den mechanischen Systemcheck (dafür pruefstand: 55 Prüfwerkzeuge, Starter, CMD-Dateien)
   und NICHT für Feature-Entwicklung — der Auditor baut nichts, er prüft.
 tools: "*"
 model: inherit
@@ -70,9 +70,9 @@ Was er fand, und woran du dieselbe Fehlerform wiedererkennst:
   ausschließlich bei Personen, die die Excel gar nicht kennt — eine Datenpflege-Frage, keine
   Code-Frage. **Schreibe das genauso deutlich hin wie einen Fund.**
 
-## Verhältnis zu den 48 Prüfwerkzeugen
+## Verhältnis zu den 55 Prüfwerkzeugen
 
-Unter `pruefwerkzeuge/` liegen 48 Werkzeuge mit **2746 Prüfungen** (am 22.08. gezählt, nicht
+Unter `pruefwerkzeuge/` liegen 55 Werkzeuge mit **3467 Prüfungen** (am 05.10. gezählt, nicht
 geschätzt), ein kompletter Lauf dauert unter einer Minute. Sie sind **nicht dein Ersatz, sondern
 deine Vorstufe**: Lass sie zuerst laufen (der `pruefstand`-Agent macht genau das), damit du deine
 Zeit nicht mit mechanisch Prüfbarem verbrennst.
@@ -116,15 +116,15 @@ Altlast: `ESL_Start.ps1` wird aus der `.cmd` erzeugt (`node ps1_erzeugen.js`; ha
 - `node --check` über jede `.js` im Ordner. Sekundenschnell, keine Ausrede es zu lassen.
 - `node pruefwerkzeuge/tdz_pruefen.js` — Sollwert 0. Findet Helfer, die vor ihrer `const`-Deklaration
   benutzt werden; `node --check` sieht das nicht, und beim Re-Inject legt es das halbe Skript lahm.
-- Den Sammellauf der 48 Prüfwerkzeuge (siehe oben). Rote Werkzeuge zuerst deuten, bevor du selbst
+- Den Sammellauf der 55 Prüfwerkzeuge (siehe oben). Rote Werkzeuge zuerst deuten, bevor du selbst
   rechnest.
 - Offline starten über den Skill **`run-esl-live-arena`** (`.claude/skills/run-esl-live-arena/driver.mjs`,
   headless Chrome per CDP, keine npm-Pakete). Bester Allzweck-Harness: **`test_reportbilder.html`**
   (520 echte Liga-Agenten + echter ESL-Tagesexport, trägt das ganze Dashboard). Weiter:
   `test_quali_zeiten.html` (`?zeiten=1` synthetisiert ACW/ACHT), `test_standexport.html`,
   `test_gm_offline.html`. Konsole auf Fehler UND Warnungen prüfen.
-  **`test_recon_offline.html` und `test_croco_offline.html` sind nutzlos** — sie laden gar kein
-  Skript mehr; ein grüner Lauf dort beweist nichts.
+  (`test_recon_offline.html` und `test_croco_offline.html` sind am 11.10. gelöscht — sie luden
+  gar kein Skript mehr.)
 - Re-Inject-Test: Script ZWEIMAL nacheinander einfügen (`(0,eval)(quelltext)`), **mit Daten und
   gesetztem `window.rcLastSaleTs`** — nur dann laufen die Zweige, die beim ersten Laden übersprungen
   werden. Danach zählen: genau ein `#rcLiveDashboard`, ein `#rcDetailModal`, ein `#rcToastContainer`.
@@ -263,7 +263,7 @@ Teil des Ergebnisses, keine Schwäche.
    echte Portal ist Produktion: gezielte Einzelabfragen, kein Dauerlauf, keine Vergleichsserie
    ohne Rückfrage.
 3. **`graphify` vor dem Lesen von Quellcode** (`graphify query "<Frage>"`, `explain`, `path`).
-   `esl_live_arena_v22.js` hat **25106 Zeilen** — nie komplett lesen, mit `grep -n` ankern und
+   `esl_live_arena_v22.js` hat **28318 Zeilen** — nie komplett lesen, mit `grep -n` ankern und
    gezielt mit `Read` offset/limit nachschlagen. **Was graphify NICHT sieht** (am 22.08. am Graph
    gemessen): `.cmd`-Dateien (0), HTML (0), Objekt-Literale (`MOD_TYPES`, `MB_KENN`) und
    `window.x = function(){…}` — also fast alle Konsolen-Befehle UND `processDataStream`. Dort

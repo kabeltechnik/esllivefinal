@@ -67,6 +67,10 @@ async function cmdLaunch() {
   const profile = mkdtempSync(path.join(tmpdir(), 'esl-arena-cdp-'));
   const proc = spawn(chrome, [
     '--headless=new', '--disable-gpu', '--hide-scrollbars',
+    // --disable-sync: laeuft hier Edge statt Chrome, meldet es das Wegwerf-Profil am Microsoft-Konto an und holt
+    // dessen Einstellungen (gemessen 05.10.: nach rund 12 s "alle Cookies blockieren") — ab dann wirft
+    // localStorage, und das Dashboard liefe anders als im Betrieb.
+    '--no-first-run', '--disable-sync',
     `--remote-debugging-port=${port}`,
     `--user-data-dir=${profile}`,
     '--window-size=1600,1000',

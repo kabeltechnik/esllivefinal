@@ -132,6 +132,11 @@ function schneideAus(text, kopf) {
     throw new Error('nicht sauber abgeschlossen: ' + kopf);
 }
 const schneide = name => schneideAus(src, 'function ' + name + '(');
+// Seit 28.09. braucht classify die Geraete-Regel (RC_KEIN_VERTRIEB + rcIstGeraet).
+const GERAET_QUELL = src.match(/const RC_KEIN_VERTRIEB = [^\n]+/)[0] + '\n' + schneide('rcIstGeraet');
+// Zentrale Stack-Regel + Blatt "Ohne Stack" (05.10.): die echten Funktionen aus
+// der Quelldatei, ueber den gemeinsamen Baustein.
+const STACK_REGEL = require('./_stack_regel.js').quelltextBlatt(src);
 const konstZeile = name => {
     const m = src.match(new RegExp('const\\s+' + name + '\\s*=\\s*[^;\\n]+;'));
     if (!m) throw new Error('Konstante ' + name + ' nicht gefunden');
@@ -205,7 +210,10 @@ function baueAPI(mutation) {
     let quelle =
         konstZeile('bcrOf') + '\n' +
         konstZeile('nonBcrOf') + '\n' +
+        GERAET_QUELL + '\n' +
         schneide('classify') + '\n' +
+        // zentrale Stack-Regel (05.10.) — rcAggAusRows fragt den Stack darueber ab
+        STACK_REGEL + '\n' +
         schneide('rcAggAusRows') + '\n';
     if (mutation) quelle = mutation(quelle);
     return new Function('window', quelle + '\nreturn { rcAggAusRows: rcAggAusRows, classify: classify };');
@@ -482,7 +490,9 @@ if (!XLSX) {
         konstZeile('stdFullName') + '\n' +
         konstZeile('bcrOf') + '\n' +
         konstZeile('nonBcrOf') + '\n' +
+        GERAET_QUELL + '\n' +
         schneide('classify') + '\n' +
+        STACK_REGEL + '\n' +        // zentrale Stack-Regel + Blatt "Ohne Stack" (05.10.)
         schneide('rcAggAusRows') + '\n' +
         schneide('rcAggTrendScope') + '\n' +
         // Seit 06.08. spaetabends ruft rcBuildAggSheets die Block-Blaetter ueber
@@ -500,7 +510,19 @@ if (!XLSX) {
     const wb = XLSX.utils.book_new();
     const aggB = BAU.rcAggAusRows({ rows: ZEILEN });
     aggB.trendScope = BAU.rcAggTrendScope({ von:'2026-07-01', bis:'2026-07-14' }, { std:'ALL', team:'ALL', stack:'ALL' });
-    BAU.rcBuildAggSheets(XLSX, wb, true, aggB, 'PRUEFLAUF');
+    // Seit 30.10. sind ab Werk nur acht Blaetter an. Diese Pruefungen brauchen die Blaetter
+    // Standorte/Stacks/Liga/Entwicklung, also wird der Dialog-Zustand "alles zugeschaltet" uebergeben.
+    const ALLE_BLAETTER = { blaetter: { produkte:true, analyseAgenten:true, reportingQ:true, standorte:true, stacks:true,
+        ligaStandorte:true, ligaTeams:true, entwicklung:true } };
+    BAU.rcBuildAggSheets(XLSX, wb, true, aggB, 'PRUEFLAUF', ALLE_BLAETTER);
+    {
+        const wbW = XLSX.utils.book_new();
+        BAU.rcBuildAggSheets(XLSX, wbW, true, aggB, 'PRUEFLAUF');   // ohne Auswahl = Werkszustand
+        pruef('Werkszustand (ohne Auswahl): Standorte/Stacks/Liga/Entwicklung/Qualitaet Reporting fehlen, Teams/Agenten/Struktur bleiben',
+            ['Standorte','Stacks','Liga Standorte','Liga Teams','Qualitaet Reporting'].every(b => wbW.SheetNames.indexOf(b) < 0) &&
+            !wbW.SheetNames.some(n => n.indexOf('Entwicklung') === 0) &&
+            ['Struktur','Teams','Agenten','Vertrieb Reporting'].every(b => wbW.SheetNames.indexOf(b) >= 0), wbW.SheetNames.join(' | '));
+    }
 
     const ziel = path.join(os.tmpdir(), 'rc_vollbericht_pruef.xlsx');
     XLSX.writeFile(wb, ziel);
@@ -512,6 +534,62 @@ if (!XLSX) {
             zurueck.SheetNames.join(' | ')));
     pruef('Entwicklungs-Blatt ist in der Mappe',
         zurueck.SheetNames.some(n => n.indexOf('Entwicklung') === 0), zurueck.SheetNames.join(' | '));
+
+    // ---- Blatt "Ohne Stack" (05.10.) ----------------------------------------
+    // Agenten ohne Stack-Zuordnung stehen unter einem Stack-Filter in KEINER
+    // Summe — ohne dieses Blatt waeren sie aus der Mappe schlicht verschwunden.
+    // Oben liegt heute nicht im Bereich (01.-14.07.): dort darf es nicht entstehen,
+    // das Verzeichnis gilt nur fuer den heutigen Datenstrom.
+    pruef('Blatt "Ohne Stack" fehlt, wenn heute NICHT im Bereich liegt', zurueck.SheetNames.indexOf('Ohne Stack') === -1,
+        zurueck.SheetNames.join(' | '));
+    {
+        const heuteK = (d => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'))(new Date());
+        const OHNE = [
+            { vo:'90001', name:'90001', ccs:'', team:'VF Mobilfunk AL 07', teamRoh:'VF Mobilfunk AL 07', standort:'AL', projekt:'mobile',
+              imMapping:false, stack:'', kontakte:7, ansprachen:3, stueck:5 },
+            { vo:'90002', name:'Beispiel Agent', ccs:'90002', team:'21101052', teamRoh:'Essen VKD', standort:'B', projekt:'kabel',
+              imMapping:true, stack:'', kontakte:4, ansprachen:1, stueck:0 }
+        ];
+        const bauOhne = (scope, liste) => {
+            const winO = Object.assign({}, winB, { rcOhneStack: liste, rcKpiData: { '90001': { agentName:'Liga Name', team:'21105006' } } });
+            const B2 = new Function('window', 'document', bauQuelle)(winO, doc);
+            const wbO = XLSX.utils.book_new();
+            const a2 = B2.rcAggAusRows({ rows: ZEILEN });
+            a2.trendScope = B2.rcAggTrendScope({ von: heuteK, bis: heuteK }, scope);
+            B2.rcBuildAggSheets(XLSX, wbO, true, a2, 'PRUEFLAUF');
+            const zielO = path.join(os.tmpdir(), 'rc_vollbericht_pruef_ohne.xlsx');
+            XLSX.writeFile(wbO, zielO);
+            const z = XLSX.readFile(zielO);
+            return { namen: z.SheetNames, zeilen: z.Sheets['Ohne Stack'] ? XLSX.utils.sheet_to_json(z.Sheets['Ohne Stack'], { header: 1, defval: '' }) : null };
+        };
+        const alle = bauOhne({ std:'ALL', team:'ALL', stack:'ALL' }, OHNE);
+        pruef('Blatt "Ohne Stack" entsteht, wenn heute im Bereich liegt und es solche Agenten gibt', !!alle.zeilen, alle.namen.join(' | '));
+        if (alle.zeilen) {
+            // Zeile 0 Titel, 1 Kopf, 2.. Agenten (meiste Stueck zuerst), letzte = Hinweis
+            pruef('Ohne Stack: Kopfzeile nennt Projekt, Team, Agent, Stueck und Grund',
+                ['Projekt', 'Team', 'Agent', 'Grund'].every(k => alle.zeilen[1].indexOf(k) !== -1) && alle.zeilen[1].some(k => /^Stück/.test(k)), alle.zeilen[1].join(' | '));
+            pruef('Ohne Stack: beide Agenten stehen drin, der mit den meisten Stueck oben',
+                alle.zeilen.length === 5 && alle.zeilen[2][4] === '90001' && alle.zeilen[3][4] === '90002', alle.zeilen.slice(2, 4).map(z => z[4]).join(','));
+            pruef('Ohne Stack: Projekt aus der Lieferung, Kontakte/Ansprachen/Stueck als Zahlen',
+                alle.zeilen[2][0] === 'Mobile' && alle.zeilen[2][5] === 7 && alle.zeilen[2][6] === 3 && alle.zeilen[2][7] === 5, alle.zeilen[2].join(' | '));
+            pruef('Ohne Stack: ohne Mapping-Eintrag kommt der Name aus der Ligaliste, das Team ist der ESL-Rohname',
+                alle.zeilen[2][3] === 'Liga Name' && alle.zeilen[2][2] === 'VF Mobilfunk AL 07', alle.zeilen[2][3] + ' / ' + alle.zeilen[2][2]);
+            pruef('Ohne Stack: der Grund unterscheidet "fehlt in der Excel" von "Team ohne Stack"',
+                /fehlt in der Mitarbeiter-Excel/.test(alle.zeilen[2][8]) && /keinen Stack/.test(alle.zeilen[3][8]), alle.zeilen[2][8] + ' || ' + alle.zeilen[3][8]);
+            pruef('Ohne Stack: ohne Stack-Filter sagt der Hinweis, dass sie in den Summen ENTHALTEN sind',
+                /sind in den Summen dieser Mappe enthalten/.test(alle.zeilen[4][0]), alle.zeilen[4][0]);
+        }
+        const nurKabel = bauOhne({ std:'ALL', team:'ALL', stack:'VKD_Tech' }, OHNE);
+        pruef('Ohne Stack: unter einem Stack-Filter nur die Agenten DESSELBEN Projekts',
+            !!nurKabel.zeilen && nurKabel.zeilen.length === 4 && nurKabel.zeilen[2][4] === '90002', nurKabel.zeilen && nurKabel.zeilen.map(z => z[4]).join(','));
+        pruef('Ohne Stack: unter einem Stack-Filter sagt der Hinweis, dass sie NICHT mitzaehlen',
+            !!nurKabel.zeilen && /\(Filter VKD_Tech\) NICHT mit/.test(nurKabel.zeilen[3][0]), nurKabel.zeilen && nurKabel.zeilen[3][0]);
+        const nurAl = bauOhne({ std:'AL', team:'ALL', stack:'ALL' }, OHNE);
+        pruef('Ohne Stack: der Standort-Filter gilt', !!nurAl.zeilen && nurAl.zeilen.length === 4 && nurAl.zeilen[2][4] === '90001');
+        pruef('Ohne Stack: "Kabel gesamt" (P:kabel) nimmt die Kabel-Agenten und zaehlt sie als enthalten',
+            (z => !!z.zeilen && z.zeilen.length === 4 && z.zeilen[2][4] === '90002' && /enthalten/.test(z.zeilen[3][0]))(bauOhne({ std:'ALL', team:'ALL', stack:'P:kabel' }, OHNE)));
+        pruef('GEGENPROBE: hat jeder Agent einen Stack, entsteht KEIN Blatt', bauOhne({ std:'ALL', team:'ALL', stack:'ALL' }, []).zeilen === null);
+    }
 
     // ---- Blatt "Standorte": Werte und FORMATE gegenlesen --------------------
     // Spalten: 0 Standort .. 11 ESL-Kontakte, 12 Tracking %, 13 BCR-BNT, 14 BCR-VVL, 15 Gesamt

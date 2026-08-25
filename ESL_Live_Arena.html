@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ESL Live-Arena</title>
+<!-- Gastseite des Datendienstes (27.10.): ausgeliefert von esl_dienst.js unter
+     http://127.0.0.1:8787/ (Start: ESL_Dienst_Start.cmd). Sie setzt die Dienst-Marke,
+     holt die Mitarbeiter-Excel und laedt das Dashboard. Alles andere (Stand abfragen,
+     Daten einspeisen, Bibliotheken) macht esl_live_arena_v22.js selbst.
+     test_abgleich_esl.html?dienst=1 fuehrt GENAU dieses Skript aus und ersetzt darin
+     "{ basis: location.origin }" und "'/esl_live_arena_v22.js?v='" — beides nicht umformulieren. -->
+<style>
+  html, body { margin: 0; height: 100%; background: #121212; color: #F5F5F5; }
+  #rcGastHinweis { position: fixed; left: 16px; bottom: 16px; max-width: min(720px, calc(100vw - 32px)); z-index: 2147483600;
+    box-sizing: border-box; padding: 10px 14px; background: #1D1D1D; color: #F5F5F5; border-left: 4px solid #EB9700;
+    font: 13px/1.4 "Segoe UI", Arial, sans-serif; cursor: pointer; }
+</style>
+</head>
+<body>
+<script>
+(async function(){
+    window.__rcDienst = { basis: location.origin };
+    // Sichtbar ueber dem Dashboard (dessen Overlay liegt bei z-index 999999); Klick blendet aus.
+    function hinweis(text){
+        let h = document.getElementById('rcGastHinweis');
+        if (!h) {
+            h = document.createElement('div');
+            h.id = 'rcGastHinweis';
+            h.title = 'Klicken zum Ausblenden';
+            h.onclick = function(){ h.remove(); };
+            document.body.appendChild(h);
+        }
+        h.textContent = text;
+    }
+    // Frist fuer Anfrage UND Lesen: haengt der Dienst, startet das Dashboard trotzdem.
+    const ac = new AbortController(), frist = setTimeout(function(){ ac.abort(); }, 10000);
+    try {
+        const r = await fetch(window.__rcDienst.basis + '/api/mapping.xlsx', { cache: 'no-store', credentials: 'same-origin', signal: ac.signal });
+        if (!r.ok) throw new Error((await r.text()).trim().slice(0, 300) || 'HTTP ' + r.status);
+        const b = new Uint8Array(await r.arrayBuffer());
+        let s = '';
+        for (let i = 0; i < b.length; i += 0x8000) s += String.fromCharCode.apply(null, b.subarray(i, i + 0x8000));
+        window.__rcFiles = { mapping: btoa(s) };
+    } catch(e){
+        hinweis('Mitarbeiter-Excel nicht geladen: ' + (ac.signal.aborted ? 'keine Antwort vom Datendienst in 10 s' : ((e && e.message) || e)) +
+            ' - das Dashboard nutzt das zuletzt gespeicherte Mapping.');
+    } finally { clearTimeout(frist); }
+    const sk = document.createElement('script');
+    sk.src = '/esl_live_arena_v22.js?v=' + Date.now();
+    sk.onerror = function(){ hinweis('Dashboard nicht geladen - laeuft ESL_Dienst_Start.cmd noch?'); };
+    document.body.appendChild(sk);
+})();
+</script>
+</body>
+</html>

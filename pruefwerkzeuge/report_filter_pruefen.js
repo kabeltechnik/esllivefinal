@@ -92,7 +92,7 @@ const collectFn = new Function('window', 'reportDaten',
     'return (' + collectSrc.replace(/^function collect/, 'function') + ')');
 const zeile = (o) => Object.assign({
     team: 'T1', name: 'A', calls: 0, ahtSec: null,
-    aq: { z: null, n: null, v: null }, cs: { z: null, n: null, v: null },
+    cs: { z: null, n: null, v: null },
     tnps: { z: null, n: null, v: null }, fq: { z: null, n: null, v: null },
     hasEsl: true, ansp: 0, standort: 'AL', kip: 0, mob: 0, bnt: 0, vvl: 0
 }, o);
@@ -210,8 +210,12 @@ pruef('… und meldet den fachlichen Grund im Klartext',
     /keine Liga-Calls im Filter/.test(buildRepSrc));
 
 // Der Stundentakt darf eine Stunde nicht spurlos verbrauchen.
+// Seit 05.10. frischt der Stundentakt erst auf (downloadFrisch liefert ein
+// Promise) — ein Wurf kann damit synchron ODER im Promise liegen. Beide Wege
+// muessen in derselben Meldung enden, sonst ist die Stunde spurlos verbraucht.
 pruef('Stundentakt: ein Wurf hinterlaesst einen sichtbaren Zustand',
-    /rcReportInterval=setInterval\([\s\S]{0,1200}?catch\(e\)\{[\s\S]{0,400}?rcReportLetzter/.test(dash));
+    /rcReportInterval=setInterval\([\s\S]{0,1400}?var gescheitert=function\(e\)\{[\s\S]{0,500}?rcReportLetzter/.test(dash) &&
+    /downloadFrisch\(\)\.catch\(gescheitert\)/.test(dash) && /catch\(e\)\{ gescheitert\(e\); \}/.test(dash));
 pruef('Gegenprobe: das leere catch im Stundentakt ist raus',
     !/CFG\.lastHourKey=hk; save\(\); download\(\); \} \}catch\(e\)\{\}/.test(dash));
 
@@ -281,8 +285,11 @@ pruef("Gegenprobe: das harte \"team: 'ALL'\" ist raus",
         /sag\([^\n]*true\)/.test(src));
 });
 pruef('der Dialog reicht seine Statuszeile herein',
-    /rcExportReporting\(b\.von, b\.bis, scopeAus\(\), sagen\)/.test(dash) &&
-    /rcExportStandZeitraum\(b\.von, b\.bis, scopeAus\(\), true, sagen, wahlAus\(\)\)/.test(dash) &&   // wahl seit 14.08. (Excel-Haekchen)
+    // "sag" seit 05.10.: frischDann holt erst die Daten und reicht dann die
+    // Statuszeile herein (bei unvollstaendigem Auffrischen mit dem Grund dahinter).
+    /rcExportReporting\(b\.von, b\.bis, scopeAus\(\), sag\)/.test(dash) &&
+    /rcExportStandZeitraum\(b\.von, b\.bis, scopeAus\(\), true, sag, wahlAus\(\)\)/.test(dash) &&   // wahl seit 14.08. (Excel-Haekchen)
+    /const sagenMit = hinweis \? /.test(dash) &&
     /rcExportReportingAlle\(b\.von, b\.bis, sagen\)/.test(dash));
 pruef('"Fertig" wird erst nach dem tatsaechlichen Speichern gemeldet',
     /rcXlsxSpeichern\(XL, wb, fn, 'Vertrieb Reporting'\)\s*\n\s*\.then\(\(\) => sag\('Fertig/.test(dash));

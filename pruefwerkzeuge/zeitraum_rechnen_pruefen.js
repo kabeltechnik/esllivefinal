@@ -38,7 +38,7 @@ console.log('');
 //  dort, muss sie auch hier nachgezogen werden - dieser Test ist die
 //  Beschreibung des SOLL-Verhaltens.
 // ---------------------------------------------------------------------------
-const KENN = ['aq', 'cs', 'tnps', 'fq', 'dds', 'ftf'];
+const KENN = ['cs', 'tnps', 'fq', 'dds', 'ftf'];   // ohne AQ seit 30.10. (Modell der Aggregation, DDS steht fuer die Null-Prozent-Regel ein)
 
 function aggregiere(tageszeilen) {
   const a = { calls: 0, ahtW: 0, ahtN: 0, ansp: 0, anspCalls: 0, hasEsl: false,
@@ -165,10 +165,10 @@ console.log('3) Quoten werden gepoolt, nicht gemittelt');
 {
   // Echte 0 %: Nenner vorhanden, Zaehler 0. Muss 0 sein, NICHT null.
   const r = aggregiere([
-    { calls: 10, aq: { z: 0, n: 10, v: 0 } },
-    { calls: 10, aq: { z: 0, n: 15, v: 0 } }
+    { calls: 10, dds: { z: 0, n: 10, v: 0 } },
+    { calls: 10, dds: { z: 0, n: 15, v: 0 } }
   ]);
-  pruefe('Zaehler 0 bei echtem Nenner -> 0 %', r.aq.v, 0);
+  pruefe('Zaehler 0 bei echtem Nenner -> 0 %', r.dds.v, 0);
 }
 
 // ---------------------------------------------------------------------------

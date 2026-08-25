@@ -65,6 +65,14 @@
 (function () {
     'use strict';
 
+    // In RAHMEN (iframes) nie laufen (27.09.). Der Starter spielt den Autopiloten
+    // per Page.addScriptToEvaluateOnNewDocument in JEDEN Rahmen des Tabs ein. Das
+    // Dashboard haelt Mobile und UM in zwei unsichtbaren Rahmen offen (Alle-
+    // Projekte-Betrieb) — ein Autopilot dort saehe ein "fremdes Projekt", stellte
+    // den Rahmen auf die Starter-Marke (Kabel) zurueck und startete ein zweites
+    // Dashboard. Die Rahmen steuert ausschliesslich das Dashboard.
+    try { if (window.top !== window.self) return; } catch (e) { return; }
+
     // Doppelstart vermeiden (Userscript + versehentlicher Konsolen-Paste)
     if (window.__rcAutoPilotV2) { try { console.log('[Autopilot] laeuft bereits.'); } catch (e) {} return; }
     window.__rcAutoPilotV2 = true;
@@ -1093,19 +1101,120 @@
     }
 
     // ========================================================================
+    //  FEHLERSEITE DES BROWSERS  (05.10. spaetabends)
+    // ========================================================================
+    // Laedt eine Portal-Seite nicht (Netz kurz weg, Portal antwortet nicht), zeigt
+    // Edge seine eigene Fehlerseite ("Diese Seite ist nicht erreichbar"). Der
+    // Autopilot laeuft auch dort — an echtem Edge gemessen: location.protocol ist
+    // "chrome-error:", location.hostname "chromewebdata". Bis 05.10. fiel das in
+    // den Zweig "keine bekannte Portal-Seite (chromewebdata)", und danach geschah
+    // NICHTS mehr: die Ligaliste lieferte nicht, bis jemand den Tab von Hand neu
+    // lud (Nutzer 05.10.: "updatet sich nicht immer und gibt immer die Meldung
+    // 'Keine bekannte Portal-Seite'"). So kommt ein Tab dorthin: Crawler und
+    // Dashboard laden nach einem Sitzungsverlust selbst neu — faellt das in einen
+    // Netz-Aussetzer, steht die Fehlerseite. Edges eigener Neuversuch hilft im
+    // Betrieb nicht verlaesslich, die Ligaliste liegt immer im Hintergrund.
+    //   - Der TITEL der Fehlerseite ist der Hostname der Adresse, die nicht lud
+    //     (gemessen). Daran und am Fensternamen wird erkannt, ob es eine UNSERER
+    //     Seiten ist; ein fremder Tab wird nicht angefasst.
+    //   - location.reload() holt von dort die urspruengliche Adresse zurueck
+    //     (gemessen); Fenstername und Verbindung zum Dashboard bleiben.
+    //   - Speicher gibt es dort nicht (sessionStorage wirft SecurityError), also
+    //     auch keinen Zaehler: jeder Fehlversuch landet wieder hier und wartet
+    //     erneut. Bei einem langen Ausfall ist das ein Versuch alle 20 s — so oft
+    //     fragt das Dashboard das ESL ohnehin ab.
+    var FEHLERSEITE_WARTE_SEK = 20;
+    function istFehlerseite() {
+        try { return location.protocol === 'chrome-error:' || H === 'chromewebdata'; } catch (e) { return false; }
+    }
+    // Hostname aus dem Titel der Fehlerseite ("ccs.vodafone.de", notfalls mit
+    // Protokoll, Port oder Pfad drumherum).
+    function fehlerseiteHost() {
+        var t = '';
+        try { t = String(document.title || ''); } catch (e) {}
+        return t.toLowerCase().replace(/^\s+|\s+$/g, '').replace(/^[a-z]+:\/\//, '').split('/')[0].split(':')[0];
+    }
+    // Fehlercode der Fehlerseite ("ERR_CONNECTION_RESET", "HTTP ERROR 500") — an
+    // echtem Edge gemessen: er steht im Element .error-code.
+    function fehlerseiteCode() {
+        try {
+            var e = document.querySelector('.error-code, #error-code');
+            return e ? String(e.textContent || '').replace(/\s+/g, ' ').replace(/^\s+|\s+$/g, '').slice(0, 60) : '';
+        } catch (x) { return ''; }
+    }
+    function fehlerseiteFlow() {
+        var blicke = 0;
+        (function entscheide() {
+            var host = fehlerseiteHost(), wname = '';
+            try { wname = String(window.name || ''); } catch (e) {}
+            // Der Titel steht nicht in der ersten Millisekunde — kurz nachsehen,
+            // bevor "fremd" entschieden wird.
+            if (!host && ++blicke <= 10) { setTimeout(entscheide, 300); return; }
+            var unser = seitenArt(host) !== '' || wname.indexOf('rcKpiQuelle') === 0 || wname.indexOf('rcQueueQuelle') === 0;
+            if (!unser) {
+                banner('Seite nicht erreichbar' + (host ? ' (' + host + ')' : '') + ' — gehoert nicht zu ESL oder Ligaliste, hier passiert nichts.', '#9C9C9C');
+                setTimeout(function () {
+                    try { var b = document.getElementById('rcAutoBanner'); if (b && b.parentNode) b.parentNode.removeChild(b); } catch (e) {}
+                }, 8000);
+                return;
+            }
+            var code = fehlerseiteCode();
+            banner((host || 'Das Portal') + ' ist nicht erreichbar (' + (code || 'Netz oder Portal antwortet nicht') + ') — lade in ' +
+                FEHLERSEITE_WARTE_SEK + ' s von selbst neu.', '#FFB84D');
+            // Dem Dashboard Bescheid geben: die Verbindung dorthin (opener) steht auch
+            // auf der Fehlerseite (gemessen). Dort wird daraus eine Zeile im Logbuch —
+            // sonst saehe man spaeter nur "Ligaliste still" und nicht, warum. Der Text
+            // bleibt bei jedem Versuch GLEICH, damit das Dashboard ihn zusammenfasst.
+            try {
+                if (window.opener) window.opener.postMessage({ type: 'KPI_HINWEIS', zeit: Date.now(),
+                    text: (wname.indexOf('rcQueueQuelle') === 0 ? 'Genesys-Tab' : wname.indexOf('rcKpiQuelle') === 0 ? 'Ligalisten-Tab' : 'Tab') +
+                        ' steht auf der Fehlerseite des Browsers (' + (host || 'Adresse unbekannt') + (code ? ', ' + code : '') +
+                        ') — der Autopilot laedt alle ' + FEHLERSEITE_WARTE_SEK + ' s neu, bis die Seite wieder da ist.' }, '*');
+            } catch (e) {}
+            setTimeout(function () {
+                if (stop) return;
+                try { location.reload(); } catch (e) {}
+            }, FEHLERSEITE_WARTE_SEK * 1000);
+        })();
+    }
+
+    // ========================================================================
     //  WEICHE
     // ========================================================================
+    // EINE Liste der Seiten, die der Autopilot kennt — die Weiche UND die
+    // Fehlerseite fragen sie (zwei Listen liefen auseinander).
+    function seitenArt(h) {
+        h = String(h || '').toLowerCase();
+        if (h === 'esl.regiocom.net') return 'esl';
+        if (h.indexOf('microsoftonline') !== -1 || h === 'login.live.com') return 'ms';
+        if (h === 'ccs.vodafone.de') return 'ccs';
+        return '';
+    }
     function weiche() {
         try {
-            if (H === 'esl.regiocom.net')                     eslFlow();
-            else if (H.indexOf('microsoftonline') !== -1 ||
-                     H === 'login.live.com')                  msFlow();
-            else if (H === 'ccs.vodafone.de')                 ccsFlow();
+            var art = seitenArt(H);
+            // Die Fehlerseite ZUERST: ihr Hostname ("chromewebdata") ist kein
+            // fremder Tab, sondern eine unserer Seiten, die nicht lud.
+            if (istFehlerseite())                             fehlerseiteFlow();
+            else if (art === 'esl')                           eslFlow();
+            else if (art === 'ms')                            msFlow();
+            else if (art === 'ccs')                           ccsFlow();
             // about:blank/data:-Huellen (z.B. der zweite Tab, der laut
             // ESL_Start.ps1 bewusst leer bleibt, bis das Dashboard steht) haben
             // keinen Hostnamen — das ist kein Fehler, sondern der gewollte
             // Wartezustand. Nur bei einem ECHTEN, unbekannten Hostnamen warnen.
-            else if (H) banner('keine bekannte Portal-Seite (' + H + ').', '#9C9C9C');
+            else if (H) {
+                // Fremde Seite: der Starter ruestet JEDEN Tab dieses Browsers aus,
+                // also auch Postfach, Suchmaschine oder eine Anmelde-Zwischenseite.
+                // Das ist kein Fehler und es gibt nichts zu tun. Vorher blieb hier
+                // "keine bekannte Portal-Seite" dauerhaft stehen und las sich wie
+                // eine Stoerung der Ligaliste (Nutzer 05.10.). Jetzt ein Satz, der
+                // sagt, was er meint, und nach 8 s von selbst verschwindet.
+                banner('diese Seite (' + H + ') gehoert nicht zu ESL oder Ligaliste — hier passiert nichts.', '#9C9C9C');
+                setTimeout(function () {
+                    try { var b = document.getElementById('rcAutoBanner'); if (b && b.parentNode) b.parentNode.removeChild(b); } catch (e) {}
+                }, 8000);
+            }
         } catch (e) {
             banner('Fehler: ' + e.message, '#FF6666');
         }

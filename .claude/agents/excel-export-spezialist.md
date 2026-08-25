@@ -71,7 +71,7 @@ Historien-Zweig — ohne diesen Schalter läsen fremde Projekte die Live-Zahlen 
 `rcBuildReportingSheets` hat dafür einen `namen`-Parameter gegen Blattnamen-Kollisionen. Fehlt ein
 Projekt auf diesem PC, wird es als **Lücke ausgewiesen**, statt die Mappe abzubrechen.
 
-**Blatt-/Kennzahl-Sieb** (Export-Dialog, Karte "Inhalt"): `RC_BLAETTER` (14 Blätter an/aus) +
+**Blatt-/Kennzahl-Sieb** (Export-Dialog, Karte "Inhalt"): `RC_BLAETTER` (15 Blätter an/aus — seit 05.10. mit „Ohne Stack“: Agenten ohne Stack-Zuordnung) +
 `RC_KENNZAHLEN_V`/`_Q` (Spalten der beiden Reporting-Blätter). **Bauart ist SIEB, nicht
 Generierung:** `vZeile`/`qZeile` bauen weiter die VOLLE Zeile, `rcKennzahlSieb` entfernt abgewählte
 Spalten aus Header, Zeilen, %-Liste und Breiten. Ohne Auswahl liefert es `null` und der
@@ -228,6 +228,6 @@ Im Zweifel alle 48. Zuletzt `node bundle_bauen.js`.
    Datei → `rcLogoZeichnen`. **`regiocom.png` fehlt im Entwicklungsordner** — hier läuft alles auf
    den gezeichneten Rückfall. Wer die Logo-Optik prüfen will, muss die Datei erst besorgen.
 5. **Keine Emojis** in Blättern, Bildern oder Code. Corporate-Design-Regel.
-6. **`graphify` vor dem Lesen von Quellcode.** `esl_live_arena_v22.js` hat **25106 Zeilen** — nie
+6. **`graphify` vor dem Lesen von Quellcode.** `esl_live_arena_v22.js` hat **28318 Zeilen** — nie
    komplett lesen. Anker über **Funktionsnamen** per `grep -n` setzen, nicht über Zeilennummern:
    die Datei wächst, jede notierte Zeilennummer altert innerhalb von Tagen.

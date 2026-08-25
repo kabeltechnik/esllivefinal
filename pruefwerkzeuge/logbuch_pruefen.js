@@ -274,11 +274,18 @@ abschnitt('6. Die sechs stummen catch-Bloecke der Historie');
     // Jede Schreibstelle einzeln: der naechste catch dahinter MUSS melden.
     // Bewusst ueber die Klammer-Zaehlung statt ueber ein Regex-Fenster —
     // ein Fenster wird beim naechsten Umformulieren grundlos rot.
-    const marke = "setItem(rcKey('rcEslHistory')";
+    // 10 seit 27.10. (Datendienst): rcRepairEslHistory schreibt ohne Marke wie bisher
+    // ueber rcKey, im Dienst-Betrieb zusaetzlich je Projekt-Schluessel (setItem(hk, ...));
+    // rcDienstHistorieAblegen schreibt die Dienst-Vortage zweimal (ESL + Liga) — auch
+    // diese drei neuen Stellen muessen ihren Fehler melden.
+    const marken = ["setItem(rcKey('rcEslHistory')", 'setItem(hk, JSON.stringify(hist))',
+                    'setItem(key, JSON.stringify(hist))', 'setItem(key, JSON.stringify(cur))'];
     const stellen = [];
-    let p = -1;
-    while ((p = src.indexOf(marke, p + 1)) !== -1) stellen.push(p);
-    pruef('Es gibt genau 6 Schreibstellen der Historie', stellen.length === 6, stellen.length);
+    marken.forEach(marke => { let p = -1; while ((p = src.indexOf(marke, p + 1)) !== -1) stellen.push(p); });
+    stellen.sort((a, b) => a - b);
+    // 7 seit 28.09.: die Reparatur vertauschter Tage (rcHistorieFremdeTage) schreibt
+    // die bereinigte Historie zurueck — auch sie muss ihren Fehler melden.
+    pruef('Es gibt genau 10 Schreibstellen der Historie', stellen.length === 10, stellen.length);
     stellen.forEach((s, i) => {
         const c = src.indexOf('catch', s);
         const koerper = c > 0 ? src.slice(c, blockEnde(src, c)) : '';
@@ -290,7 +297,7 @@ abschnitt('6. Die sechs stummen catch-Bloecke der Historie');
     // "rcHistorieSpeicherFehler = function" und traegt keine Klammer direkt
     // hinter dem Namen, faellt hier also nicht mit hinein.
     const rufe = (src.match(/rcHistorieSpeicherFehler\(/g) || []).length;
-    pruef('rcHistorieSpeicherFehler wird genau 6x gerufen', rufe === 6, rufe);
+    pruef('rcHistorieSpeicherFehler wird genau 10x gerufen (eine Meldung je Schreibstelle)', rufe === 10, rufe);
     pruef('...und genau einmal definiert',
           (src.match(/rcHistorieSpeicherFehler = function/g) || []).length === 1);
 }
@@ -434,7 +441,9 @@ abschnitt('9. Quellen-Waechter schreibt WECHSEL ins Logbuch (12.08.)');
         // aufgeloest werden koennen, genau wie im Original.
         const f = new Function('window', 'localStorage', 'realConsole', 'document', 'Blob', 'URL', 'setTimeout',
             'function rcQuellenZeitAnzeige(){} function rcQuellenBanner(){}\n' +
-            BEREICH + '\n' + WBEREICH +
+            BEREICH + '\n' + WBEREICH + '\n' +
+            // der echte Dienst-Schalter (27.10.): rcWdTick im Block fragt ihn; ohne Marke wie bisher
+            require('./_stack_regel.js').schneide(src, 'function rcDienstModus(') +
             '\nreturn { tick: rcQuellenWatchTick, laden: rcLogbuchLaden };');
         const api = f(win, speicher, konsole, dokument,
             function Blob(){ return {}; },
@@ -608,7 +617,9 @@ abschnitt('10. Datumswechsel um Mitternacht (12.08.)');
     // "gebaut, aber wirkungslos", der haeufigste Fallstrick dieses Projekts.
     {
         const p = src.indexOf('async function rcPortalAufHeute(');
-        const kopf = src.slice(p, p + 260);
+        // Ganze Funktion per Klammer-Zaehlung statt fester 260 Zeichen — ein
+        // Kommentar am Anfang (28.09.) schob die Sperre sonst aus dem Fenster.
+        const kopf = src.slice(p, blockEnde(src, p));
         pruef('rcPortalAufHeute hat den Parameter erzwingen', /rcPortalAufHeute\(erzwingen\)/.test(kopf), kopf.slice(0, 60));
         pruef('...und wertet ihn in der Sperre aus', /if \(!erzwingen && jetzt - rcTagFixZuletzt/.test(kopf));
     }

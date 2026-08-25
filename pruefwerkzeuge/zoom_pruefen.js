@@ -127,6 +127,57 @@ pruefe('rcZoomAuto zeichnet auch beim ABschalten neu (Beschriftung ehrlich)',
   /window\.rcApplyZoom\(an \? rcZoomAutoWert\(\) : \(window\.rcZoom \|\| 1\), false\)/.test(SRC));
 
 /* ---------------------------------------------------------------------------
+   2b) Vorgabe 100 % — Nutzer-Vorgabe 05.10.: "immer auf 100 % Zoom und nicht 150"
+   Die Automatik ergab bei 1920 px 150 %; der Kopfleiste blieben 1280 px und das
+   Werkzeug-Menue lag ausserhalb des Bildes (kopfleiste_pruefen.js).
+--------------------------------------------------------------------------- */
+console.log('');
+console.log('2b) Vorgabe 100 %: Automatik ab Werk AUS, einmalige Umstellung');
+{
+  const anFn = schneide(SRC, 'window.rcZoomAutoAn = function()');
+  const migFn = schneide(SRC, 'function rcZoomAufHundertMigrieren()');
+  pruefe('rcZoomAutoAn und die Umstellung lassen sich ausschneiden', !!anFn && !!migFn);
+  const speicher = init => { const o = Object.assign({}, init); return { o, getItem: k => (k in o ? o[k] : null), setItem: (k, v) => { o[k] = String(v); } }; };
+  const autoAn = (ls, quell) => new Function('window', 'localStorage', (quell || anFn) + ';\nreturn window.rcZoomAutoAn();')({}, ls);
+  if (anFn && migFn) {
+    pruefe('nichts gespeichert: Automatik AUS', autoAn(speicher({})) === false);
+    pruefe('ausdruecklich eingeschaltet ("1"): Automatik an', autoAn(speicher({ rcZoomAuto: '1' })) === true);
+    pruefe('ausgeschaltet ("0"): aus', autoAn(speicher({ rcZoomAuto: '0' })) === false);
+    pruefe('gesperrter Speicher (wirft): aus, kein Absturz', autoAn({ getItem: () => { throw new Error('gesperrt'); } }) === false);
+    // GEGENPROBE: die Vorgabe bis 05.10. — alles ausser "0" galt als AN.
+    const alt = anFn.replace("=== '1'; } catch(e){ return false; }", "!== '0'; } catch(e){ return true; }");
+    pruefe('GEGENPROBE die alte Vorgabe laesst sich bauen und liefert ohne gespeicherten Wert AN',
+      alt !== anFn && autoAn(speicher({}), alt) === true);
+
+    const mig = ls => new Function('localStorage', migFn + '\nreturn rcZoomAufHundertMigrieren();')(ls);
+    let ls = speicher({ rcZoomAuto: '1', rcZoom: '1.5' });
+    pruefe('Umstellung: gespeicherte Automatik + 150 % werden auf "aus, 100 %" gestellt',
+      mig(ls) === true && ls.o.rcZoomAuto === '0' && ls.o.rcZoom === '1' && ls.o.rcZoom100Migriert === '1', JSON.stringify(ls.o));
+    ls.o.rcZoomAuto = '1'; ls.o.rcZoom = '1.25';      // der Nutzer stellt spaeter selbst um
+    pruefe('  ... genau EINMAL: eine spaetere Einstellung des Nutzers bleibt stehen (Marke)',
+      mig(ls) === false && ls.o.rcZoomAuto === '1' && ls.o.rcZoom === '1.25', JSON.stringify(ls.o));
+    ls = speicher({});
+    pruefe('  ... auch ohne gespeicherte Werte wird die Marke gesetzt', mig(ls) === true && ls.o.rcZoom100Migriert === '1');
+    pruefe('  ... gesperrter Speicher: kein Absturz', mig({ getItem: () => { throw new Error('x'); }, setItem: () => {} }) === false);
+    const iMig = SRC.indexOf('\n    rcZoomAufHundertMigrieren();');
+    pruefe('die Umstellung laeuft VOR der ersten Abfrage der Automatik',
+      iMig > 0 && iMig < SRC.indexOf('window.rcZoomAutoAn = function()'));
+    pruefe('die Marke gehoert zur Komplett-Sicherung (sonst setzt ein Einspielen die Wahl des Nutzers zurueck)',
+      /RC_SICHERN_PLAIN = \[[^\]]*'rcZoom100Migriert'/.test(SRC));
+  }
+  // Start-Block: der Horcher haengt IMMER, und auch 100 % wird gesetzt.
+  const a = SRC.indexOf("window.addEventListener('resize', window.__rcZoomResize);");
+  const b = SRC.indexOf('if (window.rcZoomAutoAn()) { window.rcApplyZoom(rcZoomAutoWert(), false); return; }');
+  pruefe('der Resize-Horcher haengt IMMER (vor der Abfrage der Automatik)', a > 0 && b > a,
+    'Sonst folgt eine spaeter eingeschaltete Automatik dem Fenster erst nach dem naechsten Neuladen.');
+  const start = b > 0 ? SRC.slice(b, b + 700) : '';
+  pruefe('auch 100 % wird GESETZT (--rc-zoom haengt am Dokument und ueberlebt einen Re-Inject)',
+    /let z = 1; try \{ z = parseFloat\(localStorage\.getItem\('rcZoom'\)\) \|\| 1; \} catch\(e\)\{\}\s*\n\s*window\.rcApplyZoom\(z, false\);/.test(start));
+  pruefe('GEGENPROBE die alte Abkuerzung "nur wenn ungleich 1" ist RAUS',
+    !/if \(z && z !== 1\) window\.rcApplyZoom\(z, false\);/.test(SRC));
+}
+
+/* ---------------------------------------------------------------------------
    3) CSS: alles skaliert mit, nichts skaliert doppelt
 --------------------------------------------------------------------------- */
 console.log('');

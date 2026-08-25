@@ -109,7 +109,7 @@ Spezialwissen:
    verifizieren — **rAF feuert in Hintergrund-Tabs nicht**, gemessen 1 Frame in 504 Sekunden bei
    verborgener Seite. Ein Wandmonitor mit mehreren Fenstern ist genau dieser Fall.
 8. **Vor dem Lesen von Code**: `graphify query "<Frage>"` statt v22.js komplett zu lesen (die Datei
-   hat **25106 Zeilen** und wächst). Anker über **Funktionsnamen** per `grep -n` setzen, nicht über
+   hat **28318 Zeilen** und wächst). Anker über **Funktionsnamen** per `grep -n` setzen, nicht über
    notierte Zeilennummern — die altern innerhalb von Tagen.
 9. **Farbpalette: `VODAFONE_DESIGN.md` ist verbindlich.** Zustände dreistufig — ok `#008A00`,
    warn `#EB9700`, breach `#E60000`; Marke Rot `#E60000` / Dunkelrot `#BD0000`. Standortfarben

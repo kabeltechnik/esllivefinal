@@ -138,9 +138,14 @@ pruefe('"team:X" setzt ein festes Team', (function () {
 // Kachel dann auch DRAUFSCHREIBT, dass sie dem Filter folgt: still etwas
 // anderes zu zeigen, als oben steht, waere der eigentliche Fehler.
 {
+  // modScopeText schreibt den Stack-Filter seit 05.10. lesbar ('P:kabel' ->
+  // "Kabel gesamt") — die echte Regel dazu kommt aus dem gemeinsamen Baustein.
   const modScopeText = new Function('window', 'H', 'mbNationName', 'esc',
-    schneide(SRC, 'function modScopeText(sc)') + '; return modScopeText;'
+    require('./_stack_regel.js').quelltext(SRC) + '\n' + schneide(SRC, 'function modScopeText(sc)') + '; return modScopeText;'
   )({}, { std: c => 'Standort ' + c }, n => n, s => s);
+  pruefe('der Kopf nennt einen Projekt-Filter beim Namen ("Kabel gesamt", nicht "P:kabel")',
+    /Kabel gesamt/.test(modScopeText({ folgt: true, std: 'ALL', team: 'ALL', stack: 'P:kabel', nation: 'ALL' })) &&
+    !/P:kabel/.test(modScopeText({ folgt: true, std: 'ALL', team: 'ALL', stack: 'P:kabel', nation: 'ALL' })));
   const s = modScope({ scope: 'quatsch' });
   pruefe('ein kaputter Zuschnitt-Wert faellt auf den Dashboard-Filter zurueck UND sagt es',
     s.folgt === true && /Dashboard-Filter/.test(modScopeText(s)),
@@ -223,6 +228,44 @@ pruefe('rcWarBoteCands traegt die vo (sonst kein Join mit den Verkaeufen)',
   const nurT2 = mbAgentenFrei({ std: 'ALL', team: 'T2', stack: 'ALL', nation: 'ALL', folgt: false });
   pruefe('Team-Zuschnitt nimmt KEINE Boten ohne bekanntes Team auf (nicht raten)',
     nurT2.length === 1 && nurT2[0].vo === 'v2', JSON.stringify(nurT2.map(a => a.vo)));
+
+  // STACK-Zuschnitt ueber die EINE Regel (05.10.): Mapping, sonst eindeutiger
+  // Anker; 'P:<projekt>' nimmt das ganze Projekt aus der Lieferung. Vorher
+  // stand hier stackMap[team] — ein Agent ohne Mapping-Eintrag fiel aus jeder
+  // stack-geschnittenen Kachel, obwohl der Export ihn mitzaehlte.
+  const REGEL = require('./_stack_regel.js').quelltext(SRC) + '\n';
+  const wS = {
+    rcWcaMapping: { stackMap: { 'VKD-TECH-83': 'VKD_Tech', 'MF-CARE-01': 'MF_CARE' } },
+    rcRohTeamStack: { 'Vodafone AL 06': 'VKD_Tech' },          // Anker: gemappte Kollegen desselben ESL-Rohteams
+    rcKpiData: {},
+    rcAllSales: [
+      { vo: 'm1', name: 'Mapping', team: 'VKD-TECH-83', standort: 'AL', cat: 'kip', isBnt: true, anzahl: 1, projekt: 'kabel' },
+      { vo: 'a1', name: '4711',    team: 'Vodafone AL 06', standort: 'AL', cat: 'kip', isBnt: true, anzahl: 2, projekt: 'kabel' },
+      { vo: 'o1', name: '4712',    team: 'Kabel Neu 99',   standort: 'AL', cat: 'kip', isBnt: true, anzahl: 4, projekt: 'kabel' },
+      { vo: 'c1', name: 'Care',    team: 'MF-CARE-01',     standort: 'AL', cat: 'mob', isBnt: true, anzahl: 8, projekt: 'mobile' }
+    ],
+    rcWarBoteCands: []
+  };
+  const frei = (stack, fenster) => new Function('window', REGEL + body)(fenster || wS)({ std: 'ALL', team: 'ALL', stack: stack, nation: 'ALL', folgt: false })
+    .map(a => a.vo).sort().join(',');
+  pruefe('Stack-Zuschnitt: Mapping UND Anker zaehlen (VKD_Tech -> m1 + a1)', frei('VKD_Tech') === 'a1,m1', frei('VKD_Tech'));
+  pruefe('Stack-Zuschnitt: ohne Mapping und ohne Anker bleibt ein Agent draussen (nicht raten)', frei('VKD_Tech').indexOf('o1') === -1);
+  pruefe('"Kabel gesamt" (P:kabel) nimmt die ganze Lieferung — auch den Agenten ohne Stack', frei('P:kabel') === 'a1,m1,o1', frei('P:kabel'));
+  pruefe('"Kabel gesamt" laesst das andere Projekt draussen', frei('P:kabel').indexOf('c1') === -1 && frei('P:mobile') === 'c1', frei('P:mobile'));
+  pruefe('GEGENPROBE: ohne den Anker faellt der Agent aus dem Stack-Zuschnitt (die Lage vor dem 05.10.)',
+    frei('VKD_Tech', Object.assign({}, wS, { rcRohTeamStack: {} })) === 'm1');
+
+  // mbSales (die Verkaufsliste der Kacheln): der Stack-Filter fehlte dort ganz — d.sales ist
+  // die UNGEFILTERTE Liste, eine Kachel unter Stack-Filter zeigte die Verkaeufe aller Stacks.
+  const mbSales = new Function('window', REGEL + stdIn + 'function mbNation(c){ return ""; }' + schneide(SRC, 'function mbSales(d, sc){') + '; return mbSales;')(wS);
+  const vk = stack => mbSales({ sales: wS.rcAllSales }, { std: 'ALL', team: 'ALL', stack: stack, nation: 'ALL' }).map(v => v.vo).sort().join(',');
+  pruefe('mbSales: ohne Stack-Filter alle Verkaeufe', vk('ALL') === 'a1,c1,m1,o1', vk('ALL'));
+  pruefe('mbSales: unter einem Stack-Filter nur dessen Verkaeufe (Mapping und Anker)', vk('VKD_Tech') === 'a1,m1' && vk('MF_CARE') === 'c1', vk('VKD_Tech') + ' / ' + vk('MF_CARE'));
+  pruefe('mbSales: "Kabel gesamt" nimmt die Lieferung', vk('P:kabel') === 'a1,m1,o1', vk('P:kabel'));
+  pruefe('GEGENPROBE: die Fassung ohne Stack-Zeile liefert unter dem Filter ALLE Verkaeufe',
+    (function () { const alt = schneide(SRC, 'function mbSales(d, sc){').replace("if(sc.stack!=='ALL' && !rcStackFilterPasst(v.team, sc.stack, v.projekt)) return false;", '');
+      const f = new Function('window', REGEL + stdIn + 'function mbNation(c){ return ""; }' + alt + '; return mbSales;')(wS);
+      return alt !== schneide(SRC, 'function mbSales(d, sc){') && f({ sales: wS.rcAllSales }, { std: 'ALL', team: 'ALL', stack: 'VKD_Tech', nation: 'ALL' }).length === 4; })());
 }
 
 /* ---------------------------------------------------------------------------
