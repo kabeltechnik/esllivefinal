@@ -127,7 +127,8 @@ validierte, entity-gebundene Farbzuordnung.
    „vergessen aufzuhellen". Nicht ungefragt umstellen.
 3. **Keine Emojis**, ausnahmslos, in jeder Komponente.
 4. **Statusfarbe ≠ Serienfarbe**, in beide Richtungen, ausnahmslos.
-5. **Kein CDN für Kernstyling** — Vodafone-Fonts liegen lokal (`Vodafone.ttf`/`-Bold`/`-Light`),
+5. **Kein CDN für Kernstyling** — die Vodafone-Schrift steckt als Base64-woff2 direkt im
+   Dashboard-CSS (die losen `.ttf`-Dateien sind am 11.10. gelöscht, sie wurden nie geladen);
    keine Web-Font-CDN-Abhängigkeit einführen.
 6. **Zeitbasierte Animation, nicht framebasierte** — jede neue Bewegung skaliert mit `dt`, nie mit
    einer festen Pro-Frame-Konstante (sonst Physik-/Timing-Bruch bei Lag oder Tab-Wechsel).

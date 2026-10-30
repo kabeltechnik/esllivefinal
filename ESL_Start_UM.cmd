@@ -13,6 +13,6 @@ REM  Grund: geteilt wurde nie der Rechner, sondern das Edge-PROFIL
 REM  - ein Profil hat EINEN Cookie-Jar und damit EINE ESL-Sitzung,
 REM  weshalb sich zwei Projekte darin gegenseitig umkippten.
 REM  Der alte Weg "Tabs im laufenden Kabel-Edge dazuschalten"
-REM  (ESL_Start_Mobile_UM.cmd) bricht deshalb jetzt ab.
+REM  (ESL_Start_Mobile_UM.cmd) ist deshalb entfernt (11.10.).
 REM ==========================================================
 call "%~dp0ESL_Start.cmd" um

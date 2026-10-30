@@ -21,3 +21,19 @@ veyseLL_Update_*.txt
 ligaliste_vorlage_mitschnitt.txt
 ESL_Kopierte_Konsolen_Codes.txt
 .driver_state.json
+liga_0909.json
+
+# Uebergabepakete (paket_bauen.js)
+Paket_*.txt
+
+# Datendienst (esl_dienst.js): Exporte, Ligaliste und Protokoll tragen Personendaten
+Dienst_Daten/
+esl_dienst.log*
+esl_dienst.lock*
+# Mail-Zentrum: Liste wichtiger Absender (Namen/Adressen von Kollegen)
+Postfach_Wichtig.txt*
+
+# Konsolen-Mitschnitte mit Sitzungs-Cookies (bleiben lokal)
+Konsolen_COdes/Croco_CR_Excel.txt
+Konsolen_COdes/FluxCX.txt
+Konsolen_COdes/SimpleStats.txt

@@ -107,7 +107,10 @@ function bauSeite(opts) {
     opts = opts || {};
     const root = El('root');
     const form = kind(root, El('form', { id: 'filterForm' }));
-    if (opts.passwort) kind(root, El('input', { type: 'password' }));
+    // passwort: sichtbare Anmeldemaske. pwVerborgen: das verborgene Feld, das
+    // JEDE ESL-Seite traegt (27.09. gemessen) — es darf die Wache nicht sperren.
+    if (opts.passwort) kind(root, El('input', { type: 'password', offsetWidth: 180, offsetHeight: 24 }));
+    if (opts.pwVerborgen) kind(root, El('input', { type: 'password', offsetWidth: 0, offsetHeight: 0 }));
     const box = opts.ohneWidget ? form : kind(form, El('div', { className: 'ui-selectonemenu' }));
     const sel = kind(box, El('select'));
     const o0 = { textContent: '', value: '' };
@@ -133,6 +136,10 @@ console.log('=== export_ansicht_pruefen ===');
 //  BLOCK A — v22: rcExportAnsichtSicherstellen
 // ============================================================================
 const wacheSrc = schneide(V22, 'function rcExportAnsichtSicherstellen(){');
+// Seit 28.09. fragt die Wache rcPasswortSichtbar (nur eine SICHTBARE Maske zaehlt:
+// jede ESL-Seite traegt ein verborgenes Passwortfeld, die Wache griff dadurch nie).
+const pwSrc = schneide(V22, 'function rcPasswortSichtbar(d){');
+const wacheLaufSrc = (pwSrc || '') + '\n' + wacheSrc;
 pruefe('A1: rcExportAnsichtSicherstellen ist als Funktionsdeklaration in v22', !!wacheSrc);
 pruefe('A2: window-Export vorhanden', V22.indexOf('window.rcExportAnsichtSicherstellen = rcExportAnsichtSicherstellen') >= 0);
 
@@ -162,7 +169,7 @@ function wacheLauf(seite, extra) {
     const timeouts = [];
     const fakeWin = Object.assign({ rcEslFehlserie: 3, rcLogEreignis: function(t){ fakeWin._log = t; } }, extra || {});
     const fn = new Function('document', 'window', 'setTimeout', 'Date',
-        wacheSrc + '\nreturn rcExportAnsichtSicherstellen();');
+        wacheLaufSrc + '\nreturn rcExportAnsichtSicherstellen();');
     const jetztRef = { t: 1000000 };
     const fakeDate = { now: function(){ return jetztRef.t; } };
     const st = function(f, ms){ timeouts.push({ f: f, ms: ms }); };
@@ -197,7 +204,25 @@ function wacheLauf(seite, extra) {
 (function(){
     const s = bauSeite({ passwort: true });
     const r = wacheLauf(s);
-    pruefe('A9: Passwortfeld auf der Seite -> Wache steigt aus', r.ergebnis === false && s.trig.geklickt === 0);
+    pruefe('A9: SICHTBARE Anmeldemaske -> Wache steigt aus', r.ergebnis === false && s.trig.geklickt === 0);
+})();
+// A9b: das verborgene Passwortfeld jeder ESL-Seite sperrt die Wache NICHT (28.09.)
+(function(){
+    const s = bauSeite({ pwVerborgen: true });
+    const r = wacheLauf(s);
+    pruefe('A9b: nur verborgenes Passwortfeld -> Wache handelt trotzdem', r.ergebnis === true && s.trig.geklickt === 1);
+    // Gegenprobe: die alte Bedingung (jedes Passwortfeld) haette hier ausgestiegen
+    const altSrc = wacheLaufSrc.replace('if (rcPasswortSichtbar(document)) return false;', "if (document.querySelector('input[type=\"password\"]')) return false;");
+    const fnAlt = new Function('document', 'window', 'setTimeout', 'Date', altSrc + '\nreturn rcExportAnsichtSicherstellen();');
+    const s2 = bauSeite({ pwVerborgen: true });
+    const eAlt = fnAlt(docAus(s2.root), { rcEslFehlserie: 3, rcLogEreignis: function(){} }, function(){}, { now: function(){ return 1000000; } });
+    pruefe('A9c: Gegenprobe — die ALTE Bedingung blieb am verborgenen Feld haengen', altSrc !== wacheLaufSrc && eAlt === false && s2.trig.geklickt === 0);
+})();
+// A9d: Alle-Projekte-Betrieb — exportiert wird im Arbeitsrahmen, die Kabel-Seite bleibt unangetastet
+(function(){
+    const s = bauSeite({});
+    const r = wacheLauf(s, { rcAlleProjekteModus: true });
+    pruefe('A9d: Alle-Projekte-Betrieb -> Wache fasst die Kabel-Seite nicht an', r.ergebnis === false && s.trig.geklickt === 0);
 })();
 
 // A10: kein filterForm -> aus
@@ -212,7 +237,7 @@ function wacheLauf(seite, extra) {
     const timeouts = [];
     const fakeWin = { rcEslFehlserie: 3, rcLogEreignis: function(){} };
     const fn = new Function('document', 'window', 'setTimeout', 'Date',
-        wacheSrc + '\nreturn rcExportAnsichtSicherstellen;');
+        wacheLaufSrc + '\nreturn rcExportAnsichtSicherstellen;');
     const jetztRef = { t: 1000000 };
     const fakeDate = { now: function(){ return jetztRef.t; } };
     const s1 = bauSeite({});
@@ -261,7 +286,7 @@ function wacheLauf(seite, extra) {
     const timeouts = [];
     const fakeWin = { rcEslFehlserie: 4, rcLogEreignis: function(){} };
     const fn = new Function('document', 'window', 'setTimeout', 'Date',
-        wacheSrc + '\nreturn rcExportAnsichtSicherstellen;');
+        wacheLaufSrc + '\nreturn rcExportAnsichtSicherstellen;');
     const jetztRef = { t: 1000000 };
     const fakeDate = { now: function(){ return jetztRef.t; } };
     const s = bauSeite({});

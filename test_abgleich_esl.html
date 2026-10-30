@@ -1,0 +1,499 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>ESL-Abgleich — Report gegen Exporte</title>
+<!-- Prueft den Excel-Report des ECHTEN Dashboards gegen die ESL-Rohexporte
+     (28.09.: "Stueckzahlen stimmen nicht"). Laedt drei gleichzeitig gezogene
+     Exporte (Kabel/Mobile/UM) + Mitarbeiter-Excel, fuehrt sie ueber
+     rcVerarbeiteAlle zusammen, exportiert mit Standort-Filter und vergleicht
+     die Mappe mit einer UNABHAENGIGEN Sollrechnung aus den Rohzeilen.
+     Sollregeln = Nutzer-Vorgaben, nicht der Dashboard-Code: Stueck = anzahl bei
+     "angenommen"; Potential Tracking/Info World raus; BNT/VVL steht im Gruppen-
+     bzw. Produktnamen (gruppenlose "UM TV Connect"/"UM Internet&Phone" = VVL, Vorgabe 29.09.);
+     Geraete und NBA-Tipps sind kein Vertrieb.
+     Aufruf (Server esl-offline): test_abgleich_esl.html?std=AL
+       &k=Export_20260928_212911.xlsx&m=Export_20260928_212922.xlsx&u=Export_20260928_212931.xlsx
+     Die Dateien liegen in "Test Excels/" (nicht im Repo — echte Daten).
+     &dienst=1 (27.10.): dieselben Pruefungen im Dienst-Betrieb. Die Seite spielt den
+       Datendienst nach (gefaelschtes fetch unter /__dienst) und startet das Dashboard
+       ueber das Skript der ECHTEN Gastseite ESL_Live_Arena.html (zwei Ersetzungen:
+       Basis -> /__dienst, v22-Pfad -> src). Die Daten kommen ueber den Empfang in v22.
+       Dazu: Vortag aus der Liga-Datei des Dienstes, keine Fenster/kein Neuladen,
+       Re-Inject. &ohnemapping=1: /api/mapping.xlsx antwortet 503; &ohnemapping=haengt: sie
+       antwortet nie (Frist der Gastseite). &altmapping=1: ein ANDERES Mapping ist gespeichert
+       (zweiter Start, Ruling R14) - nach dem Start muss die Excel des Dienstes gelten. -->
+<form id="filterForm"><input class="hasDatepicker" name="von"><input class="hasDatepicker" name="bis">
+<button type="submit">Suchen</button><button type="submit">Excel</button></form>
+<pre id="log" style="font:12px monospace"></pre>
+<script>
+window.__fehler = [];
+(function(){ const e = console.error; console.error = function(){ try { window.__fehler.push(Array.prototype.map.call(arguments, function(a){ return a && a.stack ? a.stack : String(a); }).join(' ')); } catch(x){} return e.apply(console, arguments); }; })();
+try { localStorage.setItem('rcLigaOeffnenAus', '1'); } catch(e){}
+</script>
+<script src="node_modules/xlsx/dist/xlsx.full.min.js"></script>
+<!-- ?src=<datei.js> laedt eine andere Fassung (Gegenprobe: die alte muss durchfallen).
+     Mit dienst=1 laedt die Gastseite v22 (siehe dienstStarten), nicht diese Zeile. -->
+<script>if (new URLSearchParams(location.search).get('dienst') !== '1') document.write('<scr'+'ipt src="'+(new URLSearchParams(location.search).get('src')||'esl_live_arena_v22.js')+'?t='+Date.now()+'"></scr'+'ipt>');</script>
+<script>
+window.__fertig = false;
+const Q = new URLSearchParams(location.search);
+const STD_FILTER = Q.get('std') || 'AL';
+const DATEI = { kabel: Q.get('k') || 'Export_20260928_212911.xlsx', mobile: Q.get('m') || 'Export_20260928_212922.xlsx', um: Q.get('u') || 'Export_20260928_212931.xlsx' };
+let ok = 0, rot = 0;
+function L(s){ document.getElementById('log').textContent += s + '\n'; }
+function pruefe(name, bed, info){ if (bed) ok++; else rot++; L((bed ? 'OK   ' : 'ROT  ') + name + (info ? '  (' + info + ')' : '')); }
+const p2 = n => String(n).padStart(2,'0');
+function heuteIso(){ const d = new Date(); return d.getFullYear()+'-'+p2(d.getMonth()+1)+'-'+p2(d.getDate()); }
+async function blatt(pfad, name){
+    const wb = XLSX.read(new Uint8Array(await (await fetch(pfad)).arrayBuffer()), { type:'array' });
+    return XLSX.utils.sheet_to_json(wb.Sheets[name || wb.SheetNames[0]], { header:1, defval:'' });
+}
+// Auf HEUTE datieren (die Uhrzeit ist fuer den Abgleich egal) — damit laeuft die Seite an jedem Tag.
+function aufHeute(rows){ const iD = rows[0].map(x => String(x).toLowerCase().trim()).indexOf('datum'), h = heuteIso(); for (let i = 1; i < rows.length; i++) if (rows[i]) rows[i][iD] = h; return rows; }
+const warte = ms => new Promise(r => setTimeout(r, ms));
+// Mapping wie das Dashboard (VO-Spalten per Kopf erkannt) — aus den Bytes der Mitarbeiter-Excel.
+function mappingLesen(bytes){
+    const wb = XLSX.read(bytes, { type:'array' });
+    const mr = XLSX.utils.sheet_to_json(wb.Sheets['Daten'], { header:1, defval:'' });
+    const mi = mr.findIndex(r => r && r.some(c => /ccs_user/i.test(String(c))));
+    const H = mr[mi].map(c => String(c).toLowerCase().trim());
+    const iC = H.indexOf('ccs_user'), iN = H.indexOf('namen'), iS = H.indexOf('standort'), iT = H.indexOf('team'), iSt = H.indexOf('stack');
+    const voSp = H.map((x, i) => /^vo_id/.test(x) ? i : -1).filter(i => i >= 0);
+    const ccsMap = {}, voMap = {}, stackMap = {};
+    mr.slice(mi + 1).forEach(r => {
+        const ccs = String(r[iC] || '').trim(); if (!ccs) return;
+        const rec = { ccsId: ccs, name: String(r[iN] || '').trim(), team: String(r[iT] || '').trim(), standort: String(r[iS] || '').trim() };
+        ccsMap[ccs] = rec; if (rec.team && r[iSt]) stackMap[rec.team] = String(r[iSt]).trim();
+        voSp.forEach(k => { const vo = String(r[k] || '').trim(); if (vo) voMap[vo] = rec; });
+    });
+    return { voMap, ccsMap, stackMap };
+}
+async function exporteLesen(){
+    const P = {};
+    for (const k of Object.keys(DATEI)) P[k] = aufHeute(await blatt('Test%20Excels/' + encodeURIComponent(DATEI[k])));
+    return P;
+}
+
+// ---- Dienst-Modus (?dienst=1, 27.10.): falscher Datendienst + echte Gastseite ----
+const DIENST = Q.get('dienst') === '1', HAENGT = Q.get('ohnemapping') === 'haengt', OHNEMAP = Q.get('ohnemapping') === '1' || HAENGT;
+const ALTMAP = Q.get('altmapping') === '1';
+const SRC = Q.get('src') || 'esl_live_arena_v22.js';
+const GAST = Q.get('gast') || 'ESL_Live_Arena.html';      // gast=<datei>: Gegenprobe mit veraenderter Gastseite
+const GRUND_503 = 'Mitarbeiter_IDS_Final_komplett.xlsx ist gesperrt oder fehlt (in Excel geoeffnet?)';
+const D = window.__dienstTest = { anfragen: [], unbekannt: [], fehler: '' };
+const T0 = Date.now();
+function gesternIso(){ const d = new Date(); d.setDate(d.getDate() - 1); return d.getFullYear()+'-'+p2(d.getMonth()+1)+'-'+p2(d.getDate()); }
+function zuB64(u8){ let s = ''; for (let i = 0; i < u8.length; i += 0x8000) s += String.fromCharCode.apply(null, u8.subarray(i, i + 0x8000)); return btoa(s); }
+// Das ALTE Mapping (altmapping=1): neun Agenten weniger, einer in einem anderen Team.
+function altesMapping(bytes){
+    const wb = XLSX.read(bytes, { type:'array' }), ws = wb.Sheets['Daten'];
+    const mr = XLSX.utils.sheet_to_json(ws, { header:1, defval:'' });
+    const mi = mr.findIndex(r => r && r.some(c => /ccs_user/i.test(String(c)))), H = mr[mi].map(c => String(c).toLowerCase().trim());
+    const iC = H.indexOf('ccs_user'), iT = H.indexOf('team');
+    const zeilen = mr.slice(0, mr.length - 9), z = zeilen.findIndex((r, i) => i > mi && String(r[iC] || '').trim());
+    D.altCcs = String(zeilen[z][iC]).trim(); zeilen[z][iT] = 'ALT-TEAM-R14';
+    wb.Sheets['Daten'] = XLSX.utils.aoa_to_sheet(zeilen);
+    return new Uint8Array(XLSX.write(wb, { type:'array', bookType:'xlsx' }));
+}
+function alsXlsx(rows){
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rows), 'dataTable');
+    return new Uint8Array(XLSX.write(wb, { type:'array', bookType:'xlsx' }));
+}
+async function dienstStarten(){
+    const ORIG = window.fetch.bind(window);
+    D.orig = ORIG;
+    // Spione VOR v22. location.reload laesst sich nicht ersetzen (unforgeable) —
+    // ein Neuladen zeigt sich am Navigationstyp der Seite und an beforeunload.
+    const sp = D.spion = { open:0, verlassen:0, takte: new Set(),
+        neuGeladen: ((performance.getEntriesByType('navigation') || [])[0] || {}).type === 'reload' };
+    window.open = function(){ sp.open++; return null; };
+    window.addEventListener('beforeunload', function(){ sp.verlassen++; });
+    const sI = window.setInterval, cI = window.clearInterval;
+    window.setInterval = function(fn){ const id = sI.apply(window, arguments); if (fn && fn.name === 'rcDienstEmpfangTick') sp.takte.add(id); return id; };
+    window.clearInterval = function(id){ sp.takte.delete(id); return cI.apply(window, arguments); };
+    // Die Gastseite hat kein Portal-Formular.
+    const ff = document.getElementById('filterForm'); if (ff) ff.remove();
+
+    // Was der Dienst ausliefert: die drei Exporte (heute, neu geschrieben), Mapping, ein Vortag Liga.
+    D.mapBuf = new Uint8Array(await (await ORIG('Mitarbeiter_IDS_Final_komplett.xlsx')).arrayBuffer());
+    D.map = mappingLesen(D.mapBuf);
+    D.P = await exporteLesen();
+    const XL = { kabel: alsXlsx(D.P.kabel), mobile: alsXlsx(D.P.mobile), um: alsXlsx(D.P.um) };
+    D.gestern = gesternIso();
+    const jetzt = Date.now(), cm = D.map.ccsMap;
+    D.drei = Object.keys(cm).filter(c => cm[c].standort && cm[c].team).slice(0, 3);
+    const tag = { nurCalls: true, byAgent: {}, byStd: {}, tot: { calls: 0, agents: 0 } };
+    D.drei.forEach((c, i) => {
+        const n = [11, 7, 3][i], s = stdCode(cm[c].standort), b = tag.byStd[s] || (tag.byStd[s] = { calls: 0, agents: 0 });
+        tag.byAgent[c] = { c: n }; b.calls += n; b.agents++; tag.tot.calls += n; tag.tot.agents++;
+    });
+    const vt = n => ({ nr: n, zeit: n ? jetzt : 0, von: n ? D.gestern : '', bis: n ? D.gestern : '',
+        esl: { art: n ? 'leer' : '', grund: '' }, liga: { art: n ? 'ok' : '', tage: n, grund: '' } });
+    const es = p => ({ nr: 1, zeit: jetzt, art: 'excel', status: null, grund: '', bytes: XL[p].length });
+    const STAND = { nr: 1, aktiv: 'kabel', dienst: { start: jetzt, edge: 'eigen', flags: { zustand: '', fehlt: [] } },
+        esl: { kabel: es('kabel'), mobile: es('mobile'), um: es('um') },
+        liga: { nr: 0, zeit: 0, versuch: 0, art: '', grund: '', vollstaendig: false, jeBaum: {} },
+        vortage: { kabel: vt(1), mobile: vt(0), um: vt(0) }, ereignisse: [] };
+    const VLIGA = { art: 'ok', tage: { [D.gestern]: tag }, grund: '' };     // Ruling R10: Rueckgabe von ligaBereich
+    window.fetch = function(input, init){
+        const u = new URL(typeof input === 'string' ? input : input.url, location.href);
+        if (u.pathname.indexOf('/__dienst/') !== 0) return ORIG(input, init);
+        const pfad = u.pathname.slice('/__dienst'.length), art = ((init && init.method) || 'GET').toUpperCase();
+        D.anfragen.push(art + ' ' + pfad);
+        const antw = (body, status, typ) => Promise.resolve(new Response(body, { status: status, headers: { 'content-type': typ } }));
+        const json = o => antw(JSON.stringify(o), 200, 'application/json');
+        const m = pfad.match(/^\/api\/esl\/(kabel|mobile|um)\.xlsx$/);
+        if (art === 'GET' && pfad === '/api/stand') return json(STAND);
+        if (art === 'GET' && m) return antw(XL[m[1]].slice(), 200, 'application/octet-stream');
+        if (art === 'GET' && pfad === '/api/vortage/kabel.liga.json') return json(VLIGA);
+        if (art === 'GET' && pfad === '/api/mapping.xlsx')
+            return HAENGT ? new Promise((res, rej) => { const s = init && init.signal; if (s) s.addEventListener('abort', () => rej(new DOMException('abgebrochen', 'AbortError'))); })
+                 : OHNEMAP ? antw(GRUND_503, 503, 'text/plain; charset=utf-8') : antw(D.mapBuf.slice(), 200, 'application/octet-stream');
+        if (art === 'POST' && pfad === '/api/projekt') return json({ ok: true });
+        D.unbekannt.push(art + ' ' + pfad);
+        return antw('nicht gefaelscht: ' + pfad, 404, 'text/plain');
+    };
+    // Speicher: Liga-Vortage leer (sonst mischt sich ein frueherer Lauf ein); Mapping NUR
+    // aus der Gastseite — mit ohnemapping liegt ein gespeichertes bereit (wie nach einem Vortag).
+    ['rcLigaHistDash', 'rcLigaHistDash_mob', 'rcLigaHistDash_um', 'rcWcaMapping', 'rcWcaMappingXlsx'].forEach(k => localStorage.removeItem(k));
+    if (OHNEMAP) localStorage.setItem('rcWcaMapping', JSON.stringify({ voMap: D.map.voMap, ccsMap: cm, standortMap: {}, stackMap: D.map.stackMap }));
+    if (ALTMAP) { const alt = altesMapping(D.mapBuf), am = mappingLesen(alt);
+        localStorage.setItem('rcWcaMapping', JSON.stringify({ voMap: am.voMap, ccsMap: am.ccsMap, standortMap: {}, stackMap: am.stackMap }));
+        localStorage.setItem('rcWcaMappingXlsx', zuB64(alt)); D.altN = Object.keys(am.ccsMap).length; }
+
+    // Die echte Gastseite: ihr Stil und ihr Skript, mit genau zwei Ersetzungen.
+    const g = await ORIG(GAST, { cache: 'no-store' });
+    if (!g.ok) throw new Error(GAST + ' nicht ladbar (HTTP ' + g.status + ')');
+    const doc = new DOMParser().parseFromString(await g.text(), 'text/html');
+    const sk = Array.from(doc.scripts).filter(s => !s.src);
+    if (sk.length !== 1) throw new Error('Gastseite: genau ein Inline-Skript erwartet, gefunden ' + sk.length);
+    let code = sk[0].textContent;
+    const ersetze = (alt, neu) => {
+        const n = code.split(alt).length - 1;
+        if (n !== 1) throw new Error('Gastseite: "' + alt + '" steht ' + n + '-mal im Skript statt einmal');
+        code = code.replace(alt, () => neu);
+    };
+    ersetze('{ basis: location.origin }', "{ basis: location.origin + '/__dienst' }");
+    ersetze("'/esl_live_arena_v22.js?v='", JSON.stringify(SRC + '?v='));
+    doc.querySelectorAll('style').forEach(s => document.head.appendChild(s.cloneNode(true)));
+    const el = document.createElement('script');
+    el.textContent = code;
+    document.body.appendChild(el);
+}
+function ende(){
+    L(rot ? '\n' + rot + ' fehlgeschlagen, ' + ok + ' bestanden' : '\nALLE ' + ok + ' PRUEFUNGEN BESTANDEN');
+    window.__ergebnis = { ok, rot };
+    window.__fertig = true;
+}
+
+// ---- Sollrechnung (unabhaengig vom Dashboard-Code) ----
+const GERAET = /hardware|zubeh|router|repeater|verst[aä]rk|fritz|homebox|superwlan|ultra ?hub|modem/i;   // Nutzer-Vorgabe 30.07.
+const TIPP = /^\s*NBA\b|nba tipp/i;                                                                     // Nutzer-Vorgabe 31.07.
+const UM_VVL = /^\s*UM\s+(TV\s*Connect|Internet\s*&\s*Phone)\b/i;                                     // Nutzer-Vorgabe 29.09.: gruppenlose "UM TV Connect"/"UM Internet&Phone" sind VVL
+const STD = { alanya:'AL', berlin:'B', essen:'E', potsdam:'P', serres:'SER', sakarya:'SKA', neubrandenburg:'NBB', adp:'ADP', zwickau:'ZWT' };
+const stdCode = s => { const t = String(s || '').trim(); return STD[t.toLowerCase()] || t.toUpperCase(); };
+function soll(P, map){
+    const ag = {}, prod = {}, sum = { st:0, bnt:0, vvl:0, sonst:0, cr:0, nichtCr:0, ptvBnt:0 };
+    Object.keys(P).forEach(proj => {
+        const r = P[proj], h = r[0].map(x => String(x).toLowerCase().trim()), ix = n => h.indexOf(n);
+        const iG = ix('produktgrupe') !== -1 ? ix('produktgrupe') : ix('produktgruppe');
+        r.slice(1).forEach(z => {
+            const merk = String(z[ix('produktmerkmal')] || '').toLowerCase().trim(), pn = String(z[ix('produkt')] || '').trim();
+            if (/potential\s*tracking/.test(merk) || /^\s*info\s*world\s*$/i.test(pn)) return;
+            const vo = String(z[ix('vo_nummer')] || '').trim(), m = map.voMap[vo] || map.ccsMap[vo];
+            const code = m && m.standort ? stdCode(m.standort) : String(z[ix('standort')] || '').trim();
+            if (code !== STD_FILTER) return;
+            const key = m ? 'c:' + m.ccsId : 'v:' + vo;
+            const a = ag[key] || (ag[key] = { bnt:0, vvl:0, ansp:new Set(), kont:new Set() });
+            const id = proj + ':' + z[ix('id')];
+            a.kont.add(id);
+            if (String(z[ix('sis_angesprochen')] || '').toLowerCase().trim() === 'ja' && /^bcr[-\s]?relevant$/.test(merk)) a.ansp.add(id);
+            const anz = parseInt(z[ix('anzahl')]) || 0;
+            if (!(anz > 0 && String(z[ix('ergebnis')] || '').toLowerCase().includes('angenommen'))) return;
+            const g = iG === -1 ? '' : String(z[iG] || '').trim(), t = g || pn;
+            const art = GERAET.test(t) ? 'SONST' : (/\bVVL\b/i.test(t) || (!g && UM_VVL.test(pn))) ? 'VVL' : /\bBNT\b/i.test(t) ? 'BNT' : 'SONST';
+            sum.st += anz;
+            if (art === 'BNT') { a.bnt += anz; sum.bnt += anz; } else if (art === 'VVL') { a.vvl += anz; sum.vvl += anz; } else sum.sonst += anz;
+            if (art === 'BNT' && /^PTV\b/i.test(g)) sum.ptvBnt += anz;
+            if (!GERAET.test(t) && !TIPP.test(t)) { if (/nicht\s*bcr/.test(merk)) sum.nichtCr += anz; else sum.cr += anz; }
+            if (art !== 'SONST') prod[pn] = (prod[pn] || 0) + anz;
+        });
+    });
+    return { ag, prod, sum };
+}
+
+async function los(){
+    if (DIENST && (D.fehler || Date.now() - T0 > 40000) && !window.processDataStream) {
+        pruefe('Datendienst: Gastseite startet das Dashboard', false, D.fehler || 'v22 nach 40 s nicht geladen');
+        return ende();
+    }
+    if (!window.processDataStream || !window.rcVerarbeiteAlle || !window.rcExportStandZeitraum || (DIENST && !D.P)) { setTimeout(los, 400); return; }
+    const { voMap, ccsMap, stackMap } = DIENST ? D.map
+        : mappingLesen(new Uint8Array(await (await fetch('Mitarbeiter_IDS_Final_komplett.xlsx')).arrayBuffer()));
+    const testMap = { voMap, ccsMap, standortMap:{}, stackMap };
+    // Im Dienst-Betrieb liest das Dashboard die Excel selbst (Gastseite) — hier nicht vorgeben.
+    if (!DIENST) window.rcWcaMapping = testMap;
+    const P = DIENST ? D.P : await exporteLesen();
+    L('Geladen: Kabel ' + (P.kabel.length-1) + ', Mobile ' + (P.mobile.length-1) + ', UM ' + (P.um.length-1) + ' Zeilen · Filter ' + STD_FILTER + (DIENST ? ' · DIENST-BETRIEB' + (OHNEMAP ? ' ohne Mitarbeiter-Excel' + (HAENGT ? ' (Antwort kommt nie)' : '') : '') + (ALTMAP ? ' mit altem gespeichertem Mapping' : '') : ''));
+    const S = soll(P, testMap);
+    L('Soll ' + STD_FILTER + ': ' + JSON.stringify(S.sum) + ' · Agenten ' + Object.keys(S.ag).length);
+
+    if (DIENST) {
+        // Die Daten kommen NUR ueber den Empfang (rcDienstEmpfangTick -> rcProjektLieferung).
+        const da = () => ['kabel', 'mobile', 'um'].every(p => { const x = (window.rcProjektDaten || {})[p]; return !!(x && x.data && x.data.length === P[p].length); });
+        const t1 = Date.now();
+        while (!da() && Date.now() - t1 < 15000) await warte(250);
+        const pd = window.rcProjektDaten || {};
+        pruefe('Datendienst: die drei Exporte kommen ueber den Empfang ins Dashboard (<= 15 s)', da(),
+            ['kabel', 'mobile', 'um'].map(p => p + ' ' + (pd[p] && pd[p].data ? pd[p].data.length - 1 : '-') + '/' + (P[p].length - 1) + (pd[p] ? ' ' + pd[p].pruefung : '')).join(', ')
+            + ' · Anfragen: ' + D.anfragen.slice(0, 8).join(', '));
+        if (!da()) return ende();
+        const h = document.getElementById('rcGastHinweis');
+        const sichtbar = !!h && (() => { const r = h.getBoundingClientRect(); if (!r.width || !r.height) return false;
+            const e = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2); return !!e && (e === h || h.contains(e)); })();
+        const nIst = Object.keys(((window.rcWcaMapping || {}).ccsMap) || {}).length, nSoll = Object.keys(ccsMap).length;
+        const b64 = window.__rcFiles && window.__rcFiles.mapping;
+        if (OHNEMAP) {
+            pruefe('Mitarbeiter-Excel fehlt (' + (HAENGT ? 'Antwort kommt nie' : '503') + '): Hinweis mit dem Grund sichtbar ueber dem Dashboard',
+                sichtbar && (HAENGT ? /keine Antwort/.test(h.textContent) : h.textContent.indexOf(GRUND_503) !== -1), h ? h.textContent : 'kein Hinweis');
+            pruefe('Mitarbeiter-Excel fehlt: das Dashboard laeuft mit dem gespeicherten Mapping weiter', !b64 && nIst === nSoll, 'CCS-IDs ' + nIst + '/' + nSoll + (b64 ? ', __rcFiles.mapping gesetzt' : ''));
+        } else {
+            const bin = b64 ? atob(b64) : '';
+            const gleich = bin.length === D.mapBuf.length && D.mapBuf.every((x, i) => bin.charCodeAt(i) === x);
+            pruefe('Mitarbeiter-Excel kommt ueber die Gastseite (Base64 bytegleich) und das Dashboard liest sie selbst, kein Hinweis',
+                gleich && nIst === nSoll && !h, 'Base64 ' + (gleich ? 'bytegleich' : 'abweichend') + ', CCS-IDs ' + nIst + '/' + nSoll + (h ? ', Hinweis: ' + h.textContent : ''));
+            if (ALTMAP) {
+                const ag = ((window.rcWcaMapping || {}).ccsMap || {})[D.altCcs] || {};
+                pruefe('Zweiter Start mit altem gespeichertem Mapping (R14): die Excel des Dienstes gilt und ist fuer den naechsten Vergleich gesichert',
+                    nIst === nSoll && ag.team === ccsMap[D.altCcs].team && localStorage.getItem('rcWcaMappingXlsx') === b64,
+                    'CCS-IDs ' + nIst + ' (alt ' + D.altN + ', Dienst ' + nSoll + '), Team ' + D.altCcs + ': ' + ag.team + ' (Dienst: ' + ccsMap[D.altCcs].team + '), gesichert ' + (localStorage.getItem('rcWcaMappingXlsx') === b64 ? 'Dienst-Excel' : 'andere'));
+            }
+        }
+    } else {
+        window.rcProjektDaten = { kabel:{ data:P.kabel, zeit:Date.now() }, mobile:{ data:P.mobile, zeit:Date.now() }, um:{ data:P.um, zeit:Date.now() } };
+        window.rcVerarbeiteAlle();
+    }
+
+    // Seit 30.10. sind ab Werk nur acht Blaetter an. Der Abgleich braucht Produkte/Stacks/Liga Teams,
+    // also wird die Auswahl "alles zugeschaltet" uebergeben (6. Parameter, wie ihn der Dialog liefert);
+    // der Werkszustand wird unten mit einer zweiten Mappe geprueft.
+    const WAHL_ALLE = { blaetter: { bewertung:true, abdeckung:true, produkte:true, analyseAgenten:true, reportingQ:true, standorte:true, stacks:true,
+        ligaStandorte:true, ligaTeams:true, entwicklung:true } };
+    // Mappe abfangen statt herunterladen (Haken in rcXlsxSpeichern)
+    const mappe = await new Promise(res => {
+        window.rcXlsxAbfangen = (bytes, name) => res({ bytes, name });
+        const h = heuteIso();
+        window.rcExportStandZeitraum(h, h, { std: STD_FILTER, stack:'ALL', team:'ALL' }, true, () => {}, WAHL_ALLE);
+    });
+    const wb = XLSX.read(mappe.bytes, { type:'array' });
+    const sh = n => XLSX.utils.sheet_to_json(wb.Sheets[n], { header:1, defval:'' });
+    L('Mappe: ' + mappe.name + ' · Blaetter: ' + wb.SheetNames.join(', '));
+
+    // 0) Werkszustand (Nutzer-Vorgabe 30.10.): ohne Auswahl genau die acht Blaetter seiner Vorlage,
+    //    Stand-Blatt mit den 16 Spalten, keine AQ-Spalte in den bleibenden Blaettern.
+    {
+        const w = await new Promise(res => { window.rcXlsxAbfangen = (bytes, name) => res({ bytes, name });
+            const h3 = heuteIso(); window.rcExportStandZeitraum(h3, h3, { std: STD_FILTER, stack:'ALL', team:'ALL' }, true, () => {}); });
+        const wbW = XLSX.read(w.bytes, { type:'array' }), n = wbW.SheetNames;
+        const ACHT = ['AKTUELLER_STAND','Vertrieb','Analyse Teams','Vertrieb Reporting','Struktur','Teams','Agenten','Ohne Stack'];
+        L('Werks-Mappe: ' + n.join(', '));
+        pruefe('Werkszustand: genau die acht Standard-Blaetter (Ohne Stack nur, wenn es solche Agenten gibt)',
+            n.every(x => ACHT.indexOf(x) !== -1) && ACHT.slice(0, 7).every(x => n.indexOf(x) !== -1), n.join(', '));
+        const sw = nm => XLSX.utils.sheet_to_json(wbW.Sheets[nm], { header:1, defval:'' });
+        const stand = sw('AKTUELLER_STAND');
+        const LABELS = ['Team','Agent','Calls','Ø Min.','IST','IST %','IST','IST %','IST','IST %','Anzahl','IST %','MOB','KIP','BNT GES.','VVL GES.'];
+        pruefe('Stand-Blatt: Unterkopf = die 16 Spalten der Vorlage (B..Q)',
+            stand[8] && stand[8].slice(1, 17).join('|') === LABELS.join('|') && stand[8].slice(17).every(c => c === ''), stand[8] && stand[8].join('|'));
+        const gruppen = (stand[7] || []).filter(c => c !== '').join('|');
+        pruefe('Stand-Blatt: Gruppen CS, TNPS, FQ, Detra, BNT, VVL — ohne AQ und ohne Gelöst',
+            /CS  \|  > 90 %/.test(gruppen) && /TNPS/.test(gruppen) && /FQ/.test(gruppen) && !/AQ|Gelöst/.test(gruppen), gruppen);
+        const keinAq = nm => !sw(nm).some(z => z.some(c => /(^|[^A-Za-z])AQ([^A-Za-z]|$)|Auflegerquote/.test(String(c))));
+        pruefe('Stand-Blatt, Analyse Teams, Teams, Agenten, Struktur, Vertrieb Reporting: keine AQ-Spalte/-Zeile',
+            ['AKTUELLER_STAND','Analyse Teams','Teams','Agenten','Struktur','Vertrieb Reporting'].every(keinAq),
+            ['AKTUELLER_STAND','Analyse Teams','Teams','Agenten','Struktur','Vertrieb Reporting'].filter(x => !keinAq(x)).join(','));
+        const at = sw('Analyse Teams');
+        const sk = at.find(z => z[1] === 'Score'), vk = at.find(z => z[1] === 'Verf.');
+        pruefe('Analyse Teams: Score-Tabelle fuehrt CS|TNPS|FQ|FTF (kein AQ), Score zaehlt hoechstens 4 Ziele',
+            sk && sk.slice(2, 10).join('|') === 'Team|Calls|CS|TNPS|FQ|FTF|Detra|Ø Min.' &&
+            at.filter(z => /^\d\/\d$/.test(String(z[1]))).every(z => +String(z[1]).split('/')[1] <= 4),
+            sk && sk.join('|'));
+        if (vk) pruefe('Analyse Teams: Auffaellig-Tabelle ohne AQ-Spalte', vk.indexOf('AQ') === -1, vk.join('|'));
+    }
+
+    // 1) Agenten: BNT/VVL/Ansprachen/ESL-Kontakte je Agent
+    const A = sh('Agenten'), ah = A[1].map(x => String(x).trim()), ai = n => ah.indexOf(n);
+    const ist = {};
+    A.slice(2).forEach(z => { const c = String(z[ai('CCS-ID')] || '').trim(); const k = c ? 'c:' + c : 'v:' + String(z[ai('Agent')]).trim(); ist[k] = z; });
+    let abw = [], sBnt = 0, sVvl = 0;
+    new Set([...Object.keys(S.ag), ...Object.keys(ist)]).forEach(k => {
+        const s = S.ag[k], z = ist[k];
+        const sv = s ? [s.bnt, s.vvl, s.ansp.size, s.kont.size] : [0, 0, 0, 0];
+        const iv = z ? [+z[ai('BNT')] || 0, +z[ai('VVL')] || 0, +z[ai('Anspr.')] || 0, +z[ai('ESL-Kontakte')] || 0] : [0, 0, 0, 0];
+        if (z) { sBnt += iv[0]; sVvl += iv[1]; }
+        if (sv.join() !== iv.join()) abw.push(k + ' soll ' + sv.join('/') + ' ist ' + iv.join('/'));
+    });
+    pruefe('Agenten: BNT/VVL/Ansprachen/Kontakte je Agent wie im Export', abw.length === 0, abw.length + ' Abweichungen' + (abw.length ? ': ' + abw.slice(0, 5).join(' | ') : ''));
+    pruefe('Agenten: Summe BNT = Export', sBnt === S.sum.bnt, 'soll ' + S.sum.bnt + ' ist ' + sBnt);
+    pruefe('Agenten: Summe VVL = Export', sVvl === S.sum.vvl, 'soll ' + S.sum.vvl + ' ist ' + sVvl);
+
+    // 2) Stacks: Summen
+    const ST = sh('Stacks'), sth = ST[1].map(x => String(x).trim());
+    let stB = 0, stV = 0; ST.slice(2).forEach(z => { stB += +z[sth.indexOf('BNT gesamt')] || 0; stV += +z[sth.indexOf('VVL')] || 0; });
+    pruefe('Stacks: BNT/VVL-Summen = Export', stB === S.sum.bnt && stV === S.sum.vvl, 'BNT ' + stB + '/' + S.sum.bnt + ', VVL ' + stV + '/' + S.sum.vvl);
+
+    // 3) Produkte Block 1: Gesamt aller Stueck; Block 2: Einzelprodukte = Filter
+    const PR = sh('Produkte');
+    const g1 = PR.find(z => String(z[1]).trim() === 'GESAMT');
+    pruefe('Produkte: Gesamt aller Stueck = Export', g1 && +g1[5] === S.sum.st, 'soll ' + S.sum.st + ' ist ' + (g1 ? g1[5] : '-'));
+    let bntKl = 0; const ab1 = PR.findIndex(z => String(z[1]).trim() === 'Produktklasse');
+    PR.slice(ab1 + 1).some(z => { if (String(z[1]).trim() === 'GESAMT') return true; if (String(z[2]).trim() === 'BNT') bntKl += +z[5] || 0; return false; });
+    pruefe('Produkte: BNT-Klassen zusammen = Export-BNT', bntKl === S.sum.bnt, 'soll ' + S.sum.bnt + ' ist ' + bntKl);
+    const ab2 = PR.findIndex(z => /^EINZELPRODUKTE/.test(String(z[1]).trim()));
+    const ep = {}; PR.slice(ab2 + 2).forEach(z => { const n = String(z[1]).trim(); if (n) ep[n] = +z[5] || 0; });
+    const epAbw = Object.keys(Object.assign({}, S.prod, ep)).filter(n => (S.prod[n] || 0) !== (ep[n] || 0));
+    pruefe('Produkte: Einzelprodukte (BNT/VVL) je Produkt wie im Export, nur ' + STD_FILTER, epAbw.length === 0,
+        epAbw.length + ' Abweichungen' + (epAbw.length ? ': ' + epAbw.slice(0, 4).map(n => n + ' ' + (S.prod[n] || 0) + '/' + (ep[n] || 0)).join(' | ') : ''));
+
+    // Nutzer-Vorgabe 29.09.: die gruppenlosen UM-Produkte des Mobile-Exports sind VVL — sie muessen
+    // als Einzelprodukte mit ihrer Menge auftauchen (Sollmenge aus den Exportzeilen, nicht aus dem Dashboard).
+    const umn = Object.keys(S.prod).filter(n => UM_VVL.test(n));
+    if (umn.length) pruefe('UM TV Connect / UM Internet&Phone zaehlen als VVL und stehen in den Einzelprodukten', umn.every(n => ep[n] === S.prod[n]),
+        umn.map(n => n + ' soll ' + S.prod[n] + ' ist ' + (ep[n] || 0)).join(' | '));
+
+    // 4) Vertrieb: CR-relevant / nicht CR-relevant (ohne Geraete und NBA-Tipps)
+    const V = sh('Vertrieb'), vk = V.findIndex(z => z.some(x => String(x).trim() === 'CR-relevant'));
+    const cCr = V[vk].findIndex(x => String(x).trim() === 'CR-relevant');
+    const vg = V.find(z => String(z[1]).trim() === 'GESAMT');
+    pruefe('Vertrieb: CR-relevant = Export', vg && +vg[cCr] === S.sum.cr, 'soll ' + S.sum.cr + ' ist ' + (vg ? vg[cCr] : '-'));
+    pruefe('Vertrieb: nicht CR-relevant = Export', vg && +vg[cCr + 1] === S.sum.nichtCr, 'soll ' + S.sum.nichtCr + ' ist ' + (vg ? vg[cCr + 1] : '-'));
+
+    // 5) Liga Teams: PTV BNT = Klasse "PTV BNT" im Produkte-Blatt (vorher zaehlten
+    //    Geraete als PTV — 28.09.: 63 statt 40). Soll aus zwei Blaettern, weil UM keine
+    //    Gruppenspalte hat; die Geraete-Freiheit belegt schon die BNT-Summe oben.
+    if (wb.SheetNames.indexOf('Liga Teams') !== -1) {
+        const LT = sh('Liga Teams'), kz = LT[1].map(x => String(x).trim()), iP = kz.indexOf('PTV BNT');
+        const zeile = LT.find(z => String(z[0]).trim() && String(z[0]).trim() !== 'Standort / Team' && !/Zeitraum/.test(String(z[0])));
+        const kl = PR.find(z => String(z[1]).trim() === 'PTV BNT');
+        if (iP !== -1 && zeile) pruefe('Liga Teams: PTV BNT = Klasse PTV BNT im Produkte-Blatt (ohne Geraete)', kl && +zeile[iP] === +kl[5] && +kl[5] >= S.sum.ptvBnt,
+            'Liga Teams ' + zeile[iP] + ', Produkte ' + (kl ? kl[5] : '-') + ', davon aus Kabel/Mobile-Gruppen ' + S.sum.ptvBnt);
+    }
+    // 6) STACK-ZUORDNUNG (05.10.): "Viele werden nicht angezeigt." Ohne Filter stimmte alles —
+    //    unter einem Stack-Filter fehlte jeder, dessen Stack nicht in der Mitarbeiter-Excel stand
+    //    (28.09.: live 360 von 457, Excel 390). Jetzt EINE Regel fuer beide: Mapping, sonst der
+    //    eindeutige Anker (Stack der gemappten Kollegen desselben ESL-Rohteams); wer keinen hat,
+    //    steht sichtbar unter "ohne Stack". Soll unabhaengig vom Dashboard-Code, ueber ALLE Standorte.
+    {
+        const agU = {};
+        Object.keys(P).forEach(proj => {
+            const r = P[proj], h = r[0].map(x => String(x).toLowerCase().trim()), ix = n => h.indexOf(n);
+            r.slice(1).forEach(z => {
+                const merk = String(z[ix('produktmerkmal')] || '').toLowerCase().trim(), pn = String(z[ix('produkt')] || '').trim();
+                if (/potential\s*tracking/.test(merk) || /^\s*info\s*world\s*$/i.test(pn)) return;
+                const vo = String(z[ix('vo_nummer')] || '').trim(); if (!vo) return;
+                const m = voMap[vo] || ccsMap[vo];
+                if (!agU[vo]) agU[vo] = { proj, roh: String(z[ix('team')] || '').trim(), team: m ? m.team : '', mapped: !!m };
+            });
+        });
+        const alleU = Object.values(agU), rohS = {};
+        alleU.forEach(a => { if (a.mapped && stackMap[a.team] && a.roh) (rohS[a.roh] || (rohS[a.roh] = {}))[stackMap[a.team]] = 1; });
+        const stackSoll = a => a.mapped ? (stackMap[a.team] || '') : (rohS[a.roh] && Object.keys(rohS[a.roh]).length === 1 ? Object.keys(rohS[a.roh])[0] : '');
+        const STACKS = [...new Set(Object.values(stackMap))].sort(), PROJ = ['kabel', 'mobile', 'um'];
+        const sel = document.getElementById('rcStackFilter'), stdSel = document.getElementById('rcStandortFilter');
+        STACKS.concat(PROJ.map(p => 'P:' + p)).forEach(s => { if (!Array.from(sel.options).some(o => o.value === s)) { const o = document.createElement('option'); o.value = s; o.textContent = s; sel.appendChild(o); } });
+        stdSel.value = 'ALL';
+        const messe = async f => {
+            sel.value = f; window.rcVerarbeiteAlle();
+            const live = Object.keys(window.rcLetzteStats.agentStats).length, chip = document.getElementById('rcOhneStackChip');
+            // Die Messung endet IMMER: trifft der Filter 0 Zeilen, entsteht keine Mappe — der Export
+            // meldet das nur ueber seinen Melde-Kanal. (Die Fassung vor dem 05.10. kennt "P:<projekt>"
+            // nicht und liefert dort 0 Zeilen; ohne dieses Ende bliebe die Gegenprobe haengen.)
+            const m = await new Promise(res => { window.rcXlsxAbfangen = (bytes, name) => res({ bytes, name });
+                const h2 = heuteIso(); window.rcExportStandZeitraum(h2, h2, { std:'ALL', stack:f, team:'ALL' }, true, (t, schlecht) => { if (schlecht) res(null); }, WAHL_ALLE);
+                setTimeout(() => res(null), 25000); });
+            if (!m) return { live, excel: 0, chip: chip && chip.style.display !== 'none' ? parseInt(chip.textContent, 10) : 0, blatt: 0, name: '' };
+            const w2 = XLSX.read(m.bytes, { type:'array' });
+            const A2 = XLSX.utils.sheet_to_json(w2.Sheets['Agenten'], { header:1, defval:'' }), i2 = A2[1].map(x => String(x).trim()).indexOf('Agent');
+            const O2 = w2.Sheets['Ohne Stack'] ? XLSX.utils.sheet_to_json(w2.Sheets['Ohne Stack'], { header:1, defval:'' }) : null;
+            return { live, excel: A2.slice(2).filter(z => String(z[i2] || '').trim()).length, chip: chip && chip.style.display !== 'none' ? parseInt(chip.textContent, 10) : 0,
+                     blatt: O2 ? O2.length - 3 : 0, name: m.name };
+        };
+        const M = {};
+        for (const f of STACKS.concat(PROJ.map(p => 'P:' + p), ['ALL'])) M[f] = await messe(f);
+        const sollStack = s => alleU.filter(a => stackSoll(a) === s).length, ohne = alleU.filter(a => !stackSoll(a));
+        pruefe('Stack-Filter: das Live-Dashboard zeigt je Stack die Agenten der Sollrechnung (Mapping + eindeutiger Anker)',
+            STACKS.every(s => M[s].live === sollStack(s)), STACKS.map(s => s + ' ' + M[s].live + '/' + sollStack(s)).join(', '));
+        pruefe('Stack-Filter: die Excel traegt je Stack dieselben Agenten wie das Live-Dashboard',
+            STACKS.every(s => M[s].excel === M[s].live), STACKS.map(s => s + ' ' + M[s].excel + '/' + M[s].live).join(', '));
+        const sumLive = STACKS.reduce((s, k) => s + M[k].live, 0);
+        pruefe('Summe der Stack-Filter + "ohne Stack" = alle Agenten (niemand verschwindet)',
+            sumLive + ohne.length === alleU.length && M.ALL.live === alleU.length && M.ALL.excel === alleU.length, sumLive + ' + ' + ohne.length + ' = ' + alleU.length + ', Alle: live ' + M.ALL.live + ' / Excel ' + M.ALL.excel);
+        pruefe('"<Projekt> gesamt": live und Excel zeigen ALLE Agenten der Lieferung, auch ohne Mapping-Eintrag',
+            PROJ.every(p => { const n = alleU.filter(a => a.proj === p).length; return M['P:' + p].live === n && M['P:' + p].excel === n; }),
+            PROJ.map(p => p + ' ' + M['P:' + p].live + '/' + M['P:' + p].excel + '/' + alleU.filter(a => a.proj === p).length).join(', '));
+        pruefe('Kopfleiste und Blatt "Ohne Stack" nennen unter jedem Stack-Filter die Agenten ohne Stack DESSELBEN Projekts',
+            STACKS.every(s => { const p = window.rcProjektVonStack(s), n = ohne.filter(a => a.proj === p).length; return M[s].chip === n && M[s].blatt === n; }) && M.ALL.chip === ohne.length,
+            STACKS.map(s => s + ' ' + M[s].chip + '/' + M[s].blatt).join(', ') + ', Alle ' + M.ALL.chip + '/' + ohne.length);
+        pruefe('Dateiname eines Projekt-Exports ist lesbar (kein "P:" im Namen)', /_Kabelgesamt\.xlsx$/.test(M['P:kabel'].name), M['P:kabel'].name);
+        // 7) Der Tagesstand muss auch bei GESETZTEM Stack-Filter in die Historie (05.10. gemessen: nach
+        //    drei gefilterten Laeufen kein Eintrag fuer heute — "Gestern"/Woche trugen dann den Stand
+        //    des letzten Exports). Jetzt sichert alle 5 Min ein ungefilterter Durchlauf.
+        {
+            // Dienst-Betrieb: heute steht NUR im Speicher der Seite (window.rcEslHistory), gesichert wird nichts.
+            const hk = heuteIso(), lesen = () => { try { const hh = (DIENST ? window.rcEslHistory || {} : JSON.parse(localStorage.getItem('rcEslHistory') || '{}'))[hk]; return hh ? Object.keys(hh.byAgent || {}).length : 0; } catch(e){ return -1; } };
+            if (DIENST) { const h0 = Object.assign({}, window.rcEslHistory); delete h0[hk]; window.rcEslHistory = h0; }
+            else { const h0 = JSON.parse(localStorage.getItem('rcEslHistory') || '{}'); delete h0[hk];
+                localStorage.setItem('rcEslHistory', JSON.stringify(h0)); window.rcEslHistory = h0; }
+            window.rcArchivOhneFilterUm = 0;
+            sel.value = STACKS[0]; window.rcVerarbeiteAlle();
+            await new Promise(r => setTimeout(r, 400));
+            const nHist = lesen(), gezeigt = Object.keys(window.rcLetzteStats.agentStats).length;
+            pruefe('Tagesstand kommt auch bei gesetztem Stack-Filter in die Historie — vollstaendig, die Anzeige bleibt gefiltert',
+                nHist === alleU.length && gezeigt === sollStack(STACKS[0]), 'Historie ' + nHist + ' von ' + alleU.length + ' Agenten, Anzeige ' + gezeigt + ' (' + STACKS[0] + ')');
+        }
+        // 8) Klick auf die Kachel "BNT": die Liste dahinter muss denselben Filter tragen wie die Kachel
+        //    (05.10. gemessen: unter Filter VKD_Tech zeigte sie die 514 Abschluesse aller Standorte).
+        {
+            sel.value = STACKS[0]; window.rcVerarbeiteAlle();
+            const kachel = Object.values(window.rcLetzteStats.agentStats).reduce((s, a) => s + (a.bnt || 0), 0);
+            window.rcOpenKpiDetail('bnt');
+            const sub = (document.querySelector('#rcDetailBody .rc-detail-sub') || {}).textContent || '';
+            const inListe = parseInt((sub.match(/(\d+)\s+Abschluss/) || [])[1], 10);
+            const dm = document.getElementById('rcDetailModal'); if (dm) dm.style.display = 'none';
+            pruefe('Klick auf die Kachel "BNT": die Liste zeigt die Abschluesse DES FILTERS, nicht aller Standorte',
+                inListe === kachel && kachel > 0, 'Liste ' + inListe + ', Kachel ' + kachel + ' (' + STACKS[0] + ')');
+        }
+        sel.value = 'ALL'; window.rcVerarbeiteAlle();
+    }
+    if (DIENST) {
+        // 9) Vortag aus der Liga-Datei des Dienstes (nurCalls): Calls da, Detraktoren "nicht geliefert" statt 0.
+        const sr = window.rcStandRowsDebug(D.gestern, { std:'ALL', stack:'ALL', team:'ALL' });
+        const z = D.drei.map(c => (sr.rows || []).find(r => r.ccs === String(c)));
+        pruefe('Vortag vom Dienst: rcStandRows(gestern) liefert die drei Agenten mit Calls > 0 und Detraktoren null',
+            D.drei.length === 3 && z.every(r => r && r.calls > 0 && r.detr === null),
+            D.gestern + ': ' + z.map((r, i) => D.drei[i] + (r ? ' calls ' + r.calls + ' detr ' + r.detr : ' fehlt')).join(', ') + (sr.fehlt ? ' · ' + sr.fehlt : ''));
+        // 10) Kein Fenster, kein Neuladen (Spione vor v22 gesetzt).
+        const sp = D.spion;
+        pruefe('Dienst-Betrieb: kein window.open, kein Neuladen der Seite', sp.open === 0 && sp.verlassen === 0 && !sp.neuGeladen,
+            'open ' + sp.open + ', beforeunload ' + sp.verlassen + ', Seite neu geladen ' + sp.neuGeladen);
+        // 11) Re-Inject mit Daten und gesetztem rcLastSaleTs: je ein Dashboard/Modal/Toast, EIN Empfangstakt,
+        //     und der Empfang speist die drei Projekte erneut ein (rcProjektDaten beginnt leer).
+        if (!window.rcLastSaleTs) window.rcLastSaleTs = Date.now();
+        const quelle = await (await D.orig(SRC + '?t=' + Date.now(), { cache: 'no-store' })).text();
+        (0, eval)(quelle);
+        const wieder = () => ['kabel', 'mobile', 'um'].every(p => (window.rcDienstGesehen || {}).esl && window.rcDienstGesehen.esl[p] === 1 && (window.rcProjektDaten || {})[p]);
+        const t2 = Date.now();
+        while (!wieder() && Date.now() - t2 < 15000) await warte(250);
+        await warte(2500);                                   // mindestens ein weiterer Takt
+        const anz = id => document.querySelectorAll('#' + id).length;
+        pruefe('Re-Inject: je 1 #rcLiveDashboard, #rcDetailModal, #rcToastContainer und genau EIN Empfangstakt (rcDienstInterval)',
+            anz('rcLiveDashboard') === 1 && anz('rcDetailModal') === 1 && anz('rcToastContainer') === 1 && sp.takte.size === 1 && sp.takte.has(window.rcDienstInterval),
+            'Dashboard ' + anz('rcLiveDashboard') + ', Modal ' + anz('rcDetailModal') + ', Toast ' + anz('rcToastContainer') + ', Takte ' + sp.takte.size);
+        pruefe('Re-Inject: der Empfang speist die drei Projekte erneut ein', wieder(), JSON.stringify((window.rcDienstGesehen || {}).esl));
+        if (D.unbekannt.length) L('Hinweis: nicht gefaelschte Dienst-Anfragen: ' + D.unbekannt.slice(0, 6).join(', '));
+    }
+    pruefe('keine Fehler im Dashboard', window.__fehler.length === 0, window.__fehler.slice(0, 2).join(' | ').slice(0, 300));
+    ende();
+}
+if (DIENST) dienstStarten().catch(e => { D.fehler = String((e && e.message) || e); });
+setTimeout(los, 1200);
+</script>

@@ -50,9 +50,6 @@ const DATEIEN = [
   { name: 'kpi_crawler.js',                   zweck: 'Ligalisten-Crawler',                     pflicht: true },
   { name: 'genesys_monitor_crawler.js',       zweck: 'Warteschleifen-Crawler (Genesys)',       pflicht: true },
   { name: 'ESL_Start.cmd',                    zweck: 'Starter (Doppelklick)',                  pflicht: true },
-  // Schaltet Mobile und UM dazu. Setzt einen laufenden ESL_Start.cmd voraus -
-  // nur dessen Waechter haelt die beiden Tabs dauerhaft am Leben.
-  { name: 'ESL_Start_Mobile_UM.cmd',          zweck: 'Mobilfunk + UM dazuschalten',            pflicht: false },
   // Duenne Wrapper fuer den Ein-Stack-Start (rufen die Datei darueber mit
   // Parameter mobile bzw. um). Keine eigene Logik - Kopien laufen auseinander.
   { name: 'ESL_Start_Mobile.cmd',             zweck: 'NUR Mobilfunk dazuschalten',             pflicht: false },
@@ -87,6 +84,25 @@ const DATEIEN = [
   // einzeln dazu und sagt, welche der Server ablehnt. Hat am 05.08. die
   // ORA-00936-Ursache in 10 Sekunden gefunden.
   { name: 'liga_diagnose.js',                 zweck: 'Ligaliste: welcher Parameter kippt?',    pflicht: false },
+  // Messlauf fuer "alle drei Projekte in EINEM Dashboard" (27.09.): klaert, ob
+  // eine offene Kabel-Seite nach dem Projektwechsel weiter Kabel-Daten liefert.
+  { name: 'projektwechsel_steckbrief.js',     zweck: 'Projektwechsel-Test (F12 im ESL)',       pflicht: false },
+  // Datendienst (27.10.): ein eigener Node-Prozess holt ESL und Ligaliste und liefert die
+  // Live-Arena als Seite aus (ESL_Dienst_Start.cmd). Alles pflicht:false, damit der alte Weg
+  // (ESL_Start.cmd) ohne diese Dateien weiterlaeuft. node\node.exe gehoert NICHT ins Paket
+  // (rund 80 MB) - die liegt auf dem Zielrechner oder wird einmal einzeln kopiert.
+  { name: 'esl_dienst.js',                    zweck: 'Datendienst (Kern)',                     pflicht: false },
+  { name: 'esl_dienst_regeln.js',             zweck: 'Datendienst: reine Regeln',              pflicht: false },
+  { name: 'esl_dienst_buendel.js',            zweck: 'Datendienst: Ligalisten-Buendel',        pflicht: false },
+  { name: 'esl_dienst_cdp.js',                zweck: 'Datendienst: Edge-Fernsteuerung',        pflicht: false },
+  { name: 'esl_dienst_edge.js',               zweck: 'Datendienst: Edge starten/pruefen',      pflicht: false },
+  { name: 'esl_dienst_esl.js',                zweck: 'Datendienst: ESL-Abruf',                 pflicht: false },
+  { name: 'esl_dienst_liga.js',               zweck: 'Datendienst: Ligaliste-Abruf',           pflicht: false },
+  { name: 'esl_dienst_postfach.js',           zweck: 'Datendienst: Postfach einstufen',        pflicht: false },
+  { name: 'postfach_lesen.ps1',               zweck: 'Datendienst: Outlook lesen',             pflicht: false },
+  { name: 'postfach_aktion.ps1',              zweck: 'Datendienst: Outlook-Aktion',            pflicht: false },
+  { name: 'ESL_Live_Arena.html',              zweck: 'Datendienst: Gastseite der Live-Arena',  pflicht: false },
+  { name: 'ESL_Dienst_Start.cmd',             zweck: 'Datendienst starten (Doppelklick)',      pflicht: false },
   { name: 'Ligaliste_Crawler.html',           zweck: 'Abfrage-Baukasten Ligaliste',            pflicht: false }
 ];
 

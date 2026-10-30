@@ -119,6 +119,15 @@
         try { s('Mehrtages-Warnung', window.rcMultiDayWarn || 'nein'); } catch(e){}
         try { s('Liga nicht live', window.rcLigaNichtLive || 'nein'); } catch(e){}
         try { s('Takt-Lage', window.rcDriftLage ? JSON.stringify(window.rcDriftLage) : '-'); } catch(e){}
+        // Wachhalter (05.10.): haelt die Seite den Web Lock, und hat der Browser
+        // den Tab trotzdem eingefroren? Beantwortet "warum stand es?" in einer Zeile.
+        try {
+            const w = window.rcWachLage || {};
+            s('Wachhalter', (w.lock === true ? 'Web Lock gehalten' : w.lock === false ? 'FEHLT — ' + (w.grund || '?') : 'angefordert') +
+                ' · vom Browser eingefroren: ' + (w.eingefroren || 0) + 'x' +
+                (w.eingefroren ? ' (zuletzt ' + (w.zuletztSek || 0) + ' s, gesamt ' + (w.gesamtSek || 0) + ' s)' : ''));
+        } catch(e){}
+        try { if (window.rcLigaHinweis) s('Ligaliste meldet', window.rcLigaHinweis.text + ' (' + alt(window.rcLigaHinweis.zeit) + ')'); } catch(e){}
         z.push('');
         z.push('--- Speicher ---');
         // Echte Probe statt Schaetzung: 200 KB schreiben und sofort wieder weg.
@@ -155,7 +164,11 @@
     // genau diese eine Datei weiter.
     window.rcLogbuch = function(){
         const b = rcLogbuchLaden();
-        const txt = rcLogbuchKopf() + '\n' + (b.length ? b.join('\n') : '(noch keine Eintraege)') + '\n';
+        // Der Flugschreiber (27.09.) kommt mit in DIESELBE Datei: der Nutzer
+        // schickt genau eine Datei, und darin soll alles stehen.
+        let fl = '';
+        try { if (window.rcFluss && typeof window.rcFluss.text === 'function') fl = '\n\n' + window.rcFluss.text(false) + '\n'; } catch(e){}
+        const txt = rcLogbuchKopf() + '\n' + (b.length ? b.join('\n') : '(noch keine Eintraege)') + '\n' + fl;
         const d = new Date();
         const p = x => ('0' + x).slice(-2);
         const name = 'ESL-Logbuch-' + (window.rcProjektKuerzel || 'kabel') + '-' +
@@ -247,6 +260,462 @@
     }
     window.rcKey = rcKey;
 
+    // ========================================================================
+    //  DATENDIENST (27.10.) — Schalter und Weiterleitung
+    //  ------------------------------------------------------------------------
+    //  Setzt die Gastseite (ESL_Live_Arena.html unter http://127.0.0.1:8787) VOR
+    //  dem Laden window.__rcDienst = {basis}, laeuft dieses Dashboard als eigene
+    //  Seite: es fasst das Portal NIE selbst an — kein Abruf bei ESL/CCS, kein
+    //  Fenster, kein Neuladen, kein Klick, keine Anmeldung. Was der Nutzer
+    //  ausloest ("Jetzt", Projektwechsel, Auffrischen, Zeitraum), geht als
+    //  Auftrag an den Dienst; die Daten kommen ueber den Empfang zurueck, der
+    //  window.rcDienstGesehen / window.rcDienstErgebnis fuellt. Ohne Marke laeuft
+    //  jede Zeile wie bisher. Erkannt wird NUR an der Marke, nie am Hostnamen.
+    //  Alles Funktionsdeklarationen: rcAlleProjekteAn fragt den Schalter schon
+    //  beim Aufbau, viele Weichen stehen weit unterhalb (TDZ-Regel).
+    // ========================================================================
+    function rcDienstModus(){ return !!(window.__rcDienst && window.__rcDienst.basis); }
+    // EINE Anfrage an den Dienst: POST mit JSON, gleiche Herkunft (das Zugangs-
+    // Cookie reist mit), mit Frist. Scheitert sie, kommt {ok:false, grund} zurueck
+    // statt eines Wurfs — die Aufrufer sind Knoepfe und Takte.
+    async function rcDienstAnfrage(pfad, daten, fristMs){
+        const ac = typeof AbortController === 'function' ? new AbortController() : null;
+        let frist = null;
+        const zeit = new Promise(function(res){
+            frist = setTimeout(function(){
+                try { if (ac) ac.abort(); } catch(e){}
+                res({ ok:false, grund:'Datendienst antwortet nicht (' + (fristMs / 1000) + ' s)' });
+            }, fristMs);
+        });
+        const anfrage = (async function(){
+            const r = await fetch(window.__rcDienst.basis + pfad, { method:'POST', credentials:'same-origin', cache:'no-store',
+                headers:{ 'Content-Type':'application/json' }, body: JSON.stringify(daten || {}), signal: ac ? ac.signal : undefined });
+            let j = null;
+            try { j = await r.json(); } catch(e){}
+            if (!r.ok) return { ok:false, grund: (j && j.grund) || ('HTTP ' + r.status) };
+            return j || { ok:false, grund:'Antwort ohne JSON' };
+        })().catch(function(e){ return { ok:false, grund:'Datendienst nicht erreichbar (' + ((e && e.message) || e) + ')' }; });
+        try { return await Promise.race([anfrage, zeit]); }
+        finally { clearTimeout(frist); }
+    }
+    // Wartet, bis pruef() wahr wird (Blick alle 250 ms), hoechstens fristMs.
+    function rcDienstWarteAuf(pruef, fristMs){
+        const bis = Date.now() + fristMs;
+        return new Promise(function(res){
+            (function schritt(){
+                let ja = false;
+                try { ja = !!pruef(); } catch(e){}
+                if (ja || Date.now() >= bis) return res(ja);
+                setTimeout(schritt, 250);
+            })();
+        });
+    }
+    // Bis zu welcher Nummer hat der Empfang eingespeist? art: 'esl' | 'liga' | 'vortage'.
+    function rcDienstGesehenNr(art, key){
+        const g = (window.rcDienstGesehen || {})[art];
+        return (key ? (g || {})[key] : g) || 0;
+    }
+    // Antworten des Dienstes (Ruling R5):
+    //   /api/abruf   -> {ok, nr, art, grund}            nr = stand.esl[p].nr danach
+    //   /api/runde   -> {ok, nr, esl:{nr, art, grund}, liga:{nr, art, grund, agenten}|null}
+    //   /api/bereich -> {ok, projekte:{p:{nr, esl:{art, grund}, liga:{art, tage, grund}}}}
+    //   Frist        -> {ok:false, grund:'Frist abgelaufen', nr:<aktuell>}
+    // ESL gilt bei art excel/leer als geliefert, die Ligaliste bei ok/teil.
+    function rcDienstEslArtOk(art){ return art === 'excel' || art === 'leer'; }
+    // Ein Projekt beim Dienst holen lassen und warten, bis der Empfang GENAU diese
+    // Lieferung eingespeist hat. Das Ergebnis ist dann das von rcProjektLieferung —
+    // dieselbe Pruefung (Mapping, fremde Daten, "ploetzlich leer") wie im Portal.
+    async function rcDienstAbruf(key){
+        const a = await rcDienstAnfrage('/api/abruf', { projekt: key }, 160000);
+        if (!a || typeof a.nr !== 'number') return { ok:false, grund:'Datendienst: ' + ((a && a.grund) || 'kein Ergebnis') };
+        const drin = await rcDienstWarteAuf(function(){ return rcDienstGesehenNr('esl', key) >= a.nr; }, 10000);
+        if (!drin) return { ok:false, grund:'Datendienst: Lieferung ' + a.nr + ' (' + (a.grund || a.art || '?') + ') noch nicht eingespeist' };
+        const e = (window.rcDienstErgebnis || {})[key];
+        // Das Ergebnis der Pruefung im Dashboard gilt nur fuer GENAU diese Lieferung —
+        // und ein Fehlschlag des Dienstes (z. B. seine Frist, nr = alte Lieferung)
+        // darf nie als Erfolg einer frueheren Lieferung durchgehen.
+        if (e && e.nr === a.nr && e.r && (a.ok || !e.r.ok)) return e.r;
+        return { ok: !!a.ok, grund: a.ok ? '' : 'Datendienst: ' + (a.grund || a.art || 'kein Ergebnis') };
+    }
+    // "Jetzt": EINE Runde beim Dienst (ESL des aktiven Projekts + Ligaliste).
+    // Gewartet wird, bis der Empfang GENAU die gemeldeten Lieferungen (esl.nr,
+    // liga.nr) eingespeist hat. Liefert die Form, die rcJetztAktualisieren
+    // erwartet ({liga:{ok, agenten, error}, esl:{ok, error}}). esl.ok kommt aus der
+    // Pruefung im Dashboard (rcDienstErgebnis), sonst aus art.
+    async function rcDienstRunde(){
+        const aktiv = window.rcAktivProjekt;
+        const a = await rcDienstAnfrage('/api/runde', { projekt: aktiv }, 160000);
+        const sE = a && a.esl, sL = (a && a.liga) || null;
+        // Keine Antwort oder Frist des Dienstes ({ok:false, grund, nr} ohne esl): kein Teilergebnis.
+        if (!sE || typeof sE.nr !== 'number') {
+            const g = 'Datendienst: ' + ((a && a.grund) || 'kein Ergebnis');
+            return { liga:{ ok:false, error:g }, esl:{ ok:false, error:g } };
+        }
+        const eDrin = function(){ return rcDienstGesehenNr('esl', aktiv) >= sE.nr; };
+        const lDrin = function(){ return !sL || typeof sL.nr !== 'number' || rcDienstGesehenNr('liga') >= sL.nr; };
+        await rcDienstWarteAuf(function(){ return eDrin() && lDrin(); }, 10000);
+        const offen = ' — noch nicht eingespeist';
+        const e = (window.rcDienstErgebnis || {})[aktiv];
+        const r = (e && e.nr === sE.nr) ? e.r : null;
+        const eslOk = r ? !!r.ok : rcDienstEslArtOk(sE.art);
+        const esl = !eDrin() ? { ok:false, error:'Datendienst: ESL ' + (rcDienstEslArtOk(sE.art) ? 'geholt' : (sE.grund || sE.art || 'kein Ergebnis')) + offen }
+                  : eslOk ? { ok:true }
+                  : { ok:false, error: (r && r.grund) || sE.grund || sE.art || 'kein Ergebnis' };
+        const ligaOk = !!sL && (sL.art === 'ok' || sL.art === 'teil');
+        const liga = !sL ? { ok:false, error:'Datendienst: Ligaliste war in dieser Runde nicht dran' }
+                   : !lDrin() ? { ok:false, agenten: sL.agenten, error:'Datendienst: Ligaliste ' + (ligaOk ? 'geholt' : (sL.grund || sL.art || 'kein Ergebnis')) + offen }
+                   : ligaOk ? { ok:true, agenten: sL.agenten }
+                   : { ok:false, agenten: sL.agenten, error: sL.grund || sL.art || 'kein Ergebnis' };
+        return { liga: liga, esl: esl };
+    }
+    // Zeitraum: der Dienst holt die Vortage je Projekt (ESL-Bereichs-Export +
+    // Liga-Tage), der Empfang legt sie in die Historie. Gewartet wird, bis jede
+    // gemeldete Lieferung eingespeist ist. text = Bilanz fuer eine Statuszeile.
+    async function rcDienstBereich(von, bis, projekte){
+        const a = await rcDienstAnfrage('/api/bereich', { von: von, bis: bis, projekte: projekte }, 910000);
+        const P = (a && a.projekte) || {};
+        if (!Object.keys(P).length) return { ok:false, projekte:P, text:'Datendienst: ' + ((a && a.grund) || 'kein Ergebnis') };
+        const drin = function(p){ const n = (P[p] || {}).nr; return typeof n !== 'number' || rcDienstGesehenNr('vortage', p) >= n; };
+        await rcDienstWarteAuf(function(){ return Object.keys(P).every(drin); }, 10000);
+        let ok = !!a.ok;
+        const teile = Object.keys(P).map(function(p){
+            const x = P[p] || {}, esl = x.esl || {}, liga = x.liga || {};
+            if (!drin(p)) ok = false;
+            return ((rcProjEintrag(p) || {}).name || p) + ': ESL ' +
+                (esl.art === 'excel' ? 'geholt' : esl.art === 'leer' ? 'ohne Datensaetze' : (esl.grund || esl.art || 'kein Ergebnis')) +
+                ', Ligaliste ' + (liga.art === 'ok' || liga.art === 'teil' ? (liga.tage || 0) + ' Tag(e)' + (liga.grund ? ' (' + liga.grund + ')' : '') : (liga.grund || liga.art || 'kein Ergebnis')) +
+                (drin(p) ? '' : ' (noch nicht eingespeist)');
+        });
+        return { ok: ok, projekte: P, text: teile.join(' · ') };
+    }
+    // ------------------------------------------------------------------------
+    //  EMPFANG (27.10.): alle 2 s /api/stand lesen und NEUE Lieferungen ueber die
+    //  vorhandenen Eingaenge einspeisen — ESL ueber rcProjektLieferung (dieselbe
+    //  Pruefung wie im Portal), Ligaliste ueber handleKpiMessage, Vortage ueber
+    //  rcDienstHistorieAblegen. Kein zweiter Parser. rcDienstGesehen haelt fest,
+    //  bis zu welcher Nummer eingespeist ist (darauf warten rcDienstAbruf/-Runde/
+    //  -Bereich), rcDienstErgebnis[p] = {nr, r} das Pruefergebnis GENAU dieser
+    //  Lieferung. Gestartet aus dem Start-Block; Takt im Clean-State.
+    // ------------------------------------------------------------------------
+    // GET mit Frist. Wirft nie: {ok:true, daten} oder {ok:false, status, grund}.
+    async function rcDienstHole(pfad, art, fristMs){
+        const ac = typeof AbortController === 'function' ? new AbortController() : null;
+        const frist = setTimeout(function(){ try { if (ac) ac.abort(); } catch(e){} }, fristMs);
+        try {
+            const r = await fetch(window.__rcDienst.basis + pfad, { credentials:'same-origin', cache:'no-store', signal: ac ? ac.signal : undefined });
+            if (!r.ok) return { ok:false, status: r.status, grund: r.status === 403 ? 'Zugang abgelehnt - Seite ueber ESL_Dienst_Start.cmd oeffnen' : 'HTTP ' + r.status };
+            return { ok:true, daten: art === 'buf' ? await r.arrayBuffer() : await r.json() };
+        } catch(e){
+            return { ok:false, grund: ac && ac.signal.aborted ? 'keine Antwort in ' + (fristMs / 1000) + ' s' : String((e && e.message) || e) };
+        } finally { clearTimeout(frist); }
+    }
+    function rcDienstEmpfangStarten(){
+        if (window.rcDienstInterval) clearInterval(window.rcDienstInterval);
+        window.rcDienstInterval = setInterval(rcDienstEmpfangTick, 2000);
+        rcDienstEmpfangTick();
+        // EINMAL beim Start: der Dienst holt ab jetzt das hier aktive Projekt.
+        // Spaetere Wechsel meldet rcProjektWechseln selbst (Ruling R6).
+        rcDienstAnfrage('/api/projekt', { projekt: window.rcAktivProjekt }, 10000).then(function(r){
+            if (!r || !r.ok) rcLog.warn('Datendienst: aktives Projekt nicht gemeldet (' + ((r && r.grund) || 'kein Ergebnis') + ').');
+        });
+        rcLog.log('Datendienst: Empfang laeuft (Stand alle 2 s).');
+    }
+    async function rcDienstEmpfangTick(){
+        // Ein Tick zur Zeit; eine Sperre aelter als 3 Min gilt als verwaist.
+        const l = window.rcDienstEmpfangLaeuft;
+        if (l && Date.now() - l.seit < 180000) return;
+        const sperre = { seit: Date.now() };
+        window.rcDienstEmpfangLaeuft = sperre;
+        // Wird mitten im Tick neu eingespielt, schreibt dieser Tick in SEINE Objekte.
+        const G = window.rcDienstGesehen, ERG = window.rcDienstErgebnis;
+        try {
+            const a = await rcDienstHole('/api/stand', 'json', 8000);
+            const lage = window.rcDienstLage || {};
+            if (!a.ok || !a.daten) {
+                const grund = a.grund || 'leerer Stand';
+                window.rcDienstLage = { zuletztOk: lage.zuletztOk || 0, fehler: grund, gemeldet: lage.gemeldet || 0 };
+                // Hoechstens alle 20 s — sonst zaehlte die Fehlserie im 2-s-Takt hoch.
+                if (Date.now() - (lage.gemeldet || 0) >= 20000) {
+                    window.rcDienstLage.gemeldet = Date.now();
+                    rcEslFehlschlag('Datendienst antwortet nicht (' + grund + ')');
+                }
+                return;
+            }
+            window.rcDienstLage = { zuletztOk: Date.now(), fehler: '', gemeldet: 0 };
+            const S = a.daten, P = ['kabel', 'mobile', 'um'];
+            // 1. ESL je Projekt. Jede Lieferung, auch ein Fehlschlag, traegt eine neue nr.
+            for (const p of P) {
+                const s = (S.esl || {})[p];
+                if (!s || !(s.nr > G.esl[p])) continue;
+                let e;
+                if (s.art === 'excel') {
+                    const f = await rcDienstHole('/api/esl/' + p + '.xlsx', 'buf', 30000);
+                    e = f.ok ? { art:'excel', buf: f.daten, zeit: s.zeit } : { art:'fehler', grund:'ESL-Datei vom Datendienst nicht lesbar (' + f.grund + ')', zeit: s.zeit };
+                } else e = { art: s.art, status: s.status, grund: s.grund, zeit: s.zeit };
+                let r;
+                try { r = rcProjektLieferung(p, e); }
+                catch(err){ r = { ok:false, grund:'Einspeisen gescheitert: ' + ((err && err.message) || err) }; rcLog.warn('[Dienst] ' + p + ': ' + r.grund); }
+                ERG[p] = { nr: s.nr, r: r };
+                G.esl[p] = s.nr;
+            }
+            // 2. Ligaliste. liga.zeit = letzte ERFOLGREICHE Lieferung: ist sie neuer als
+            // eingespeist, kommt die Datei — auch wenn der letzte Versuch scheiterte
+            // (nach Start/Neueinspielen stehen dann die letzten echten Zahlen samt Alter da).
+            const L = S.liga || {};
+            if (L.nr > G.liga) {
+                try {
+                    if ((L.zeit || 0) > (G.ligaZeit || 0)) {
+                        const f = await rcDienstHole('/api/liga.json', 'json', 30000);
+                        if (f.ok && f.daten && Array.isArray(f.daten.payload)) {
+                            handleKpiMessage({ type:'KPI_BATCH', payload: f.daten.payload, vollstaendig: !!f.daten.vollstaendig, liveDaterange:'intraday' });
+                            window.rcKpiLastUpdate = new Date(L.zeit);
+                            G.ligaZeit = L.zeit;
+                        } else rcLog.warn('[Dienst] Ligaliste-Datei nicht lesbar (' + (f.grund || 'ohne Nutzlast') + ').');
+                    }
+                    const zeit = L.versuch || L.zeit || Date.now(), grund = L.grund || 'Ligaliste nicht erreichbar';
+                    if (L.art === 'teil') handleKpiMessage({ type:'KPI_HINWEIS', text:'Datendienst: Ligaliste unvollstaendig' + (L.grund ? ' - ' + L.grund : ''), zeit: zeit });
+                    // Dieselbe Stoerung je Versuch (jede Minute) nur einmal — der Quellen-Waechter zeigt sie ohnehin.
+                    else if (L.art === 'fehler' && !(window.rcLigaStoerung && window.rcLigaStoerung.grund === grund))
+                        handleKpiMessage({ type:'KPI_QUELLE_TOT', grund: grund, zeit: zeit });
+                } catch(err){ rcLog.warn('[Dienst] Ligaliste nicht eingespeist: ' + ((err && err.message) || err)); }
+                G.liga = L.nr;
+            }
+            // 3. Vortage je Projekt in dessen eigene Historie.
+            for (const p of P) {
+                const v = (S.vortage || {})[p];
+                if (!v || !(v.nr > G.vortage[p])) continue;
+                const fe = (v.esl || {}).art === 'excel' ? await rcDienstHole('/api/vortage/' + p + '.xlsx', 'buf', 60000) : null;
+                const fl = ['ok', 'teil'].indexOf((v.liga || {}).art) >= 0 ? await rcDienstHole('/api/vortage/' + p + '.liga.json', 'json', 30000) : null;
+                let tage = fl && fl.ok ? fl.daten : null;
+                if (tage && tage.tage && typeof tage.tage === 'object') tage = tage.tage;     // Datei = {art, tage, grund} oder nur die Tage
+                try {
+                    const r = rcDienstHistorieAblegen(p, fe && fe.ok ? fe.daten : null, tage, v.von, v.bis);
+                    rcLog.log('[Dienst] Vortage ' + p + ' ' + v.von + ' bis ' + v.bis + ': ESL ' + (r.esl.ok ? r.esl.tage + ' Tag(e)' : r.esl.grund) + ', Ligaliste ' + r.liga.tage + ' Tag(e).');
+                } catch(err){ rcLog.warn('[Dienst] Vortage ' + p + ' nicht abgelegt: ' + ((err && err.message) || err)); }
+                G.vortage[p] = v.nr;
+            }
+            // 4. Ereignisse des Dienstes ins Logbuch (Ring 50, jede nr einmal).
+            (S.ereignisse || []).filter(function(x){ return x && x.nr > G.ereignis; })
+                .sort(function(x, y){ return x.nr - y.nr; })
+                .forEach(function(x){
+                    if (x.art === 'W') rcLog.warn('[Dienst] ' + x.text); else window.rcLogEreignis('[Dienst] ' + x.text);
+                    G.ereignis = x.nr;
+                });
+            // 5. Postfach (Mail-Zentrum): nur wenn der Dienst es fuehrt (Schalter an). Inhalte nur
+            // bei neuer nr holen; !== statt >, ein Dienst-Neustart beginnt wieder bei 0.
+            const PF = S.postfach;
+            if (PF) {
+                rcPostfachKopf(PF);
+                if (PF.nr !== G.postfach) {
+                    const f = await rcDienstHole('/api/postfach', 'json', 15000);
+                    G.postfach = PF.nr;
+                    if (f.ok && f.daten) rcPostfachAnnehmen(f.daten);
+                    else {
+                        window.rcPostfachFehler = 'Postfach nicht abrufbar (' + f.grund + ')';
+                        rcPostfachZeichnen();
+                        rcLog.warn('[Dienst] Postfach nicht abrufbar (' + f.grund + ').');
+                    }
+                }
+            }
+        } finally {
+            if (window.rcDienstEmpfangLaeuft === sperre) window.rcDienstEmpfangLaeuft = null;
+        }
+    }
+
+    // ---- MAIL-ZENTRUM (Postfach) — Vorhaben 3, 30.10. ------------------------
+    //  Eigene Seite "Postfach", nur im Dienst-Betrieb mit ESL_DIENST_POSTFACH=1
+    //  (der Dienst liefert dann stand.postfach). Daten nur in window.rcPostfachDaten,
+    //  nie in localStorage oder im Logbuch; die Seite steht in keiner Rotationsliste.
+    //  Abwesende und Mitarbeiterinfos zeigen ALLE Meldungen (Nutzer 30.10.: "Alle
+    //  zeigen"); nur "Mail an Team" folgt dem Dashboard-Filter. Gesendet wird nie:
+    //  der Dienst oeffnet in Outlook nur Mail, Antwortfenster oder Entwurf.
+    //  Alles Funktionsdeklarationen (rcDienstEmpfangTick ruft sie, TDZ-Regel).
+    function rcPostfachEsc(t){ return String(t == null ? '' : t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+    function rcPostfachZahl(v, nk){ return (v == null || !isFinite(v)) ? '—' : Number(v).toFixed(nk).replace('.', ','); }
+    // Name -> Team ueber die Mitarbeiter-Excel (rcNormName: Reihenfolge und Komma egal).
+    function rcPostfachTeamIndex(map){
+        const idx = {}, cm = (map && map.ccsMap) || {};
+        Object.keys(cm).forEach(function(k){ const i = cm[k]; if (i && i.name) idx[window.rcNormName(i.name)] = { team: i.team || '', standort: i.standort || '' }; });
+        return idx;
+    }
+    function rcPostfachTeam(idx, ma){ const t = ma ? idx[window.rcNormName(ma)] : null; return (t && t.team) || '—'; }
+    // Reine Funktion: Daten -> HTML. Jeder Datenwert laeuft durch rcPostfachEsc.
+    function rcPostfachHtml(d, kopf, idx, filter, teams){
+        const E = rcPostfachEsc, pad = function(n){ return (n < 10 ? '0' : '') + n; };
+        const k = kopf || {}, jetzt = new Date(), f = filter || 'Alle';
+        const heute = jetzt.getFullYear() + '-' + pad(jetzt.getMonth() + 1) + '-' + pad(jetzt.getDate());
+        const uhr = function(ms){ const x = new Date(ms); return pad(x.getHours()) + ':' + pad(x.getMinutes()); };
+        const wannMs = function(ms){ const x = new Date(ms), t = x.getFullYear() + '-' + pad(x.getMonth() + 1) + '-' + pad(x.getDate()); return (t === heute ? '' : pad(x.getDate()) + '.' + pad(x.getMonth() + 1) + '. ') + uhr(ms); };
+        const wann = function(z){ z = String(z || ''); return z.slice(0, 10) === heute ? z.slice(11, 16) : z.slice(8, 10) + '.' + z.slice(5, 7) + '. ' + z.slice(11, 16); };
+        const tm = function(iso){ return iso ? iso.slice(8, 10) + '.' + iso.slice(5, 7) + '.' : ''; };
+        // Ohne Lesestand (gelesen:false: Dienst neu gestartet, Outlook nie erreicht) gibt es keine Listen —
+        // dann "—" und "Noch keine Daten" statt "0 abwesend" (das saehe wie ein ruhiger Tag aus).
+        const hat = !!d && d.gelesen !== false, keine = '<div class="rc-pf-leer">Noch keine Daten aus Outlook.</div>';
+        const D = hat ? d : {}, mails = D.mails || [], abw = D.abwesend || [], infos = D.infos || [], termine = D.termine || [];
+        const knopf = function(art, attr, text){ return '<button class="rc-pf-knopf" data-pf-art="' + art + '" ' + attr + '>' + text + '</button>'; };
+        const leer = function(t){ return '<div class="rc-pf-leer">' + t + '</div>'; };
+        const box = function(art, titel, inhalt){ return '<section class="rc-pf-box" data-pf-box="' + art + '"><h4>' + titel + '</h4>' + inhalt + '</section>'; };
+        const kachel = function(art, zahl, text, ton){ return '<div class="rc-pf-kachel" data-kachel="' + art + '" data-ton="' + ton + '"><b>' + E(zahl) + '</b><span>' + text + '</span></div>'; };
+        const tonGrund = function(g){ return /krv|krank|\bau\b/i.test(g) ? 'rot' : /urlaub/i.test(g) ? 'blau' : 'amber'; };
+        const mail = function(m){
+            const id = 'data-pf-id="' + E(m.entryId) + '"', em = String(m.email || '').toLowerCase();
+            let w = '';
+            if (!m.wichtig) { if (em.indexOf('@') > 0) w = knopf('wichtig_neu', 'data-pf-eintrag="' + E(em) + '"', 'als wichtig markieren'); }
+            else if (m.wichtig === em) w = knopf('wichtig_weg', 'data-pf-eintrag="' + E(em) + '"', 'Entfernen');
+            else w = knopf('hinweis', 'data-pf-muster="' + E(m.wichtig) + '"', 'Entfernen');
+            return '<div class="rc-pf-mail' + (m.ungelesen ? ' neu' : '') + '"><div class="k">' + E(m.kategorie) + ' · ' + E(m.absender) + ' · ' + E(wann(m.zeit)) + '</div>' +
+                '<div class="s">' + E(m.betreff || '(ohne Betreff)') + '</div>' + (m.vorschau ? '<div class="v">' + E(m.vorschau) + '</div>' : '') +
+                '<div class="rc-pf-knoepfe">' + knopf('oeffnen', id, 'In Outlook öffnen') + knopf('antworten', id, 'Antworten') + w + '</div></div>';
+        };
+        const stand = !k.zeit ? '<span class="rc-pf-stand">Outlook wird gelesen …</span>'
+            : k.ok ? '<span class="rc-pf-stand">Outlook gelesen ' + uhr(k.zeit) + '</span>'
+            : '<span class="rc-pf-stand warn">Nicht gelesen: ' + E(k.grund) + (hat && D.zeit ? ' · letzter Stand ' + E(wannMs(D.zeit)) : '') + '</span>';
+        const hinw = (D.hinweise || []).map(function(h){ return '<div class="rc-pf-hinweis">' + E(h) + '</div>'; }).join('');
+        const abwHtml = abw.length ? abw.map(function(a){
+            return '<div class="rc-pf-zeile"><span>' + E(a.ma) + ' <i>' + E(rcPostfachTeam(idx, a.ma)) + '</i></span><span class="rc-pf-tag" data-ton="' + tonGrund(a.grund) + '">' + E(a.grund + (a.bis ? ' bis ' + tm(a.bis) : '')) + '</span></div>';
+        }).join('') : (hat ? leer('Heute keine Abwesenheit gemeldet.') : keine);
+        const infoHtml = infos.length ? infos.map(function(i){
+            return '<div class="rc-pf-zeile"><span>' + E(i.ma || '—') + ' <i>' + E(i.ma ? rcPostfachTeam(idx, i.ma) : '') + '</i><br><small>' + E(i.text) + '</small></span><span class="rc-pf-tag">' + E(i.art) + '</span></div>';
+        }).join('') : (hat ? leer('Keine Hinweise der letzten 7 Tage.') : keine);
+        const wichtig = mails.filter(function(m){ return m.wichtig; });
+        const auswahl = mails.filter(function(m){ return f === 'Alle' || m.kategorie === f; });
+        const chips = ['Alle', 'Steuerung', 'Management', 'Performance', 'Rest'].map(function(c){ return '<button class="rc-pf-chip' + (c === f ? ' an' : '') + '" data-pf-filter="' + c + '">' + c + '</button>'; }).join('');
+        const terHtml = termine.length ? termine.map(function(t){
+            return '<div class="rc-pf-zeile"><span>' + (t.ganztaegig ? 'Ganztägig' : E(t.start + (t.ende ? ' – ' + t.ende : ''))) + '</span><span>' + E(t.titel) + '</span></div>';
+        }).join('') : (hat ? leer('Heute keine Termine.') : keine);
+        const teamHtml = leer('Entwurf mit den heutigen Werten in Outlook öffnen. Empfänger trägst du ein, gesendet wird von dir.') +
+            ((teams || []).length ? '<div class="rc-pf-knoepfe">' + teams.map(function(t){ return knopf('entwurf', 'data-pf-team="' + E(t.team) + '"', E(t.team)); }).join('') + '</div>' : leer('Heute noch keine Teamwerte im Filter.'));
+        return '<div class="rc-pf"><div class="rc-pf-kopf"><div class="rc-pf-kacheln">' +
+                kachel('ungelesen', D.ungelesen == null ? '—' : D.ungelesen, 'ungelesen', 'rot') +
+                kachel('wichtig', hat ? wichtig.filter(function(m){ return m.ungelesen; }).length : '—', 'wichtig (ungelesen)', 'amber') +
+                kachel('abwesend', hat ? abw.length : '—', 'abwesend heute', 'amber') +
+                kachel('termine', hat ? termine.length : '—', 'Termine heute', 'gruen') +
+            '</div>' + stand + '</div>' + hinw + '<div class="rc-pf-spalten">' +
+            '<div class="rc-pf-spalte">' + box('abwesend', 'Abwesend heute (Dispo)', abwHtml) + box('infos', 'Mitarbeiterinfos', infoHtml) + '</div>' +
+            '<div class="rc-pf-spalte">' + box('wichtig', 'Wichtige Mails', wichtig.length ? wichtig.map(mail).join('') : (hat ? leer('Keine Mails aus der Wichtig-Liste.') : keine)) +
+                box('posteingang', 'Posteingang', '<div class="rc-pf-chips">' + chips + '</div>' + (auswahl.length ? auswahl.map(mail).join('') : (hat ? leer('Keine Mails in dieser Auswahl.') : keine))) + '</div>' +
+            '<div class="rc-pf-spalte">' + box('termine', 'Termine heute', terHtml) + box('team', 'Mail an Team', teamHtml) + '</div>' +
+            '</div></div>';
+    }
+    // Entwurfstext je Team: dieselben Rechenwege wie das Stand-Blatt (rcAggTeams + rcPoolQuote).
+    function rcPostfachMailText(team, t, uhr){
+        const pad = function(n){ return (n < 10 ? '0' : '') + n; }, d = new Date();
+        const q = function(k){ return rcPostfachZahl(rcPoolQuote(t, k), 1); }, fq = q('fq');
+        return {
+            betreff: 'Teamwerte ' + team + ' ' + pad(d.getDate()) + '.' + pad(d.getMonth() + 1) + '.' + d.getFullYear(),
+            text: ['Hallo Team ' + team + ',', '', 'hier eure Werte von heute (Stand ' + uhr + '):',
+                'Calls: ' + rcPostfachZahl(t.calls, 0), 'Ansprachen: ' + rcPostfachZahl(t.ansp, 0), 'BNT: ' + rcPostfachZahl(t.bnt, 0), 'VVL: ' + rcPostfachZahl(t.vvl, 0),
+                'CS: ' + q('cs'), 'TNPS: ' + q('tnps'), 'FQ: ' + (fq === '—' ? fq : fq + ' %'), '', 'Viele Grüße'].join('\n')
+        };
+    }
+    // Teams mit Daten heute im Dashboard-Filter (Standort/Stack/Team).
+    function rcPostfachTeams(){
+        try {
+            return rcAggTeams(rcStandRows(null, window.rcActiveScope()).rows || [])
+                .filter(function(t){ return t.calls > 0 || t.mitEsl > 0; })
+                .sort(function(a, b){ return a.team.localeCompare(b.team, 'de'); });
+        } catch(e){ return []; }
+    }
+    function rcPostfachCss(){
+        return '.rc-pf-seite{flex:1 1 auto;min-height:0;overflow:auto;padding:12px;box-sizing:border-box;}' +
+            '.rc-pf-kopf{display:flex;align-items:center;gap:14px;margin-bottom:12px;}' +
+            '.rc-pf-kacheln{display:grid;grid-template-columns:repeat(4,minmax(110px,1fr));gap:10px;flex:1;}' +
+            '.rc-pf-kachel{background:var(--vf-surface);border-radius:8px;padding:10px 12px;border-bottom:3px solid var(--vf-line-strong);}' +
+            '.rc-pf-kachel b{display:block;font-size:26px;color:var(--vf-ink);}' +
+            '.rc-pf-kachel span{color:var(--vf-grey);font-size:12px;}' +
+            '.rc-pf-kachel[data-ton=rot]{border-bottom-color:var(--vf-red);}.rc-pf-kachel[data-ton=amber]{border-bottom-color:var(--vf-warn);}.rc-pf-kachel[data-ton=gruen]{border-bottom-color:var(--vf-ok);}' +
+            '.rc-pf-stand{color:var(--vf-grey);font-size:13px;white-space:nowrap;}.rc-pf-stand.warn{color:var(--vf-warn);white-space:normal;max-width:34%;}' +
+            '.rc-pf-spalten{display:grid;grid-template-columns:1fr 1.6fr 1fr;gap:12px;align-items:start;}' +
+            '.rc-pf-box{background:var(--vf-surface);border-radius:8px;padding:10px 12px;margin-bottom:12px;border-top:2px solid var(--vf-red);}' +
+            '.rc-pf-box h4{margin:0 0 8px;color:var(--vf-grey);font-size:12px;text-transform:uppercase;letter-spacing:.5px;}' +
+            '.rc-pf-zeile{display:flex;justify-content:space-between;gap:8px;padding:6px 0;border-bottom:1px solid var(--vf-line);font-size:13px;color:var(--vf-ink);}' +
+            '.rc-pf-zeile:last-child{border-bottom:0;}.rc-pf-zeile i{color:var(--vf-grey);font-style:normal;margin-left:4px;}.rc-pf-zeile small{color:var(--vf-grey);font-size:12px;}' +
+            '.rc-pf-tag{font-size:11px;padding:1px 7px;border-radius:3px;background:var(--vf-surface-2);color:var(--vf-ink);white-space:nowrap;align-self:flex-start;}' +
+            '.rc-pf-tag[data-ton=rot]{background:rgba(230,0,0,.28);}.rc-pf-tag[data-ton=amber]{background:rgba(235,151,0,.28);}.rc-pf-tag[data-ton=blau]{background:rgba(0,104,160,.40);}' +
+            '.rc-pf-mail{padding:7px 0;border-bottom:1px solid var(--vf-line);}.rc-pf-mail:last-child{border-bottom:0;}' +
+            '.rc-pf-mail .k{font-size:11px;color:var(--vf-grey);}.rc-pf-mail .s{font-weight:600;color:var(--vf-ink);font-size:13px;}.rc-pf-mail .v{font-size:12px;color:var(--vf-grey);}' +
+            '.rc-pf-mail.neu .s::before{content:"";display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--vf-red);margin-right:6px;vertical-align:middle;}' +
+            '.rc-pf-knoepfe{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;}' +
+            '.rc-pf-knopf,.rc-pf-chip{background:var(--vf-surface-2);color:var(--vf-ink);border:1px solid var(--vf-line);border-radius:4px;padding:3px 9px;font-size:12px;cursor:pointer;}' +
+            '.rc-pf-knopf:hover,.rc-pf-chip:hover{border-color:var(--vf-line-strong);}' +
+            '.rc-pf-chips{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:6px;}.rc-pf-chip{border-radius:12px;}' +
+            '.rc-pf-chip.an{background:var(--vf-red);border-color:var(--vf-red);color:#fff;}' +
+            '.rc-pf-leer{color:var(--vf-grey);font-size:12px;padding:4px 0;}' +
+            '.rc-pf-hinweis{color:var(--vf-warn);font-size:12px;margin:-4px 0 10px;}' +
+            '@media (max-width:1100px){.rc-pf-spalten{grid-template-columns:1fr;}}';
+    }
+    // Reiter (rechts neben "Steuerung"), Inhalt und Stil einmal anlegen. Nach einem Re-Inject
+    // ist das Overlay neu, dann entsteht alles neu; der Stil im <head> wird ersetzt.
+    function rcPostfachSeiteSicher(){
+        const ov = window.__rcOverlayEl;
+        if (!ov) return null;
+        const alt = document.getElementById('rcPostfachCss');
+        if (!alt || alt.__rcFassung !== rcPostfachCss) {
+            if (alt) alt.remove();
+            const s = document.createElement('style'); s.id = 'rcPostfachCss'; s.textContent = rcPostfachCss(); s.__rcFassung = rcPostfachCss;
+            document.head.appendChild(s);
+        }
+        let c = document.getElementById('rcPagePostfachContent');
+        if (!c) {
+            c = document.createElement('div'); c.id = 'rcPagePostfachContent'; c.className = 'rc-pf-seite'; c.style.display = 'none';
+            const mq = ov.querySelector('.rc-marquee');
+            if (mq) ov.insertBefore(c, mq); else ov.appendChild(c);
+            c.addEventListener('click', rcPostfachKlick);
+        }
+        const sw = ov.querySelector('.rc-pageswitch');
+        if (sw && !document.getElementById('rcPagePostfach')) {
+            const b = document.createElement('button'); b.className = 'rc-page-btn'; b.id = 'rcPagePostfach'; b.setAttribute('data-page', 'postfach'); b.textContent = 'Postfach';
+            b.addEventListener('click', function(){ if (window.__rcSwitchPageFn) window.__rcSwitchPageFn('postfach'); });
+            const nach = document.getElementById('rcPageCockpit');
+            if (nach && nach.parentNode === sw) sw.insertBefore(b, nach.nextSibling); else sw.appendChild(b);
+        }
+        if (window.__rcPagesRef) window.__rcPagesRef.postfach = ['rcPagePostfach', 'rcPagePostfachContent', 'block'];
+        return c;
+    }
+    function rcPostfachZeichnen(){
+        const c = rcPostfachSeiteSicher();
+        if (!c) return;
+        const kopf = Object.assign({}, window.rcPostfachKopfStand, window.rcPostfachFehler ? { ok: false, grund: window.rcPostfachFehler } : {});
+        let idx = {};
+        try { idx = rcPostfachTeamIndex(window.rcWcaMapping); } catch(e){}
+        c.innerHTML = rcPostfachHtml(window.rcPostfachDaten, kopf, idx, window.rcPostfachFilter || 'Alle', window.rcPostfachDaten ? rcPostfachTeams() : []);
+    }
+    // Kopf aus stand.json (alle 2 s): neu zeichnen nur, wenn sich nr oder Grund aendert.
+    function rcPostfachKopf(pf){
+        const alt = window.rcPostfachKopfStand;
+        window.rcPostfachKopfStand = { nr: pf.nr, zeit: pf.zeit, ok: pf.ok, grund: pf.grund };
+        if (!alt || alt.nr !== pf.nr || alt.grund !== pf.grund || !document.getElementById('rcPagePostfachContent')) rcPostfachZeichnen();
+    }
+    function rcPostfachAnnehmen(d){
+        // Ohne Lesestand bleibt der letzte gute Stand stehen (Review 30.10.: Dienst-Neustart wischte ihn weg).
+        if (!(d && d.gelesen === false) || !window.rcPostfachDaten) window.rcPostfachDaten = d;
+        window.rcPostfachFehler = '';
+        rcPostfachZeichnen();
+    }
+    function rcPostfachAktion(d){
+        return rcDienstAnfrage('/api/postfach/aktion', d, 45000).then(function(r){
+            window.rcToast(r && r.ok ? 'Erledigt' : 'Nicht ausgeführt: ' + rcPostfachEsc((r && r.grund) || 'ohne Antwort'), 5000);
+            return r;
+        });
+    }
+    function rcPostfachKlick(e){
+        const b = e.target && e.target.closest ? e.target.closest('[data-pf-art],[data-pf-filter]') : null;
+        if (!b) return;
+        const filter = b.getAttribute('data-pf-filter');
+        if (filter) { window.rcPostfachFilter = filter; rcPostfachZeichnen(); return; }
+        const art = b.getAttribute('data-pf-art');
+        if (art === 'hinweis') { window.rcToast('Kommt über ‚' + rcPostfachEsc(b.getAttribute('data-pf-muster')) + '‘ — in Postfach_Wichtig.txt ändern', 7000); return; }
+        if (art === 'oeffnen' || art === 'antworten') { rcPostfachAktion({ art: art, entryId: b.getAttribute('data-pf-id') }); return; }
+        if (art === 'wichtig_neu' || art === 'wichtig_weg') { rcPostfachAktion({ art: art, eintrag: b.getAttribute('data-pf-eintrag') }); return; }
+        if (art === 'entwurf') {
+            const name = b.getAttribute('data-pf-team'), t = rcPostfachTeams().filter(function(x){ return x.team === name; })[0];
+            if (!t) { window.rcToast('Teamwerte für ' + rcPostfachEsc(name) + ' gerade nicht verfügbar', 5000); return; }
+            const n = new Date(), pad = function(x){ return (x < 10 ? '0' : '') + x; };
+            rcPostfachAktion({ art: 'entwurf', entwurf: rcPostfachMailText(name, t, pad(n.getHours()) + ':' + pad(n.getMinutes())) });
+        }
+    }
+    // ---- ENDE MAIL-ZENTRUM ----------------------------------------------------
+
     rcLog.log("esl live-arena v22.0 (Vodafone Edition) gestartet — Projekt: " + window.rcProjektName);
     // Als Ereignis (nicht als Info-Zeile) ins Logbuch: der Start ist die
     // wichtigste Marke ueberhaupt. Steht im Logbuch alle zwei Minuten ein
@@ -255,7 +724,7 @@
         ' — Seite ' + (function(){ try { return location.pathname; } catch(e){ return '?'; } })());
 
     // 2. CLEAN-STATE: alte Intervalle stoppen, alte DOM-Reste entfernen
-    ['rcLiveInterval','rcFlashbackInterval','rcSprucheInterval','rcClockInterval','rcRotateInterval','rcHistInterval','rcHeroInterval','rcLowPerfInterval','rcWarHudInterval','rcAutoRotInterval','rcRadarCarouselInterval','rcCfgInterval','rcReportInterval','rcKeepAliveInterval','rcSessionWatchInterval','rcQuellenWatchInterval','rcSessionRetryInterval','rcCrocoInterval','rcCrocoReconcileInterval','rcQueueInterval','rcQueueAutoInterval','rcMgmtInterval','rcJetztBtnInterval'].forEach(k=>{
+    ['rcLiveInterval','rcFlashbackInterval','rcSprucheInterval','rcClockInterval','rcRotateInterval','rcHistInterval','rcHeroInterval','rcLowPerfInterval','rcWarHudInterval','rcAutoRotInterval','rcRadarCarouselInterval','rcCfgInterval','rcReportInterval','rcKeepAliveInterval','rcSessionWatchInterval','rcQuellenWatchInterval','rcSessionRetryInterval','rcCrocoInterval','rcCrocoReconcileInterval','rcQueueInterval','rcQueueAutoInterval','rcMgmtInterval','rcJetztBtnInterval','rcDienstInterval'].forEach(k=>{
         if (window[k]) { clearInterval(window[k]); window[k]=null; }
     });
     window.rcHarvestBusy = false;
@@ -270,6 +739,23 @@
     // Aktualisierung". rcLiveNowDone ist der Antwort-Handle des laufenden Laufs.
     window.rcJetztBusy = false;
     window.rcLiveNowDone = null;
+    // Datendienst-Empfang (27.10.): nach dem Neueinspielen wird alles neu eingespeist
+    // (rcProjektDaten und rcKpiData sind dann leer). Eine Sperre aus einem
+    // abgebrochenen Tick liesse den neuen Empfang sonst stehen.
+    window.rcDienstEmpfangLaeuft = null;
+    window.rcDienstGesehen = { esl:{ kabel:0, mobile:0, um:0 }, liga:0, ligaZeit:0, vortage:{ kabel:0, mobile:0, um:0 }, ereignis:0, postfach:0 };
+    window.rcDienstErgebnis = {};
+    // Mail-Zentrum (30.10.): Postfach-Inhalte nur im Speicher; nach dem Neueinspielen neu holen.
+    window.rcPostfachDaten = null;
+    window.rcPostfachKopfStand = null;
+    window.rcPostfachFehler = '';
+    window.rcPostfachFilter = 'Alle';
+    // Auffrischen vor Export/Report (05.10.): ein Lauf, der beim Neueinspielen
+    // haengen blieb, liesse jeden spaeteren Export auf ihn warten.
+    window.rcLigaSofortP = null;
+    window.rcFrischLauf = null;
+    window.rcFrischLetzter = null;
+    window.rcFrischLigaVersuch = 0;
     // rcExportBusy (09.08.): sagt dem Takt-Waechter, dass gerade eine Mappe
     // geschrieben wird und eine Takt-Luecke deshalb ein blockierter Hauptthread
     // ist und keine Hintergrund-Drosselung. Bricht ein Export ab oder wird das
@@ -317,6 +803,1220 @@
     if (window.rcAutoScrollRaf) { try { cancelAnimationFrame(window.rcAutoScrollRaf); } catch(e){} window.rcAutoScrollRaf = null; }
     window.rcRadarBuilt = false;
     if (window._rcHeroHideTO) { clearTimeout(window._rcHeroHideTO); window._rcHeroHideTO = null; }
+
+    // ========================================================================
+    //  WACHHALTER (05.10. spaetabends) — Edge darf diesen Tab nicht einfrieren
+    //  ------------------------------------------------------------------------
+    //  Befund aus Logbuch und Ligalisten-Konsole vom 05.10.: die Ligaliste
+    //  lieferte 13 Minuten nichts ("Sperre ... verfallen (787 s)"), das Dashboard
+    //  stand 50 Minuten ("Takt stand 2992 s still") — und beide liefen in der
+    //  Sekunde weiter, in der ihr Tab wieder vorn lag. Edge legt verborgene Tabs
+    //  schlafen ("Schlafende Tabs"): Zeitgeber und Netzabrufe stehen dann,
+    //  Nachrichten kommen noch an. Genau dieses Bild stand im Log.
+    //  An echtem Edge 154 gemessen (pruefwerkzeuge/schlaf_messen.mjs):
+    //    - verborgener Tab ohne Schutz: nach der Schlaf-Schwelle eingefroren
+    //    - die Hintergrund-Argumente aus ESL_Start.cmd aendern daran NICHTS
+    //      (sie nehmen nur die Zeitgeber-Drosselung weg)
+    //    - haelt die Seite einen Web Lock, friert Edge sie nicht ein
+    //      (edge://discards: "Is Freezable: nein — holding Web Lock"); der
+    //      Schutz gilt auch fuer die verbundene Seite (Dashboard <-> Ligaliste)
+    //  Der Lock wird nie zurueckgegeben (Promise ohne Ende) und faellt mit der
+    //  Seite. Beim Re-Inject bleibt der vorhandene stehen — deshalb gibt es im
+    //  Clean-State nichts abzuraeumen ausser den beiden Horchern unten.
+    //  Friert der Browser trotzdem ein, steht es mit Uhrzeit und Dauer im
+    //  Logbuch statt als Raetsel ("Takt stand N s still").
+    function rcWachhalten(){
+        const lage = window.rcWachLage || (window.rcWachLage = { lock: null, grund: '', eingefroren: 0, seit: 0, zuletztSek: 0, gesamtSek: 0 });
+        if (window.__rcWachLock) { lage.lock = true; return 'steht schon'; }
+        try {
+            if (!(navigator.locks && navigator.locks.request)) {
+                lage.lock = false; lage.grund = 'Web Locks gibt es in diesem Browser nicht';
+                return lage.grund;
+            }
+            const name = 'rc_wach_dashboard_' + Date.now() + '_' + Math.round(performance.now() * 1000);
+            window.__rcWachLock = { name: name, seit: Date.now() };
+            navigator.locks.request(name, function(){
+                lage.lock = true; lage.grund = '';
+                return new Promise(function(){});        // nie fertig: der Lock gilt, solange die Seite lebt
+            }).catch(function(e){
+                window.__rcWachLock = null; lage.lock = false; lage.grund = String(e && e.message || e);
+                try { rcLog.warn('Wachhalter: Web Lock nicht bekommen (' + lage.grund + ') — Edge kann diesen Tab im Hintergrund einfrieren.'); } catch(_){}
+            });
+            return 'angefordert';
+        } catch(e){
+            window.__rcWachLock = null; lage.lock = false; lage.grund = String(e && e.message || e);
+            return lage.grund;
+        }
+    }
+    function rcWachDauer(sek){ return sek >= 120 ? Math.round(sek / 60) + ' Min' : sek + ' s'; }
+    (function(){
+        const stand = rcWachhalten();
+        if (stand !== 'angefordert' && stand !== 'steht schon')
+            rcLog.warn('Wachhalter nicht moeglich (' + stand + ') — liegt dieser Tab im Hintergrund, kann Edge ihn einfrieren.');
+        // RE-INJECT: die Horcher der alten Ausfuehrung abmelden (Muster wie
+        // __rcZoomResize), sonst stuende jedes Einfrieren mehrfach im Logbuch.
+        try {
+            if (window.__rcFreezeHorcher) {
+                document.removeEventListener('freeze', window.__rcFreezeHorcher.f);
+                document.removeEventListener('resume', window.__rcFreezeHorcher.r);
+            }
+        } catch(e){}
+        window.__rcFreezeHorcher = {
+            f: function(){
+                const l = window.rcWachLage; l.eingefroren++; l.seit = Date.now();
+                // Als Ereignis: wird sofort gesichert — danach laeuft hier nichts mehr.
+                try { window.rcLogEreignis('Browser friert diesen Tab ein (Edge "Schlafende Tabs") — Zeitgeber und Abrufe stehen, bis der Tab wieder vorn liegt.'); } catch(e){}
+            },
+            r: function(){
+                const l = window.rcWachLage;
+                const sek = l.seit ? Math.round((Date.now() - l.seit) / 1000) : 0;
+                l.seit = 0; l.zuletztSek = sek; l.gesamtSek += sek;
+                try {
+                    rcLog.warn('Tab war ' + rcWachDauer(sek) + ' vom Browser eingefroren (Edge "Schlafende Tabs")' +
+                        (l.lock ? ' — trotz Wachhalter' : '') + '. Abhilfe in Edge: Einstellungen > System und Leistung > ' +
+                        '"Ressourcen mit schlafenden Tabs sparen" aus, oder esl.regiocom.net und ccs.vodafone.de bei ' +
+                        '"Diese Websites nie in den Ruhezustand versetzen" eintragen.');
+                } catch(e){}
+            }
+        };
+        try {
+            document.addEventListener('freeze', window.__rcFreezeHorcher.f);
+            document.addEventListener('resume', window.__rcFreezeHorcher.r);
+        } catch(e){}
+    })();
+
+
+    // ========================================================================
+    //  FLUGSCHREIBER (27.09.) — schreibt ALLES mit, was das Dashboard tut
+    //  ------------------------------------------------------------------------
+    //  Nutzer-Vorgabe: "wir brauchen einen Logger, der alles speichert, was das
+    //  Board macht, warum der haengt oder sonst irgendwas." Anlass: der Alle-
+    //  Projekte-Betrieb lieferte live "erst Daten, dann 0", und aus der Ferne
+    //  war nicht zu sehen, WARUM. Das Logbuch oben haelt nur fest, was rcLog
+    //  schreibt. Der Flugschreiber misst von AUSSEN, ohne den Fachcode zu
+    //  aendern:
+    //   - jeden ESL-Abruf der Hauptseite UND der Rahmen (fetch angeklemmt):
+    //     gesendeter Zeitraum/Statistik/Knopf, ViewState nur als Pruefsumme,
+    //     Antwort Excel / HTML (mit Grund) / abgelaufen / Umleitung,
+    //   - was die Exporte ENTHALTEN, gelesen aus den schon geparsten Tabellen
+    //     des Dashboards (kein zweites Parsen, das kostete auf Citrix Sekunden):
+    //     Zeilen, Zeilen von heute, Tage, Spaltensatz, Datenstand-Wechsel und
+    //     die Ueberschneidung eines Rahmens mit Kabel (verraet, ob ein Rahmen
+    //     in Wahrheit Kabel-Daten liefert),
+    //   - jede Auswertung (processDataStream): Zeilen hinein je Projekt,
+    //     Kontakte heraus, Filter, DAUER,
+    //   - Portal-Ajax (PrimeFaces-Poll), Rahmen-Navigationen und -Aufbau,
+    //   - JS-Fehler und unbehandelte Promise-Fehler (Seite UND Rahmen),
+    //   - HAENGER: lange Aufgaben des Hauptthreads (mit Herkunft Seite/Rahmen),
+    //     Taktluecken (blockiert vs. im Hintergrund gedrosselt) und ein
+    //     Lebenszeichen, an dem der naechste Start erkennt, ob die Seite
+    //     abgestuerzt/eingefroren war,
+    //   - Liga-/Genesys-Pakete, Sitzung, Live-Takt, Sperren, Streifen, Klicks,
+    //   - je Minute einen Zustand je Seite, alle 15 Minuten eine Messung
+    //     (Speicher, DOM-Knoten, Blockadezeit, Dauer der Auswertung).
+    //  Gleichartiges wird zusammengefasst ("x45 von-bis"), der Mitschnitt liegt
+    //  gedeckelt im localStorage und ueberlebt Neuladen und Re-Inject (die neue
+    //  Fassung uebernimmt, die alte klemmt sich ab). Ausgabe: Knopf "Logbuch"
+    //  (EINE Datei mit allem) oder rcFluss.bericht(). Keine Namen, keine
+    //  Kundendaten, keine Datensatz-IDs; ViewState nur als Pruefsumme.
+    //  Funktionsdeklaration (TDZ-Regel) und ohne Bezug auf interne Namen des
+    //  Dashboards — test_datenfluss.html schneidet sie heraus und prueft sie
+    //  allein gegen ein Schein-Portal.
+    // ========================================================================
+    function rcFlugschreiberStarten(){
+        'use strict';
+        var VERSION = '2 (27.09.2026)';
+        // VOR dem Abklemmen merken, ob eine Fassung lief: stop() setzt aktiv=false.
+        var vorige = window.rcFluss;
+        var uebernahme = !!(vorige && vorige.aktiv && typeof vorige.stop === 'function');
+        if (uebernahme) { try { vorige.stop(true); } catch(e){} }
+        var BASIS = 'rcFlussMitschnitt_v1', PULS = 'rcFlussPuls_v1';
+        var MAX_EINTRAEGE = 1500, MAX_ZEICHEN = 250000;
+        var E = [], LETZTE = {}, TIMER = [], HORCHER = [], AKTIV = true, TEST = '';
+        var SPEICHER_ZULETZT = 0, SPEICHER_AUS_BIS = 0, PDS_GESEHEN = false, LOG_LETZTE = null;
+        var RAHMEN = {}, RSTAT = {}, ZUSTAND = {}, DATEN_ZEIT = {}, KABEL_IDS = null;
+        var T0 = Date.now(), TAKT_LETZT = 0, TAKTE = 0, BEOBACHTER = null;
+        var LANG_MIN = { n:0, ms:0, max:0, rahmen:0 }, LANG_15 = { n:0, ms:0, max:0 }, PDS_15 = { n:0, ms:0, max:0 };
+
+        // ---- Konsole: dieselbe Vorsicht wie das Dashboard (das Portal kann console ueberschreiben) ----
+        var K = (typeof realConsole !== 'undefined' && realConsole) ? realConsole : window.console;
+        function sag(s){ try { K.log('%c[Flugschreiber]%c ' + s, 'color:#E60000;font-weight:bold', ''); } catch(e){} }
+
+        // ---- kleine Helfer ----
+        function schluessel(b){ try { return window.rcKey ? window.rcKey(b) : b; } catch(e){ return b; } }
+        function p2(n){ return (n < 10 ? '0' : '') + n; }
+        function uhr(t){ var d = new Date(t); return p2(d.getHours()) + ':' + p2(d.getMinutes()) + ':' + p2(d.getSeconds()); }
+        function heuteKey(){ var d = new Date(); return d.getFullYear() + '-' + p2(d.getMonth() + 1) + '-' + p2(d.getDate()); }
+        function kurz(s, n){ s = String(s == null ? '' : s).replace(/\s+/g, ' ').trim(); return s.length > n ? s.slice(0, n) + '...' : s; }
+        function pfad(u){ try { return decodeURIComponent(new URL(u, location.href).pathname); } catch(e){ return kurz(u, 80); } }
+        function norm(s){ return String(s == null ? '' : s).replace(/\s+/g, ' ').trim().toLowerCase(); }
+        function feld(k){ k = String(k || ''); var i = k.lastIndexOf(':'); return i >= 0 ? k.slice(i + 1) : k; }
+        function hash(s){ s = String(s); var h = 5381; for (var i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0; return ('000' + (h >>> 0).toString(36)).slice(-4); }
+        function pad(s, n){ s = String(s == null ? '' : s); while (s.length < n) s += ' '; return s + ' '; }
+        function sek(ms){ return ms >= 120000 ? Math.round(ms / 60000) + ' Min' : ms >= 10000 ? Math.round(ms / 1000) + ' s' : (Math.round(ms / 100) / 10) + ' s'; }
+        // ViewState nur als Pruefsumme. Server-Zustand "logisch:aktuell" getrennt,
+        // damit man sieht, ob dieselbe ANSICHT weiterlebt (L gleich) oder eine neue kam.
+        function vsKurz(v){
+            v = String(v == null ? '' : v);
+            var m = /^(-?\d+):(-?\d+)$/.exec(v);
+            if (m) return 'L' + hash(m[1]) + '/A' + hash(m[2]);
+            if (v.length > 60) return 'lang' + v.length + '#' + hash(v);
+            return v ? 'k' + hash(v) : '-';
+        }
+        function vsAnsicht(vs){ return /^L\w{4}\//.test(vs || '') ? vs.slice(0, 5) : ''; }
+        function oben(){ var k = window.rcProjektKuerzel; return k === 'mob' ? 'Mobile' : k === 'um' ? 'UM' : 'Kabel'; }
+        function qName(key){ return key === 'mobile' ? 'Mobile' : key === 'um' ? 'UM' : key === 'kabel' ? 'Kabel' : String(key); }
+        function pwSichtbar(d){
+            var l = null;
+            try { l = d.querySelectorAll('input[type="password"]'); } catch(e){ return false; }
+            for (var i = 0; l && i < l.length; i++) {
+                try {
+                    var el = l[i], W = el.ownerDocument && el.ownerDocument.defaultView;
+                    if (!(el.offsetWidth || el.offsetHeight)) continue;
+                    if (W && W.getComputedStyle(el).visibility === 'hidden') continue;
+                    return true;
+                } catch(e){}
+            }
+            return false;
+        }
+        function tagVon(raw){
+            if (raw == null || raw === '') return null;
+            if (typeof raw === 'number') {
+                var d = new Date(Math.round((raw - 25569) * 86400000));
+                return isNaN(d) ? null : d.getUTCFullYear() + '-' + p2(d.getUTCMonth() + 1) + '-' + p2(d.getUTCDate());
+            }
+            var t = String(raw).trim(), m = /^(\d{4})-(\d{1,2})-(\d{1,2})/.exec(t);
+            if (m) return m[1] + '-' + p2(+m[2]) + '-' + p2(+m[3]);
+            m = /^(\d{1,2})\.(\d{1,2})\.(\d{4})/.exec(t);
+            if (m) return m[3] + '-' + p2(+m[2]) + '-' + p2(+m[1]);
+            return null;
+        }
+        function zeitVon(raw){
+            var m = /(\d{1,2}):(\d{2})(?::(\d{2}))?/.exec(String(raw == null ? '' : raw));
+            return m ? p2(+m[1]) + ':' + m[2] + (m[3] ? ':' + m[3] : '') : '';
+        }
+        function dashModus(){
+            if (window.rcAlleProjekteModus === true) return 'Alle-Projekte-Betrieb, aktiv ' + qName(window.rcAktivProjekt || 'kabel');
+            if (window.rcAlleProjekteModus === false) return 'Einzelprojekt ' + oben();
+            return typeof window.processDataStream === 'function' ? 'Dashboard ohne Alle-Projekte-Schalter' : 'Dashboard startet noch';
+        }
+
+        // ---- Mitschnitt: anhaengen, gleichartige zusammenfassen, sichern ----
+        function neu(e, strom, sig){
+            if (!AKTIV) return e;
+            e.t = Date.now();
+            if (strom) {
+                var alt = LETZTE[strom];
+                if (alt && alt.sig === sig && E.indexOf(alt) !== -1) { zusammenfassen(alt, e); sichern(false); return alt; }
+                e.sig = sig;
+                LETZTE[strom] = e;
+            }
+            E.push(e);
+            if (E.length > MAX_EINTRAEGE) E.splice(0, E.length - MAX_EINTRAEGE);
+            sichern(e.k === 'ende');
+            return e;
+        }
+        function zusammenfassen(alt, e){
+            alt.n = (alt.n || 1) + 1;
+            alt.bis = e.t;
+            if (e.k === 'stand') { Object.keys(e).forEach(function(k){ if (k !== 't' && k !== 'sig') alt[k] = e[k]; }); return; }
+            ['z', 'h', 'max', 'tage', 'ms', 'vsNeu', 'tabelle', 'kopf', 'bytes', 'http', 'ein', 'heute', 'kabel', 'mobile', 'um',
+             'kont', 'verk', 'ag', 'vs', 'dat', 'stat', 'gleichKabel', 'text', 'wo', 'blockN', 'agenten', 'voll', 'dr', 'std'].forEach(function(k){
+                if (e[k] !== undefined) alt[k] = e[k];
+            });
+            if (e.idh !== undefined) { if (alt.idh !== e.idh) alt.idhW = (alt.idhW || 0) + 1; alt.idh = e.idh; }
+            if (e.ms !== undefined) alt.msMax = Math.max(alt.msMax || 0, e.ms);
+        }
+        function sichern(sofort){
+            var jetzt = Date.now();
+            if (jetzt < SPEICHER_AUS_BIS) return;
+            if (!sofort && jetzt - SPEICHER_ZULETZT < 15000) return;
+            SPEICHER_ZULETZT = jetzt;
+            var ohneSig = function(k, v){ return k === 'sig' ? undefined : v; };
+            try {
+                var s = JSON.stringify(E, ohneSig);
+                while (s.length > MAX_ZEICHEN && E.length > 50) { E.splice(0, Math.ceil(E.length / 10)); s = JSON.stringify(E, ohneSig); }
+                localStorage.setItem(schluessel(BASIS), s);
+            } catch(e){
+                try { E.splice(0, Math.floor(E.length / 2)); localStorage.setItem(schluessel(BASIS), JSON.stringify(E, ohneSig)); }
+                catch(e2){ SPEICHER_AUS_BIS = jetzt + 300000; }
+            }
+        }
+
+        // ---- Formular einer ESL-Anfrage lesen (was wurde GESENDET?) ----
+        function istFormData(b){ return !!(b && typeof b === 'object' && typeof b.entries === 'function' && typeof b.append === 'function'); }
+        function statSelect(d){
+            var s = d ? d.querySelectorAll('select') : [];
+            for (var i = 0; i < s.length; i++)
+                for (var o = 0; o < s[i].options.length; o++)
+                    if (norm(s[i].options[o].textContent).indexOf('export projektergebnisse') !== -1) return s[i];
+            return null;
+        }
+        function optText(sel, val){
+            for (var o = 0; o < sel.options.length; o++) if (sel.options[o].value === val) return kurz(sel.options[o].textContent, 40) || '(leer)';
+            return 'Wert ' + kurz(val, 20);
+        }
+        function formInfo(body, W){
+            var o = { ajax:false, src:'', knopf:'', dat:[], stat:'', vs:'-', faces:false }, werte = {};
+            try {
+                var it = body.entries(), x;
+                while (!(x = it.next()).done) {
+                    var k = String(x.value[0]), v = x.value[1];
+                    if (typeof v !== 'string') continue;
+                    werte[k] = v;
+                    if (k === 'javax.faces.ViewState') { o.vs = vsKurz(v); o.faces = true; }
+                    else if (k === 'javax.faces.partial.ajax') o.ajax = v === 'true';
+                    else if (k === 'javax.faces.source') o.src = v;
+                    else if (k === v && k.indexOf(':') !== -1) o.knopf = k;   // so haengt das Dashboard Such-/Exportknopf an
+                    else if (/^\d{1,2}\.\d{1,2}\.\d{4}/.test(v.trim()) || /^\d{4}-\d{2}-\d{2}/.test(v.trim())) o.dat.push(feld(k) + '=' + v.trim());
+                }
+                var s = statSelect(W && W.document);
+                if (s && s.name) o.stat = werte[s.name] == null ? '(nicht gesendet)' : (werte[s.name] === '' ? '(LEER)' : optText(s, werte[s.name]));
+            } catch(e){ o.fehler = kurz(e && e.message, 80); }
+            return o;
+        }
+
+        // ---- Antwort auswerten (was kam ZURUECK?) ----
+        function projektAusKopf(kopf){
+            if (kopf.indexOf('produktgrupe') !== -1) return 'Kabel';
+            if (kopf.indexOf('produktgruppe') !== -1 || kopf.indexOf('osf_id') !== -1) return 'Mobile';
+            if (kopf.indexOf('winback') !== -1 || kopf.indexOf('postleitzahl') !== -1) return 'UM';
+            return 'unbekannt (' + kopf.length + ' Spalten)';
+        }
+        function tageText(tage){
+            var k = Object.keys(tage).sort();
+            if (!k.length) return 'keine';
+            var t = k.slice(-4).map(function(x){ return x + ':' + tage[x]; }).join(' ');
+            return (k.length > 4 ? '(' + k.length + ' Tage) ... ' : '') + t;
+        }
+        function htmlGrund(h, ct){
+            if (!h) return 'leere Antwort (' + (ct || 'ohne Typ') + ')';
+            if (/type=["']?password/i.test(h) && !/frmMainMenu/.test(h)) return 'ANMELDEMASKE';
+            // Nur die Ausnahme selbst: den viewExpiredDialog traegt JEDE Seite versteckt
+            // (28.09. — "3x HTML (ViewExpired)" war in Wahrheit "kein Export-Knopf").
+            if (/ViewExpiredException/.test(h)) return 'ViewExpired';
+            if (/Statistik liefert kein Ergebnis/i.test(h)) return 'keine Datensaetze ("Statistik liefert kein Ergebnis")';
+            if (/bitte\s+abfrage/i.test(h)) return '"Bitte Abfrage waehlen" (Statistik-Auswahl leer)';
+            var msg = /class="[^"]*ui-messages-(?:error|warn|fatal)[^"]*"[^>]*>([\s\S]{0,500}?)<\/div>/i.exec(h);
+            var titel = (/<title>([^<]*)/i.exec(h) || [])[1];
+            return kurz((titel ? 'Titel "' + titel.trim() + '"' : 'ohne Titel') +
+                (msg ? ' - Meldung: ' + msg[1].replace(/<[^>]+>/g, ' ') : '') + ' - ' + (ct || 'ohne Typ'), 220);
+        }
+        // Nur den ANFANG lesen (Excel-Kennung "PK" oder HTML-Grund) und den Rest
+        // verwerfen: das Dashboard liest seinen eigenen Zweig ohnehin ganz.
+        function anfang(resp, max){
+            var r;
+            try { r = resp.clone().body.getReader(); } catch(e){ return Promise.reject(e); }
+            var teile = [], n = 0;
+            function fertig(){
+                var out = new Uint8Array(Math.min(n, max)), o = 0;
+                for (var i = 0; i < teile.length && o < out.length; i++) { var t = teile[i].subarray(0, out.length - o); out.set(t, o); o += t.length; }
+                return out;
+            }
+            function lies(){
+                return r.read().then(function(x){
+                    if (x.done || !x.value) return fertig();
+                    teile.push(x.value); n += x.value.length;
+                    if (n >= max) { try { r.cancel(); } catch(e){} return fertig(); }
+                    return lies();
+                });
+            }
+            return lies();
+        }
+        function antwort(resp, info, t0, q){
+            var e = { k:'req', q:q, a: info.ajax ? 'Suche' : 'Export', src: feld(info.src || info.knopf),
+                      dat: info.dat.join(' '), stat: info.stat, vs: info.vs, http: resp.status,
+                      ms: Math.round(performance.now() - t0) };
+            if (info.test) e.test = 1;
+            try { if (resp.redirected) e.umleitung = pfad(resp.url); } catch(x){}
+            var ct = ''; try { ct = (resp.headers.get('content-type') || '').toLowerCase(); } catch(x){}
+            var laenge = NaN; try { laenge = parseInt(resp.headers.get('content-length'), 10); } catch(x){}
+            if (laenge >= 0) e.bytes = laenge;
+            if (info.ajax) {
+                var c; try { c = resp.clone(); } catch(x){ e.erg = 'UNLESBAR'; ablegen(e); return; }
+                c.text().then(function(txt){
+                    var r = /<redirect\s+url="([^"]*)"/.exec(txt);
+                    var er = /<error-name>([^<]*)<\/error-name>[\s\S]*?<error-message>(?:<!\[CDATA\[)?([\s\S]*?)(?:\]\]>)?<\/error-message>/.exec(txt);
+                    if (/ViewExpiredException|viewExpiredDialog/.test(txt)) e.erg = 'ABGELAUFEN';
+                    else if (r) { e.erg = 'UMLEITUNG'; e.info = 'nach ' + pfad(r[1].replace(/&amp;/g, '&')); }
+                    else if (er) { e.erg = 'FEHLER'; e.info = kurz(er[1] + ': ' + er[2], 200); }
+                    else e.erg = resp.ok ? 'ok' : 'HTTP-Fehler';
+                    var vs = /<update id="[^"]*javax\.faces\.ViewState[^"]*"><!\[CDATA\[(.*?)\]\]><\/update>/.exec(txt);
+                    e.vsNeu = vs ? vsKurz(vs[1]) : '-';
+                    var ri = txt.match(/data-ri="/g);
+                    e.tabelle = ri ? ri.length : (/ui-datatable-empty-message/.test(txt) ? 0 : null);
+                    ablegen(e);
+                }, function(err){ e.erg = 'UNLESBAR'; e.info = kurz(err && err.message, 100); ablegen(e); });
+                return;
+            }
+            anfang(resp, 60000).then(function(b){
+                if (!(b[0] === 0x50 && b[1] === 0x4b)) {       // xlsx ist ein ZIP ("PK")
+                    var h = ''; try { h = new TextDecoder().decode(b); } catch(x){}
+                    e.erg = 'HTML'; e.info = htmlGrund(h, ct);
+                } else e.erg = 'Excel';
+                ablegen(e);
+            }, function(err){ e.erg = 'UNLESBAR'; e.info = kurz(err && err.message, 100); ablegen(e); });
+        }
+        function ablegen(e){
+            if (e.test) { neu(e); return; }
+            var sig = [e.q, e.a, e.erg, e.info || '', e.umleitung || '', e.dat, e.stat, e.src, vsAnsicht(e.vs),
+                       e.a === 'Suche' ? (e.tabelle > 0 ? '+' : String(e.tabelle)) : ''].join('|');
+            neu(e, 'req|' + e.q + '|' + e.a, sig);
+        }
+
+        // ---- fetch anklemmen (Hauptseite und jeder Rahmen; nach Navigation neu) ----
+        function wickleFetch(W, q){
+            var roh;
+            try { roh = W.fetch; } catch(e){ return; }
+            if (typeof roh !== 'function' || roh.__rcFluss) return;
+            var huelle = function(input, init){
+                var info = null, t0 = 0;
+                try {
+                    var body = init && init.body, m = String((init && init.method) || 'GET').toUpperCase();
+                    if (AKTIV && m === 'POST' && istFormData(body)) {
+                        info = formInfo(body, W);
+                        if (!info.faces) info = null;            // keine JSF-Anfrage -> nicht unser Thema
+                        else { t0 = performance.now(); info.test = TEST === q; }
+                    }
+                } catch(e){ info = null; }
+                var p = roh.apply(W, arguments);
+                if (!info) return p;
+                return p.then(function(resp){
+                    try { antwort(resp, info, t0, q); } catch(e){}
+                    return resp;
+                }, function(err){
+                    try { neu({ k:'req', q:q, a: info.ajax ? 'Suche' : 'Export', erg:'NETZFEHLER', info: kurz(err && err.message, 120), dat: info.dat.join(' ') }); } catch(e){}
+                    throw err;
+                });
+            };
+            huelle.__rcFluss = true;
+            huelle.__roh = roh;
+            try { W.fetch = huelle; } catch(e){}
+        }
+        function loeseFetch(W){ try { if (W.fetch && W.fetch.__rcFluss) W.fetch = W.fetch.__roh; } catch(e){} }
+
+        // ---- XHR anklemmen: die eigenen PrimeFaces-Anfragen des Portals ----
+        function wickleXhr(W, q){
+            try {
+                var P = W.XMLHttpRequest && W.XMLHttpRequest.prototype;
+                if (!P || P.__rcFluss) return;
+                var o = P.open, s = P.send;
+                P.open = function(m, u){ try { this.__rcF = { m: String(m).toUpperCase(), u: String(u) }; } catch(e){} return o.apply(this, arguments); };
+                P.send = function(body){
+                    try {
+                        var x = this, f = x.__rcF;
+                        if (AKTIV && f && f.m === 'POST' && typeof body === 'string' && body.indexOf('javax.faces') !== -1) {
+                            var src = (/(?:^|&)javax\.faces\.source=([^&]*)/.exec(body) || [])[1] || '';
+                            try { src = decodeURIComponent(src.replace(/\+/g, ' ')); } catch(e){}
+                            var t0 = performance.now();
+                            x.addEventListener('loadend', function(){
+                                try {
+                                    var txt = '';
+                                    try { if (!x.responseType || x.responseType === 'text') txt = String(x.responseText || ''); } catch(e){}
+                                    var r = /<redirect\s+url="([^"]*)"/.exec(txt);
+                                    var flag = /ViewExpiredException|viewExpiredDialog/.test(txt) ? 'ABGELAUFEN'
+                                             : r ? 'UMLEITUNG nach ' + pfad(r[1].replace(/&amp;/g, '&'))
+                                             : /<error>/.test(txt) ? 'FEHLER' : (x.status && x.status !== 200 ? 'HTTP ' + x.status : '');
+                                    neu({ k:'xhr', q:q, src: feld(src) || '?', http: x.status, flag: flag, ms: Math.round(performance.now() - t0) },
+                                        'xhr|' + q + '|' + src, x.status + '|' + flag);
+                                } catch(e){}
+                            });
+                        }
+                    } catch(e){}
+                    return s.apply(this, arguments);
+                };
+                P.__rcFluss = { o: o, s: s };
+            } catch(e){}
+        }
+        function loeseXhr(W){
+            try { var P = W.XMLHttpRequest.prototype; if (P.__rcFluss) { P.open = P.__rcFluss.o; P.send = P.__rcFluss.s; delete P.__rcFluss; } } catch(e){}
+        }
+
+        // ---- JS-Fehler und unbehandelte Promise-Fehler (Seite und Rahmen) ----
+        function fehlerHorcher(W, q){
+            try {
+                if (!W || W.__rcFlussFehler) return;
+                var h1 = function(ev){
+                    try {
+                        var ziel = ev && ev.target;
+                        if (ziel && ziel !== W && ziel.tagName) {      // Ressource (Bild/Skript) laedt nicht
+                            var quelle = ziel.src || ziel.href || '';
+                            neu({ k:'fehler', q:q, art:'Ressource', text: ziel.tagName + ' ' + kurz(pfad(quelle), 120) }, 'fehler|' + q + '|r|' + quelle, 'r');
+                            return;
+                        }
+                        var msg = kurz(ev && ev.message, 200);
+                        var ort = (ev && ev.filename ? pfad(ev.filename) : '') + (ev && ev.lineno ? ':' + ev.lineno + ':' + ev.colno : '');
+                        var st = ev && ev.error && ev.error.stack ? kurz(String(ev.error.stack).split('\n').slice(1, 4).join(' | '), 300) : '';
+                        neu({ k:'fehler', q:q, art:'JS', text: msg, ort: ort, stack: st }, 'fehler|' + q + '|' + msg + '|' + ort, 'j');
+                    } catch(x){}
+                };
+                var h2 = function(ev){
+                    try {
+                        var g = ev && ev.reason, msg = kurz(g && g.message ? g.message : String(g), 200);
+                        var st = g && g.stack ? kurz(String(g.stack).split('\n').slice(1, 4).join(' | '), 300) : '';
+                        neu({ k:'fehler', q:q, art:'Promise', text: msg, stack: st }, 'fehler|' + q + '|p|' + msg, 'p');
+                    } catch(x){}
+                };
+                W.addEventListener('error', h1, true);
+                W.addEventListener('unhandledrejection', h2);
+                W.__rcFlussFehler = { h1: h1, h2: h2 };
+            } catch(e){}
+        }
+        function fehlerLoesen(W){
+            try { var f = W.__rcFlussFehler; if (f) { W.removeEventListener('error', f.h1, true); W.removeEventListener('unhandledrejection', f.h2); delete W.__rcFlussFehler; } } catch(e){}
+        }
+
+        // ---- processDataStream anklemmen: was geht hinein, was kommt heraus, wie lange? ----
+        function filterText(){
+            var g = function(id){ var el = document.getElementById(id); return el ? (el.value || 'ALL') : '-'; };
+            return 'Standort ' + g('rcStandortFilter') + ' / Team ' + g('rcTeamFilter') + ' / Stack ' + g('rcStackFilter');
+        }
+        function datenStats(rows){
+            var kopf = (rows[0] || []).map(norm), iD = kopf.indexOf('datum'), iId = kopf.indexOf('id');
+            var tage = {}, hk = heuteKey(), z = 0, h = 0, max = '', ids = [];
+            for (var r = 1; r < rows.length; r++) {
+                var zr = rows[r];
+                if (!zr || !zr.length) continue;
+                z++;
+                var raw = iD >= 0 ? zr[iD] : null, tk = tagVon(raw) || '?';
+                tage[tk] = (tage[tk] || 0) + 1;
+                if (tk === hk) { h++; var zt = zeitVon(raw); if (zt > max) max = zt; }
+                if (iId >= 0 && zr[iId] != null && zr[iId] !== '') ids.push(String(zr[iId]));
+            }
+            return { z:z, h:h, tage: tageText(tage), max:max, kopf: projektAusKopf(kopf), idh: hash(ids.join(',')), ids: ids };
+        }
+        function datenEintrag(q, st, vergleich){
+            var e = { k:'daten', q:q, z: st.z, h: st.h, tage: st.tage, max: st.max, kopf: st.kopf, idh: st.idh, z0: st.z, h0: st.h };
+            if (vergleich && KABEL_IDS && KABEL_IDS.size && st.ids.length) {
+                var n = 0;
+                for (var i = 0; i < st.ids.length; i++) if (KABEL_IDS.has(st.ids[i])) n++;
+                e.gleichKabel = Math.round(100 * n / st.ids.length);
+            }
+            neu(e, 'daten|' + q, [q, st.z > 0, st.h > 0, st.kopf, (e.gleichKabel || 0) >= 50].join('|'));
+        }
+        // Alle-Projekte-Betrieb: jede FRISCHE Projekt-Tabelle (rcProjektDaten[p].zeit neu).
+        // Einzelprojekt: die Tabelle, die processDataStream bekommt (neue Referenz;
+        // ein Filterwechsel reicht dieselbe Tabelle noch einmal durch).
+        function datenPruefen(sheetData){
+            var PD = window.rcProjektDaten;
+            if (window.rcAlleProjekteModus && PD) {
+                ['kabel', 'mobile', 'um'].forEach(function(key){
+                    var d = PD[key];
+                    if (!d || !d.data || DATEN_ZEIT[key] === d.zeit) return;
+                    DATEN_ZEIT[key] = d.zeit;
+                    var st = datenStats(d.data);
+                    if (key === 'kabel') KABEL_IDS = new Set(st.ids);
+                    datenEintrag(qName(key), st, key !== 'kabel');
+                });
+            } else if (sheetData && DATEN_ZEIT.oben !== sheetData) {
+                DATEN_ZEIT.oben = sheetData;
+                datenEintrag(oben(), datenStats(sheetData), false);
+            }
+        }
+        function pdsEin(d){
+            var o = { z:0, heute:0, k:0, m:0, u:0, filter: filterText() };
+            if (!d || !d.length) return o;
+            var h = (d[0] || []).map(norm), iId = h.indexOf('id'), iD = h.indexOf('datum'), hk = heuteKey();
+            for (var r = 1; r < d.length; r++) {
+                var z = d[r];
+                if (!z) continue;
+                o.z++;
+                var id = iId >= 0 && z[iId] != null ? String(z[iId]) : '';
+                if (id.indexOf('M-') === 0) o.m++; else if (id.indexOf('U-') === 0) o.u++; else o.k++;
+                if (iD >= 0) { var t = tagVon(z[iD]); if (!t || t === hk) o.heute++; } else o.heute++;
+            }
+            return o;
+        }
+        function pdsAus(ein, t0){
+            var s = window.rcLetzteStats || {}, st = s.standortStats || {}, kont = 0;
+            Object.keys(st).forEach(function(c){ kont += (st[c] && st[c].calls) || 0; });
+            var ms = Math.round(performance.now() - t0);
+            PDS_15.n++; PDS_15.ms += ms; if (ms > PDS_15.max) PDS_15.max = ms;
+            var e = { k:'pds', ein: ein.z, heute: ein.heute, kabel: ein.k, mobile: ein.m, um: ein.u, filter: ein.filter,
+                      kont: kont, verk: (window.rcAllSales || []).length, ag: Object.keys(s.agentStats || {}).length, ms: ms };
+            neu(e, 'pds', [ein.z > 0, ein.heute > 0, ein.k > 0, ein.m > 0, ein.u > 0, kont > 0, ein.filter].join('|'));
+        }
+        function wicklePds(){
+            var f = window.processDataStream;
+            if (typeof f !== 'function' || f.__rcFluss) return;
+            var wieder = PDS_GESEHEN;
+            PDS_GESEHEN = true;
+            var h = function(sheetData){
+                var ein = null;
+                try { if (AKTIV) { datenPruefen(sheetData); ein = pdsEin(sheetData); } } catch(e){}
+                var t0 = performance.now();
+                var r = f.apply(this, arguments);
+                try { if (ein) pdsAus(ein, t0); } catch(e){}
+                return r;
+            };
+            h.__rcFluss = true;
+            h.__roh = f;
+            window.processDataStream = h;
+            if (wieder) neu({ k:'info', text: 'Dashboard wurde NEU EINGESPIELT (neue processDataStream, Rahmen-Generation ' + (window.rcRahmenGen || '?') + ')' });
+        }
+
+        // ---- Rahmen beobachten ----
+        function rahmenListe(){
+            var out = [];
+            Array.prototype.forEach.call(document.querySelectorAll('iframe[data-rc-projekt]'), function(f){
+                var W = null;
+                try { W = f.contentWindow; } catch(e){}
+                out.push({ key: f.getAttribute('data-rc-projekt'), el: f, W: W });
+            });
+            return out;
+        }
+        function klemmeAn(W, q){ if (W) { wickleFetch(W, q); wickleXhr(W, q); fehlerHorcher(W, q); } }
+        function klemmeAb(W){ if (W) { loeseFetch(W); loeseXhr(W); fehlerLoesen(W); } }
+        function rahmenGeladen(key, el){
+            var q = qName(key), W = null, d = null, o = { k:'rahmen', q:q, was:'Seite geladen' };
+            try { W = el.contentWindow; d = el.contentDocument; } catch(e){}
+            try {
+                o.pfad = pfad(d.location.href);
+                o.titel = kurz(d.title, 60);
+                o.form = !!d.getElementById('filterForm');
+                o.menue = !!d.getElementById('frmMainMenu');
+                o.pw = pwSichtbar(d);
+            } catch(e){ o.info = 'kein Zugriff: ' + kurz(e && e.message, 60); }
+            neu(o);
+            klemmeAn(W, q);
+        }
+        function rahmenTakt(){
+            var gesehen = {};
+            rahmenListe().forEach(function(r){
+                gesehen[r.key] = 1;
+                var q = qName(r.key);
+                if (RAHMEN[r.key] !== r.el) {
+                    neu({ k:'rahmen', q:q, was: RAHMEN[r.key] ? 'ERSETZT (Dashboard baut neu auf)' : 'vorhanden/angelegt' });
+                    RAHMEN[r.key] = r.el;
+                    var el = r.el, key = r.key, h = function(){ rahmenGeladen(key, el); };
+                    el.addEventListener('load', h);
+                    HORCHER.push([el, 'load', h]);
+                }
+                klemmeAn(r.W, q);
+            });
+            Object.keys(RAHMEN).forEach(function(key){
+                if (!gesehen[key]) { neu({ k:'rahmen', q: qName(key), was:'ENTFERNT' }); delete RAHMEN[key]; }
+            });
+            var R = window.rcRahmen || {};
+            Object.keys(R).forEach(function(key){
+                var st = R[key] || {}, sig = (st.bereit ? 'B' : 'b') + (st.laeuft ? 'L' : 'l') + '|' + (st.fehler || 0) + '|' + (st.grund || '');
+                if (RSTAT[key] === sig) return;
+                RSTAT[key] = sig;
+                neu({ k:'rstat', q: qName(key), bereit: !!st.bereit, laeuft: !!st.laeuft, fehler: st.fehler || 0, grund: kurz(st.grund, 160) });
+            });
+        }
+
+        // ---- Warnungen/Fehler aus dem Logbuch des Dashboards uebernehmen ----
+        function logbuchTakt(){
+            var b = window.rcLogBuf;
+            if (!Array.isArray(b) || !b.length) return;
+            if (LOG_LETZTE === null) { LOG_LETZTE = b[b.length - 1]; return; }   // beim Start nur merken
+            var i = b.lastIndexOf(LOG_LETZTE), start = i === -1 ? Math.max(0, b.length - 30) : i + 1;
+            for (var j = start; j < b.length; j++) {
+                var m = /^(\d\d:\d\d:\d\d) (\S) (.*)$/.exec(String(b[j]));
+                if (!m) continue;
+                if (m[2] === 'W' || m[2] === 'F' || m[2] === 'E' ||
+                    /alle projekte|portal|historie|sitzung|session|zeitraum|mehrtages|harvest|export/i.test(m[3])) {
+                    var t = kurz(m[3], 280);
+                    neu({ k:'log', s: m[2], zeit: m[1], text: t }, 'log|' + m[2] + '|' + t.replace(/\d+/g, '#'), 'l');
+                }
+            }
+            LOG_LETZTE = b[b.length - 1];
+        }
+
+        // ---- Zustandswechsel des Dashboards (nur WECHSEL werden geschrieben) ----
+        var NORMAL = /^(lebt|laeuft|frei|ok|nein|keiner|-)$/;
+        function beobachte(k, wert, name){
+            // Verglichen wird OHNE Zahlen: "seit 12 Minuten" -> "seit 13 Minuten"
+            // ist kein Wechsel, sonst stuende jede Minute ein neuer Eintrag da.
+            var sig = String(wert).replace(/\d+/g, '#');
+            if (ZUSTAND[k] === sig) return;
+            var erst = !(k in ZUSTAND);
+            ZUSTAND[k] = sig;
+            if (erst && NORMAL.test(wert)) return;       // Normalzustand beim ersten Blick nicht melden
+            neu({ k:'zustand', name: name, wert: wert });
+        }
+        function zustandTakt(){
+            var ss = window.rcSessionState || {};
+            beobachte('modus', dashModus(), 'Dashboard');
+            beobachte('sitzung', ss.alive === false ? 'TOT (' + kurz(ss.lostReason, 90) + ')' : 'lebt', 'ESL-Sitzung');
+            beobachte('takt', window.rcLiveInterval ? 'laeuft' : 'STEHT (kein Live-Takt)', 'Live-Takt');
+            beobachte('harvest', window.rcHarvestBusy ? 'LAEUFT (Kabel-Seite verstellt)' : 'frei', 'Historien-Harvest/Zeitraum-Abruf');
+            beobachte('jetzt', window.rcJetztBusy ? 'LAEUFT' : 'frei', 'Jetzt-Knopf');
+            beobachte('tag', window.rcPortalTagFalsch ? 'FALSCH: ' + kurz(window.rcPortalTagFalsch.tage, 60) : 'ok', 'Portal-Tag');
+            beobachte('mehrtage', window.rcMultiDayWarn ? kurz(window.rcMultiDayWarn, 140) : 'nein', 'Mehrtages-Daten');
+            beobachte('liganichtlive', window.rcLigaNichtLive ? String(window.rcLigaNichtLive) : 'nein', 'Ligaliste nicht live');
+            beobachte('ligastoerung', window.rcLigaStoerung ? kurz(window.rcLigaStoerung.grund, 90) : 'nein', 'Liga-Stoerung');
+            var ql = window.rcQuellenLage && window.rcQuellenLage.texte;
+            beobachte('streifen', ql && ql.length ? kurz(ql.join(' | '), 240) : 'keiner', 'Quellen-Streifen (Wandmonitor)');
+            var af = window.rcAutoLetzterFehler;
+            beobachte('autopilot', af ? kurz((af.zeit || '') + ' ' + (af.text || ''), 160) : 'keiner', 'Autopilot-Meldung');
+            var hs = window.rcHistorieSpeicherDefekt;
+            beobachte('speicher', hs ? kurz(hs.wo + ' ' + hs.grund, 90) : 'ok', 'Historie speichern');
+            beobachte('fehlserie', (window.rcEslFehlserie || 0) >= 3 ? 'SERIE: ' + kurz(window.rcEslFehlgrund, 90) : 'nein', 'ESL-Fehlserie');
+            beobachte('starter', window.__rcStarterCfg ? kurz(JSON.stringify(window.__rcStarterCfg), 220) : '-', 'Starter-Einstellungen');
+        }
+
+        // ---- Haenger: lange Aufgaben, Taktluecken, Lebenszeichen ----
+        function langStart(){
+            try {
+                if (!window.PerformanceObserver) return;
+                BEOBACHTER = new PerformanceObserver(function(liste){
+                    try {
+                        liste.getEntries().forEach(function(x){
+                            var d = Math.round(x.duration), a = x.attribution && x.attribution[0];
+                            var rahmen = !!(a && a.containerType === 'iframe');
+                            LANG_MIN.n++; LANG_MIN.ms += d; if (d > LANG_MIN.max) LANG_MIN.max = d; if (rahmen) LANG_MIN.rahmen += d;
+                            LANG_15.n++; LANG_15.ms += d; if (d > LANG_15.max) LANG_15.max = d;
+                            if (d >= 2000) {
+                                var wo = rahmen ? 'Rahmen ' + (a.containerName || pfad(a.containerSrc || '')) : 'Hauptseite';
+                                neu({ k:'haenger', art:'lange Aufgabe', ms: d, wo: kurz(wo, 80) }, 'lang|' + wo + '|' + (d >= 10000 ? 'x' : 'n'), 'l');
+                            }
+                        });
+                    } catch(e){}
+                });
+                BEOBACHTER.observe({ type:'longtask', buffered:true });
+            } catch(e){ BEOBACHTER = null; }
+        }
+        function lueckeTakt(){
+            var jetzt = performance.now();
+            if (TAKT_LETZT) {
+                var luecke = jetzt - TAKT_LETZT;
+                if (luecke > 5000) {
+                    var verborgen = document.visibilityState === 'hidden', s = luecke / 1000;
+                    // Bei verborgener Seite ist eine Luecke nicht eindeutig: der Browser
+                    // drosselt dort die Zeitgeber UND meldet keine langen Aufgaben.
+                    neu({ k:'haenger', art: verborgen ? 'Taktluecke bei verborgener Seite (gedrosselt oder blockiert)' : 'SEITE HING (Takt blockiert)', ms: Math.round(luecke) },
+                        'luecke|' + (verborgen ? 'v' : 's') + '|' + (s < 30 ? 'a' : s < 120 ? 'b' : 'c'), 'x');
+                }
+            }
+            TAKT_LETZT = jetzt;
+        }
+        function minuteTakt(){
+            if (LANG_MIN.ms >= 2000)
+                neu({ k:'haenger', art:'Hauptthread blockiert', ms: LANG_MIN.ms, blockN: LANG_MIN.n,
+                      wo: 'laengste ' + sek(LANG_MIN.max) + (LANG_MIN.rahmen ? ', davon Rahmen ' + sek(LANG_MIN.rahmen) : '') },
+                    'block|' + (LANG_MIN.ms >= 15000 ? 'c' : LANG_MIN.ms >= 5000 ? 'b' : 'a'), 'b');
+            LANG_MIN = { n:0, ms:0, max:0, rahmen:0 };
+            try { var s = schnappschuss(); neu(s, 'stand', standSig(s)); } catch(e){}
+            try { sag(kurzstand()); } catch(e){}
+        }
+        function messTakt(){
+            var e = { k:'messung', langN: LANG_15.n, langMs: LANG_15.ms, langMax: LANG_15.max, pdsN: PDS_15.n,
+                      pdsMs: PDS_15.n ? Math.round(PDS_15.ms / PDS_15.n) : 0, pdsMax: PDS_15.max };
+            try { var m = performance.memory; if (m) { e.heap = Math.round(m.usedJSHeapSize / 1048576); e.heapGrenze = Math.round(m.jsHeapSizeLimit / 1048576); } } catch(x){}
+            try { e.knoten = document.getElementsByTagName('*').length; } catch(x){}
+            LANG_15 = { n:0, ms:0, max:0 }; PDS_15 = { n:0, ms:0, max:0 };
+            try {
+                var summe = 0;
+                for (var i = 0; i < localStorage.length; i++) { var k = localStorage.key(i); summe += k.length + (localStorage.getItem(k) || '').length; }
+                e.lsKB = Math.round(summe / 1024);
+            } catch(x){}
+            neu(e);
+        }
+        function puls(){ try { localStorage.setItem(schluessel(PULS), String(Date.now())); } catch(e){} }
+
+        // ---- Nachrichten der Crawler (Ligaliste, Genesys) ----
+        function nachricht(ev){
+            try {
+                var d = ev && ev.data;
+                if (!d || typeof d !== 'object') return;
+                if (d.type === 'KPI_BATCH') {
+                    var n = Array.isArray(d.payload) ? d.payload.length : 0;
+                    neu({ k:'liga', q: d.projekt || '-', agenten: n, voll: !!d.vollstaendig, dr: d.liveDaterange || '', std: (d.standorteInDaten || []).length },
+                        'liga|' + (d.projekt || '-'), [n > 0, !!d.vollstaendig, d.liveDaterange || ''].join('|'));
+                } else if (typeof d.type === 'string' && /^(KPI_|RC_)/.test(d.type)) {
+                    var t = kurz(d.grund || d.error || (d.ok === false ? 'fehlgeschlagen' : (d.agenten != null ? d.agenten + ' Agenten' : '')), 160);
+                    neu({ k:'liga', q: d.projekt || '-', typ: d.type, text: t }, 'ligamsg|' + d.type, t.replace(/\d+/g, '#'));
+                } else if (d.typ === 'gm_daten') {
+                    neu({ k:'genesys', q: d.projekt || '-' }, 'gm', 'g');
+                }
+            } catch(e){}
+        }
+        // ---- Bedienung: Klicks und Auswahlwechsel im Dashboard (nur Kennungen) ----
+        function klick(ev){
+            try {
+                var t = ev.target, el = t && t.closest ? t.closest('[id^="rc"]') : null;
+                if (!el) return;
+                var knopf = t.closest('button, a, [role="tab"], label, input') || el;
+                var name = knopf.id || (el.id + ' "' + kurz(knopf.textContent || knopf.title || '', 30) + '"');
+                if (knopf.type === 'checkbox' || knopf.type === 'radio') name += ' = ' + (knopf.checked ? 'an' : 'aus');
+                neu({ k:'klick', text: kurz(name, 90) });
+            } catch(e){}
+        }
+        function wechsel(ev){
+            try {
+                var t = ev.target;
+                if (!t || !t.id || t.id.indexOf('rc') !== 0 || t.type === 'checkbox' || t.type === 'radio') return;
+                // Bei Textfeldern bewusst NUR die Kennung: dort koennte eine Adresse stehen.
+                neu({ k:'klick', text: t.tagName === 'SELECT' ? t.id + ' -> ' + kurz(t.value, 40) : t.id + ' geaendert' });
+            } catch(e){}
+        }
+        function sicht(){ neu({ k:'info', text: 'Seite ' + (document.visibilityState === 'hidden' ? 'VERBORGEN (minimiert/anderer Tab)' : 'wieder sichtbar') }, 'sicht', document.visibilityState); }
+        function netz(ev){ neu({ k:'info', text: ev.type === 'offline' ? 'NETZ WEG (offline)' : 'Netz wieder da (online)' }); }
+        function beiVerlassen(){ try { neu({ k:'ende' }); sichern(true); } catch(e){} }
+        function horche(ziel, typ, h, cap){ ziel.addEventListener(typ, h, !!cap); HORCHER.push([ziel, typ, h, !!cap]); }
+
+        // ---- Zustand einer Seite (Hauptseite oder Rahmen) ----
+        function leerlauf(W){
+            var teile = [];
+            try {
+                var PF = W.PrimeFaces;
+                if (PF && PF.widgets) Object.keys(PF.widgets).forEach(function(k){
+                    var w = PF.widgets[k];
+                    if (w && w.cfg && ('timeout' in w.cfg) && typeof w.pause === 'function' && typeof w.resume === 'function')
+                        teile.push('IdleMonitor ' + Math.round(w.cfg.timeout / 60000) + ' Min');
+                });
+            } catch(e){}
+            try {
+                var jq = W.jQuery || W.$ || (W.PrimeFaces && W.PrimeFaces.$);
+                if (jq && jq.fn && jq.fn.idleTimer) {
+                    var rest = null, idle = null;
+                    try { rest = jq(W.document).idleTimer('getRemainingTime'); } catch(e){}
+                    try { idle = jq(W.document).idleTimer('isIdle'); } catch(e){}
+                    if (typeof rest === 'number') teile.push('laeuft ab in ' + Math.round(rest / 60000) + ' Min');
+                    if (idle === true) teile.push('IM LEERLAUF');
+                }
+            } catch(e){}
+            return teile.join(', ') || 'kein IdleMonitor erkannt';
+        }
+        function seite(W){
+            var o = {}, d;
+            try { d = W.document; } catch(e){ return { fehler:'kein Zugriff' }; }
+            if (!d) return { fehler:'kein Dokument' };
+            try { o.pfad = pfad(d.location.href); } catch(e){}
+            o.bereit = d.readyState;
+            var form = d.getElementById('filterForm');
+            o.form = form ? 'ja' : 'NEIN';
+            if (form) {
+                var f = Array.prototype.filter.call(form.querySelectorAll('input.hasDatepicker, .ui-calendar input'), function(i){ return i.name; });
+                o.zeitraum = f.map(function(i){ return i.value || '(leer)'; }).join(' bis ') || '(keine Datumsfelder)';
+            }
+            var s = statSelect(d), box = s && s.closest ? s.closest('.ui-selectonemenu') : null;
+            var lab = box ? box.querySelector('.ui-selectonemenu-label') : null;
+            o.statistik = lab ? (kurz(lab.textContent, 40) || '(LEER)') : (s ? (s.selectedIndex >= 0 ? kurz(s.options[s.selectedIndex].textContent, 40) : '(LEER)') : '(keine Statistik-Auswahl)');
+            // Nur eine SICHTBARE Maske zaehlt: jede ESL-Seite traegt ein verborgenes
+            // Passwortfeld (27.09.: "JA" auf allen Seiten, waehrend sie Excel lieferten).
+            o.anmeldemaske = pwSichtbar(d) ? 'JA' : (d.querySelector('input[type="password"]') ? 'nein (nur verborgenes Passwortfeld)' : 'nein');
+            var vs = d.querySelector('input[name="javax.faces.ViewState"]');
+            o.vs = vs ? vsKurz(vs.value) : '-';
+            var dl = [];
+            Array.prototype.forEach.call(d.querySelectorAll('.ui-dialog'), function(x){
+                try { if (x.offsetWidth > 0 && x.getAttribute('aria-hidden') !== 'true') dl.push(kurz(x.innerText || x.textContent, 90)); } catch(e){}
+            });
+            o.dialoge = dl.length ? dl.join(' | ') : 'keine';
+            o.leerlauf = leerlauf(W);
+            return o;
+        }
+        function schnappschuss(){
+            var s = { k:'stand' }, ss = window.rcSessionState || {};
+            s.modus = dashModus();
+            s.takt = window.rcLiveInterval ? 'laeuft' : 'STEHT (rcLiveInterval fehlt)';
+            s.runde = window.rcAlleProjekteModus ? 'aktiv ' + qName(window.rcAktivProjekt || 'kabel') +
+                (window.rcSitzungProjekt ? ', Anmeldung auf ' + qName(window.rcSitzungProjekt) : ', Anmeldung offen') : 'Einzelprojekt';
+            s.sitzung = ss.alive === false ? 'TOT seit ' + ss.lostAt + ' (' + kurz(ss.lostReason, 90) + ')'
+                      : 'lebt' + (ss.lastReset === false ? ' (Keep-Alive ohne Timer-Reset)' : '');
+            s.fehlserie = (window.rcEslFehlserie || 0) + (window.rcEslFehlgrund ? ' (' + kurz(window.rcEslFehlgrund, 70) + ')' : '');
+            s.eslOkVorS = window.rcEslLastOk ? Math.round((Date.now() - window.rcEslLastOk) / 1000) : null;
+            s.sperren = [window.rcHarvestBusy && 'Historien-Harvest', window.rcRangeBusy && 'Zeitraum-Abruf', window.rcJetztBusy && 'Jetzt-Knopf',
+                         window.rcProjektAbrufLaeuft && ('Projekt-Abruf ' + qName(window.rcProjektAbrufLaeuft.key) + ' (' + window.rcProjektAbrufLaeuft.anlass + ')')].filter(Boolean).join(', ') || 'keine';
+            s.tagFalsch = window.rcPortalTagFalsch ? kurz(window.rcPortalTagFalsch.tage, 60) : 'nein';
+            s.mehrtage = window.rcMultiDayWarn ? kurz(window.rcMultiDayWarn, 110) : 'nein';
+            try { s.streifen = (window.rcQuellenLage && window.rcQuellenLage.texte || []).map(function(t){ return kurz(t, 120); }).join(' | ') || 'keiner'; } catch(e){}
+            s.sicht = document.visibilityState + (document.hasFocus && document.hasFocus() ? ', Fokus' : '') + ' | Seite ' + (window.rcActivePage || '-');
+            try { var m = performance.memory; if (m) s.heap = Math.round(m.usedJSHeapSize / 1048576) + ' MB'; } catch(e){}
+            s.oben = seite(window);
+            s.oben.name = oben();
+            rahmenListe().forEach(function(r){
+                var st = (window.rcRahmen || {})[r.key] || {}, dat = (window.rcProjektDaten || {})[r.key];
+                var o = r.W ? seite(r.W) : { fehler:'kein Fenster' };
+                o.aufbau = (st.bereit ? 'bereit' : 'NICHT bereit') + (st.laeuft ? ', baut gerade' : '') +
+                           (st.fehler ? ', Fehler ' + st.fehler : '') + (st.grund ? ' - ' + kurz(st.grund, 90) : '');
+                o.daten = dat ? Math.max(0, (dat.data || []).length - 1) + ' Zeilen, vor ' + Math.round((Date.now() - dat.zeit) / 1000) + ' s' : 'noch keine';
+                s['rahmen_' + r.key] = o;
+            });
+            var kd = (window.rcProjektDaten || {}).kabel;
+            s.kabelDaten = kd ? Math.max(0, (kd.data || []).length - 1) + ' Zeilen, vor ' + Math.round((Date.now() - kd.zeit) / 1000) + ' s' : '-';
+            var lu = window.rcKpiLastUpdate;
+            s.liga = (window.rcKpiData ? Object.keys(window.rcKpiData).length : 0) + ' Agenten, letztes Paket ' +
+                     (lu && lu.getTime ? 'vor ' + Math.round((Date.now() - lu.getTime()) / 60000) + ' Min' : 'nie');
+            return s;
+        }
+        function standSig(s){
+            return JSON.stringify(s, function(k, v){ return (k === 't' || k === 'sig' || k === 'n' || k === 'bis' || k === 'eslOkVorS') ? undefined : v; })
+                .replace(/\d+/g, '#');
+        }
+
+        // ---- Auswertung fuer Menschen ----
+        function letzte(pred){ for (var i = E.length - 1; i >= 0; i--) if (pred(E[i])) return E[i]; return null; }
+        function kurzstand(){
+            var teile = [];
+            projekte().forEach(function(q){
+                var d = letzte(function(x){ return x.k === 'daten' && x.q === q; });
+                var r = letzte(function(x){ return x.k === 'req' && x.q === q && x.a === 'Export' && !x.test; });
+                if (!d && !r) return;
+                teile.push(q + ' ' + (r && r.erg !== 'Excel' ? r.erg + (r.info ? ' (' + kurz(r.info, 50) + ')' : '') : d ? 'heute ' + d.h + ' von ' + d.z + ' Zeilen' : 'Excel') +
+                    ' @' + uhr((r && (r.bis || r.t)) || (d.bis || d.t)));
+            });
+            var p = letzte(function(x){ return x.k === 'pds'; });
+            if (p) teile.push('Dashboard: ' + p.kont + ' Kontakte im Filter (' + p.ein + ' Zeilen hinein, ' + p.ms + ' ms)');
+            var ss = window.rcSessionState || {};
+            if (ss.alive === false) teile.push('SITZUNG TOT (' + ss.lostReason + ')');
+            return teile.join(' | ') || 'noch keine Abrufe gesehen';
+        }
+        function projekte(){ var o = oben(); return window.rcAlleProjekteModus ? ['Kabel', 'Mobile', 'UM'] : [o]; }
+        function fmt(e){
+            var zeit = pad(uhr(e.t) + (e.n > 1 ? '-' + uhr(e.bis) + ' x' + e.n : ''), 21);
+            switch (e.k) {
+                case 'req':
+                    var s = pad(e.q, 6) + pad(e.a + (e.test ? '(TEST)' : ''), 12) + pad(e.erg, 10) + 'HTTP ' + (e.http || '-') +
+                            (e.ms != null ? ' ' + e.ms + 'ms' : '') + (e.msMax ? ' (max ' + e.msMax + 'ms)' : '') + (e.bytes != null ? ' ' + Math.round(e.bytes / 1024) + 'KB' : '');
+                    if (e.a === 'Suche') s += ' | Tabelle ' + (e.tabelle == null ? '?' : e.tabelle) + ' Zeilen';
+                    if (e.info) s += ' | ' + e.info;
+                    if (e.umleitung) s += ' | umgeleitet nach ' + e.umleitung;
+                    s += ' || gesendet: ' + (e.dat || 'kein Datum') + ' | Statistik ' + (e.stat || '?') + ' | Knopf ' + (e.src || '?') +
+                         ' | VS ' + (e.vs || '-') + (e.vsNeu && e.vsNeu !== '-' && e.vsNeu !== e.vs ? ' -> ' + e.vsNeu : '');
+                    return zeit + s;
+                case 'daten':
+                    return zeit + pad(e.q, 6) + pad('Daten', 12) + (e.n > 1 && e.z0 !== e.z ? e.z0 + '->' : '') + e.z + ' Zeilen, heute ' +
+                           (e.n > 1 && e.h0 !== e.h ? e.h0 + '->' : '') + e.h + (e.max ? ', juengste ' + e.max : '') + ' | Tage ' + e.tage +
+                           ' | Spalten ' + e.kopf + (e.gleichKabel != null ? ' | gleiche Datensaetze wie Kabel: ' + e.gleichKabel + '%' : '') +
+                           (e.n > 1 ? (e.idhW ? ' | Datenstand ' + e.idhW + 'x neu' : ' | Datenstand UNVERAENDERT') : '');
+                case 'pds':
+                    return zeit + pad('Dash', 6) + pad('Auswertung', 12) + e.ein + ' Zeilen hinein (Kabel ' + e.kabel + ', Mobile ' + e.mobile + ', UM ' + e.um +
+                           ', davon heute ' + e.heute + ') -> ' + e.kont + ' Kontakte im Filter, ' + e.ag + ' Agenten, ' + e.verk + ' Verkaeufe gesamt | ' +
+                           e.filter + ' | ' + e.ms + 'ms' + (e.msMax ? ' (max ' + e.msMax + 'ms)' : '');
+                case 'xhr': return zeit + pad(e.q, 6) + pad('Portal-Ajax', 12) + pad(e.flag || 'ok', 10) + 'HTTP ' + e.http + ' ' + e.ms + 'ms | Quelle ' + e.src;
+                case 'rahmen': return zeit + pad(e.q, 6) + pad('Rahmen', 12) + e.was + (e.pfad ? ' -> ' + e.pfad : '') + (e.titel ? ' "' + e.titel + '"' : '') +
+                               (e.pfad ? ' | filterForm ' + (e.form ? 'ja' : 'NEIN') + ' | Menue ' + (e.menue ? 'ja' : 'NEIN') + (e.pw ? ' | ANMELDEMASKE' : '') : '') + (e.info ? ' | ' + e.info : '');
+                case 'rstat': return zeit + pad(e.q, 6) + pad('Aufbau', 12) + (e.bereit ? 'bereit' : 'NICHT bereit') + (e.laeuft ? ', baut' : '') + (e.fehler ? ', Fehler ' + e.fehler : '') + (e.grund ? ' - ' + e.grund : '');
+                case 'log': return zeit + pad('Log', 6) + pad(e.s === 'F' ? 'FEHLER' : e.s === 'W' ? 'Warnung' : e.s === 'E' ? 'Ereignis' : 'Info', 12) + e.zeit + ' ' + e.text;
+                case 'fehler': return zeit + pad(e.q, 6) + pad(e.art === 'JS' ? 'JS-FEHLER' : e.art === 'Promise' ? 'PROMISE' : 'Ressource', 12) + e.text + (e.ort ? ' @ ' + e.ort : '') + (e.stack ? ' | ' + e.stack : '');
+                case 'haenger': return zeit + pad('Takt', 6) + pad('HAENGER', 12) + e.art + ' ' + sek(e.ms) + (e.msMax && e.msMax !== e.ms ? ' (max ' + sek(e.msMax) + ')' : '') +
+                               (e.blockN ? ', ' + e.blockN + ' lange Aufgaben' : '') + (e.wo ? ' | ' + e.wo : '');
+                case 'liga': return zeit + pad('Liga', 6) + pad(e.typ || 'Paket', 12) + (e.typ ? e.text : e.agenten + ' Agenten, ' + (e.voll ? 'vollstaendig' : 'teilweise') +
+                               (e.dr ? ', Zeitraum ' + e.dr : '') + ', ' + e.std + ' Standorte') + (e.q && e.q !== '-' ? ' | Projekt ' + e.q : '');
+                case 'genesys': return zeit + pad('GM', 6) + pad('Paket', 12) + 'Warteschleifen-Daten' + (e.q && e.q !== '-' ? ' | Projekt ' + e.q : '');
+                case 'zustand': return zeit + pad('Zust.', 6) + pad('Wechsel', 12) + e.name + ': ' + e.wert;
+                case 'klick': return zeit + pad('Nutzer', 6) + pad('Bedienung', 12) + e.text;
+                case 'messung': return zeit + pad('Mess', 6) + pad('15 Min', 12) + 'Speicher ' + (e.heap != null ? e.heap + ' MB' + (e.heapGrenze ? ' von ' + e.heapGrenze : '') : '?') +
+                               ' | DOM ' + (e.knoten || '?') + ' Knoten | lange Aufgaben ' + e.langN + ' (' + sek(e.langMs) + ', max ' + sek(e.langMax) + ')' +
+                               ' | Auswertung ' + e.pdsN + 'x, Mittel ' + e.pdsMs + 'ms, max ' + e.pdsMax + 'ms' + (e.lsKB != null ? ' | localStorage ' + e.lsKB + ' KB' : '');
+                case 'stand': return zeit + pad('Stand', 6) + standZeilen(e).join('\n' + pad('', 21) + pad('', 6));
+                case 'start': return zeit + 'START Flugschreiber ' + e.v + ' | Seite ' + e.pfad + ' | Aufruf ' + (e.nav || '?') + ', ' + e.seitAufbau + ' s nach Seitenaufbau' + (e.vorher ? ' | ' + e.vorher : '');
+                case 'ende': return zeit + 'SEITE WIRD VERLASSEN / NEU GELADEN';
+                case 'test': return zeit + pad('Test', 6) + e.text;
+                default: return zeit + (e.text || JSON.stringify(e));
+            }
+        }
+        function seiteText(name, o){
+            if (!o) return name + ': -';
+            if (o.fehler) return name + ': ' + o.fehler;
+            return name + ': ' + (o.pfad || '?') + ' (' + o.bereit + ') | filterForm ' + o.form + (o.zeitraum ? ' | Zeitraum ' + o.zeitraum : '') +
+                   ' | Statistik ' + o.statistik + ' | Anmeldemaske ' + o.anmeldemaske + ' | VS ' + o.vs + ' | Dialoge ' + o.dialoge +
+                   ' | Leerlauf: ' + o.leerlauf + (o.aufbau ? ' | Aufbau ' + o.aufbau : '') + (o.daten ? ' | Daten ' + o.daten : '');
+        }
+        function standZeilen(s){
+            var z = [
+                s.modus + ' | Live-Takt ' + s.takt + ' (' + s.runde + ') | Sitzung ' + s.sitzung,
+                'ESL-Fehlserie ' + s.fehlserie + ' | letzter ESL-Erfolg vor ' + (s.eslOkVorS == null ? '?' : s.eslOkVorS + ' s') + ' | Sperren ' + s.sperren +
+                    ' | Portal falscher Tag ' + s.tagFalsch + ' | Mehrtage ' + s.mehrtage,
+                'Quellen-Streifen: ' + (s.streifen || '-') + ' | Liga: ' + s.liga + ' | Kabel-Daten im Speicher: ' + (s.kabelDaten || '-') +
+                    ' | Anzeige: ' + (s.sicht || '-') + (s.heap ? ' | Speicher ' + s.heap : ''),
+                seiteText('Seite ' + ((s.oben && s.oben.name) || 'oben'), s.oben)
+            ];
+            Object.keys(s).forEach(function(k){ if (k.indexOf('rahmen_') === 0) z.push(seiteText('Rahmen ' + qName(k.slice(7)), s[k])); });
+            return z;
+        }
+        function befund(){
+            var z = [];
+            projekte().forEach(function(q){
+                var ex = E.filter(function(e){ return e.k === 'req' && e.q === q && e.a === 'Export' && !e.test; });
+                var su = E.filter(function(e){ return e.k === 'req' && e.q === q && e.a === 'Suche'; });
+                var da = E.filter(function(e){ return e.k === 'daten' && e.q === q; });
+                if (!ex.length && !su.length && !da.length) { z.push(q + ': KEIN einziger Abruf gesehen.'); return; }
+                var n = 0, ok = 0, arten = {};
+                ex.forEach(function(e){
+                    var k = e.n || 1;
+                    n += k;
+                    if (e.erg === 'Excel') ok += k;
+                    else { var a = e.erg + (e.info ? ' (' + kurz(e.info, 70) + ')' : ''); arten[a] = (arten[a] || 0) + k; }
+                });
+                var s = q + ': ' + n + ' Exporte, ' + ok + ' davon Excel';
+                Object.keys(arten).forEach(function(a){ s += ', ' + arten[a] + 'x ' + a; });
+                var mit = null, ohne = null;
+                da.forEach(function(e){ if (e.h > 0) { mit = e; ohne = null; } else if (mit && !ohne) ohne = e; });
+                if (ohne) s += ' | ACHTUNG: Zeilen von HEUTE fallen ab ' + uhr(ohne.t) + ' auf 0 (vorher ' + mit.h + ' um ' + uhr(mit.bis || mit.t) + '), Tage danach: ' + ohne.tage;
+                else if (da.length && !mit) s += ' | ACHTUNG: KEIN Export enthielt je eine Zeile von heute (Tage: ' + da[da.length - 1].tage + ')';
+                var falsch = da.filter(function(e){ return /^(Kabel|Mobile|UM)$/.test(e.kopf) && e.kopf !== q; });
+                if (falsch.length) s += ' | ACHTUNG: liefert Spalten von ' + falsch[falsch.length - 1].kopf + ' (ab ' + uhr(falsch[0].t) + ')';
+                var leck = da.filter(function(e){ return (e.gleichKabel || 0) >= 50; });
+                // Welche Seite die fremden Daten liefert, sagt der Vergleich allein nicht
+                // (27.09.: es war KABEL, das UM-Daten lieferte) — die Mapping-Pruefung
+                // des Abrufs steht dazu im Logbuch ("Alle Projekte: ... fremde Daten").
+                if (leck.length) s += ' | ACHTUNG: ' + leck[leck.length - 1].gleichKabel + '% dieselben Datensaetze wie Kabel (ab ' + uhr(leck[0].t) + ') - eine der beiden Seiten liefert fremde Daten';
+                var steht = da.filter(function(e){ return e.n >= 10 && !e.idhW && e.z > 0; });
+                if (steht.length) s += ' | Datenstand ' + (steht[steht.length - 1].n) + ' Exporte lang UNVERAENDERT (ab ' + uhr(steht[steht.length - 1].t) + ')';
+                var dats = [];
+                ex.concat(su).sort(function(a, b){ return a.t - b.t; }).forEach(function(e){ if (e.dat && dats[dats.length - 1] !== e.dat) dats.push(e.dat); });
+                if (dats.length > 1) s += ' | gesendeter Zeitraum WECHSELT: ' + dats.slice(-4).join('  ->  ');
+                var leer = ex.concat(su).filter(function(e){ return /LEER|nicht gesendet/.test(e.stat || ''); });
+                if (leer.length) s += ' | Statistik-Auswahl ' + leer.length + 'x leer gesendet';
+                var abg = su.filter(function(e){ return e.erg === 'ABGELAUFEN' || e.erg === 'UMLEITUNG' || e.erg === 'FEHLER'; });
+                if (abg.length) s += ' | Suche ' + abg.map(function(e){ return e.erg + ' ' + uhr(e.t) + (e.n > 1 ? ' x' + e.n : ''); }).slice(-3).join(', ');
+                z.push(s + '.');
+            });
+            var neuA = E.filter(function(e){ return e.k === 'rahmen' && /ERSETZT/.test(e.was); });
+            if (neuA.length) z.push('Rahmen wurden ' + neuA.length + 'x neu aufgebaut (zuletzt ' + uhr(neuA[neuA.length - 1].t) + ').');
+            var fremd = E.filter(function(e){ return e.k === 'rahmen' && e.was === 'Seite geladen' && (e.pw || e.menue === false); });
+            if (fremd.length) z.push('Rahmen landeten auf fremden Seiten: ' + fremd.slice(-3).map(function(e){ return e.q + ' ' + uhr(e.t) + ' ' + e.pfad + (e.pw ? ' (Anmeldemaske)' : ''); }).join(' | '));
+            var gr = E.filter(function(e){ return e.k === 'rstat' && e.grund; });
+            if (gr.length) z.push('Aufbau-Gruende der Rahmen: ' + gr.slice(-4).map(function(e){ return e.q + ' ' + uhr(e.t) + ' "' + e.grund + '"'; }).join(' | '));
+            var xa = E.filter(function(e){ return e.k === 'xhr' && e.flag; });
+            if (xa.length) z.push('Portal-Ajax auffaellig: ' + xa.slice(-4).map(function(e){ return e.q + ' ' + uhr(e.t) + ' ' + e.flag + ' (' + e.src + ')' + (e.n > 1 ? ' x' + e.n : ''); }).join(' | '));
+            var p = E.filter(function(e){ return e.k === 'pds'; });
+            if (p.length) {
+                var l = p[p.length - 1];
+                z.push('Auswertung zuletzt ' + uhr(l.bis || l.t) + ': ' + l.ein + ' Zeilen hinein (Kabel ' + l.kabel + ', Mobile ' + l.mobile + ', UM ' + l.um + ', heute ' + l.heute +
+                       ') -> ' + l.kont + ' Kontakte im Filter | ' + l.filter + ' | Dauer ' + l.ms + ' ms' + (l.msMax ? ', max ' + l.msMax + ' ms' : ''));
+                var nullA = p.filter(function(e){ return e.heute > 0 && e.kont === 0; });
+                if (nullA.length) z.push('ACHTUNG: Auswertung bekam Zeilen von heute, zeigte aber 0 Kontakte (' + nullA.length + 'x) - Filter: ' + nullA[nullA.length - 1].filter);
+                var nullE = p.filter(function(e){ return e.heute === 0; });
+                if (nullE.length) z.push('Auswertung bekam ' + nullE.length + 'x KEINE Zeile von heute (zuletzt ' + uhr(nullE[nullE.length - 1].bis || nullE[nullE.length - 1].t) + ').');
+            } else z.push('Keine Auswertung (processDataStream) gesehen.');
+            var fe = E.filter(function(e){ return e.k === 'fehler' && e.art !== 'Ressource'; });
+            if (fe.length) {
+                var sum = 0; fe.forEach(function(e){ sum += e.n || 1; });
+                z.push(sum + ' JS-/Promise-Fehler, zuletzt: ' + fe.slice(-3).map(function(e){ return e.q + ' ' + uhr(e.bis || e.t) + ' ' + kurz(e.text, 90) + (e.n > 1 ? ' x' + e.n : ''); }).join(' | '));
+            }
+            var hing = E.filter(function(e){ return e.k === 'haenger' && /HING|Hauptthread blockiert|lange Aufgabe/.test(e.art); });
+            if (hing.length) z.push('HAENGER: ' + hing.slice(-4).map(function(e){ return uhr(e.t) + ' ' + e.art + ' ' + sek(e.msMax || e.ms) + (e.wo ? ' (' + e.wo + ')' : '') + (e.n > 1 ? ' x' + e.n : ''); }).join(' | '));
+            var weg = E.filter(function(e){ return e.k === 'haenger' && /war weg/.test(e.art); });
+            if (weg.length) z.push('Seite war zwischendurch WEG (Absturz/Einfrieren/Browser zu): ' + weg.slice(-3).map(function(e){ return e.wo; }).join(' | '));
+            var drossel = E.filter(function(e){ return e.k === 'haenger' && /gedrosselt/.test(e.art); });
+            if (drossel.length) { var dn = 0, dm = 0; drossel.forEach(function(e){ dn += e.n || 1; dm = Math.max(dm, e.msMax || e.ms); }); z.push('Taktluecken bei verborgener Seite (minimiert/anderer Tab): ' + dn + 'x, laengste ' + sek(dm) + ' - gedrosselt oder blockiert, bei verborgener Seite nicht unterscheidbar.'); }
+            var me = E.filter(function(e){ return e.k === 'messung' && e.heap != null; });
+            if (me.length >= 2) {
+                var a1 = me[0], a2 = me[me.length - 1];
+                z.push('Speicher ' + a1.heap + ' MB -> ' + a2.heap + ' MB, DOM ' + a1.knoten + ' -> ' + a2.knoten + ' Knoten (' + uhr(a1.t) + ' bis ' + uhr(a2.t) + ')' +
+                       (a2.heap > a1.heap * 1.5 && a2.heap - a1.heap > 100 ? ' - WAECHST deutlich (Leck?)' : ''));
+            }
+            var tot = E.filter(function(e){ return e.k === 'zustand' && e.name === 'ESL-Sitzung' && /^TOT/.test(e.wert); });
+            if (tot.length) z.push('Sitzung als TOT gemeldet: ' + tot.map(function(e){ return uhr(e.t) + ' ' + e.wert; }).slice(-3).join(' | '));
+            var takt = E.filter(function(e){ return e.k === 'zustand' && e.name === 'Live-Takt' && /STEHT/.test(e.wert); });
+            if (takt.length) z.push('Live-Takt stand still: ' + takt.map(function(e){ return uhr(e.t); }).slice(-4).join(', '));
+            var zw = E.filter(function(e){ return e.k === 'zustand'; });
+            if (zw.length) z.push('Letzte Zustandswechsel: ' + zw.slice(-5).map(function(e){ return uhr(e.t) + ' ' + e.name + ': ' + kurz(e.wert, 70); }).join(' | '));
+            var li = E.filter(function(e){ return e.k === 'liga' && !e.typ; });
+            if (li.length) {
+                var anz = 0, ll = li[li.length - 1];
+                li.forEach(function(e){ anz += e.n || 1; });
+                z.push('Liga: ' + anz + ' Pakete, zuletzt ' + uhr(ll.bis || ll.t) + ' mit ' + ll.agenten + ' Agenten (' + (ll.voll ? 'vollstaendig' : 'teilweise') + (ll.dr ? ', ' + ll.dr : '') + ').');
+            } else z.push('Liga: kein einziges Paket gesehen.');
+            var lt = E.filter(function(e){ return e.k === 'liga' && e.typ; });
+            if (lt.length) z.push('Liga-Meldungen: ' + lt.slice(-3).map(function(e){ return uhr(e.bis || e.t) + ' ' + e.typ + (e.text ? ' ' + e.text : '') + (e.n > 1 ? ' x' + e.n : ''); }).join(' | '));
+            // Zusammengefasste Eintraege (x18) tragen nur Anfang und Ende. Liegen ihre
+            // Abrufe im Mittel dichter als 150 s, gilt die Spanne als abgedeckt — sonst
+            // sah ein sauberer 20-s-Takt wie eine 16-Minuten-Luecke aus (27.09.).
+            var iv = [];
+            E.forEach(function(e){
+                if (e.k !== 'req' || e.test) return;
+                var a = e.t, b = e.bis || e.t, n = e.n || 1;
+                if (n > 1 && (b - a) / (n - 1) <= 150000) iv.push([a, b]);
+                else { iv.push([a, a]); if (b !== a) iv.push([b, b]); }
+            });
+            iv.sort(function(x, y){ return x[0] - y[0]; });
+            var luecken = [], bisher = null;
+            iv.forEach(function(x){
+                if (bisher !== null && x[0] - bisher > 150000) luecken.push(uhr(bisher) + '-' + uhr(x[0]) + ' (' + Math.round((x[0] - bisher) / 60000) + ' Min)');
+                bisher = bisher === null ? x[1] : Math.max(bisher, x[1]);
+            });
+            if (luecken.length) z.push('Kein einziger ESL-Abruf zwischen: ' + luecken.slice(-5).join(', '));
+            var ende = E.filter(function(e){ return e.k === 'ende'; });
+            if (ende.length) z.push('Seite wurde ' + ende.length + 'x verlassen/neu geladen (zuletzt ' + uhr(ende[ende.length - 1].t) + ').');
+            var kl = E.filter(function(e){ return e.k === 'klick'; });
+            if (kl.length) z.push('Letzte Bedienung: ' + kl.slice(-4).map(function(e){ return uhr(e.t) + ' ' + e.text; }).join(' | '));
+            var logs = E.filter(function(e){ return e.k === 'log' && (e.s === 'F' || e.s === 'W'); });
+            if (logs.length) z.push(logs.length + ' Warnungen/Fehler im Logbuch, zuletzt: ' + logs.slice(-3).map(function(e){ return e.zeit + ' ' + kurz(e.text, 110) + (e.n > 1 ? ' x' + e.n : ''); }).join(' | '));
+            return z;
+        }
+        function berichtText(mitLogbuch){
+            var L = [], jetzt = Date.now(), erster = E.length ? E[0].t : jetzt;
+            L.push('=== FLUGSCHREIBER ' + VERSION + ' | erstellt ' + new Date().toLocaleString('de-DE') + ' ===');
+            L.push('Seite ' + pfad(location.href) + ' | ' + ((/Edg\/[\d.]+/.exec(navigator.userAgent) || ['Browser ?'])[0]) + ' | ' + dashModus());
+            L.push('Mitschnitt seit ' + new Date(erster).toLocaleString('de-DE') + ' (' + Math.round((jetzt - erster) / 60000) + ' Min), ' + E.length + ' Eintraege');
+            L.push('');
+            L.push('--- BEFUND (automatisch) ---');
+            befund().forEach(function(b){ L.push('- ' + b); });
+            L.push('');
+            L.push('--- ZUSTAND JETZT ---');
+            standZeilen(schnappschuss()).forEach(function(x){ L.push(x); });
+            L.push('');
+            L.push('--- VERLAUF (x = zusammengefasste gleichartige Ereignisse) ---');
+            E.forEach(function(e){ try { L.push(fmt(e)); } catch(x){ L.push(JSON.stringify(e)); } });
+            if (mitLogbuch) {
+                L.push('');
+                L.push('--- LOGBUCH DES DASHBOARDS ---');
+                (Array.isArray(window.rcLogBuf) ? window.rcLogBuf : []).forEach(function(x){ L.push(String(x)); });
+            }
+            return L.join('\n');
+        }
+
+        // ---- Befehle ----
+        function bericht(){
+            sichern(true);
+            befund().forEach(function(b){ sag('Befund: ' + b); });
+            // EINE Datei mit allem: das Logbuch nimmt den Flugschreiber mit.
+            if (typeof window.rcLogbuch === 'function') return window.rcLogbuch();
+            var text = berichtText(true), d = new Date();
+            window.__rcFlussBericht = text;
+            var name = 'ESL-Flugschreiber-' + d.getFullYear() + p2(d.getMonth() + 1) + p2(d.getDate()) + '-' + p2(d.getHours()) + p2(d.getMinutes()) + '.txt';
+            try {
+                var url = URL.createObjectURL(new Blob(['\ufeff' + text], { type:'text/plain;charset=utf-8' }));
+                var a = document.createElement('a');
+                a.href = url; a.download = name; a.style.display = 'none';
+                document.body.appendChild(a);
+                a.click();
+                setTimeout(function(){ try { URL.revokeObjectURL(url); a.remove(); } catch(e){} }, 4000);
+            } catch(e){ return 'siehe __rcFlussBericht'; }
+            return name;
+        }
+        function jetzt(){
+            sag(kurzstand());
+            standZeilen(schnappschuss()).forEach(function(x){ sag(x); });
+            befund().forEach(function(b){ sag('Befund: ' + b); });
+            E.slice(-15).forEach(function(e){ sag(fmt(e)); });
+            return E.length + ' Eintraege im Mitschnitt';
+        }
+        function warte(ms){ return new Promise(function(r){ setTimeout(r, ms); }); }
+        async function test(){
+            if (TEST) { sag('Sofortmessung laeuft schon.'); return; }
+            sag('Sofortmessung laeuft (wenige Sekunden) ...');
+            var zeilen = [];
+            try {
+                var r = await fetch('/Agents/secure/main.xhtml', { credentials:'same-origin', cache:'no-store' });
+                var t = await r.text();
+                var z1 = 'Die SITZUNG zeigt auf: ' + pfad(r.url) + ' (HTTP ' + r.status + (/type=["']?password/i.test(t) && !/frmMainMenu/.test(t) ? ', ANMELDEMASKE' : '') + ')';
+                zeilen.push(z1);
+                neu({ k:'test', text: z1 });
+            } catch(e){ zeilen.push('Startseite nicht abrufbar: ' + kurz(e && e.message, 80)); }
+            var seiten = [{ q: oben(), W: window }].concat(rahmenListe().map(function(x){ return { q: qName(x.key), W: x.W }; }));
+            for (var i = 0; i < seiten.length; i++) {
+                var sx = seiten[i], zeile = sx.q + ' Export OHNE vorherige Suche: ';
+                try {
+                    var d = sx.W.document, form = d.getElementById('filterForm');
+                    if (!form) { zeilen.push(zeile + 'kein filterForm auf ' + pfad(d.location.href)); continue; }
+                    var kn = Array.prototype.slice.call(form.querySelectorAll('button[type="submit"], input[type="submit"]'));
+                    var exp = kn.filter(function(b){ var x = norm(b.innerText || b.value); return x.indexOf('excel') !== -1 || x.indexOf('export') !== -1 || (b.innerHTML || '').toLowerCase().indexOf('excel') !== -1; })[0];
+                    var id = exp ? (exp.id || exp.name) : '';
+                    if (!id) { zeilen.push(zeile + 'kein Exportknopf gefunden'); continue; }
+                    wickleFetch(sx.W, sx.q);
+                    var fd = new sx.W.FormData(form);
+                    fd.append(id, id);
+                    TEST = sx.q;
+                    var vorher = E.length;
+                    var rr = await sx.W.fetch(form.action || d.location.href, { method:'POST', body: fd });
+                    var buf = await rr.arrayBuffer();
+                    var e = null;
+                    for (var w = 0; w < 25 && !e; w++) {
+                        await warte(200);
+                        for (var j = E.length - 1; j >= vorher; j--) if (E[j].k === 'req' && E[j].test && E[j].q === sx.q) { e = E[j]; break; }
+                    }
+                    var inhalt = '';
+                    if (e && e.erg === 'Excel' && window.XLSX) {
+                        try {
+                            var wb = window.XLSX.read(new Uint8Array(buf), { type:'array' }), ws = wb.Sheets[wb.SheetNames[0]];
+                            var st = datenStats(ws ? window.XLSX.utils.sheet_to_json(ws, { header:1 }) : []);
+                            inhalt = st.z + ' Zeilen, heute ' + st.h + ', Tage ' + st.tage + ', Spalten ' + st.kopf;
+                        } catch(x){ inhalt = 'nicht lesbar: ' + kurz(x && x.message, 60); }
+                    }
+                    zeilen.push(zeile + (e ? (e.erg === 'Excel' ? (inhalt || 'Excel') : e.erg + (e.info ? ' - ' + e.info : '')) + ' | gesendet ' + (e.dat || 'kein Datum') + ', Statistik ' + e.stat : 'nicht mitgeschnitten'));
+                    neu({ k:'test', text: zeilen[zeilen.length - 1] });
+                } catch(x){
+                    zeilen.push(zeile + 'Fehler ' + kurz(x && x.message, 80));
+                } finally { TEST = ''; }
+            }
+            zeilen.forEach(function(x){ sag('Test: ' + x); });
+            return zeilen;
+        }
+        function stop(still){
+            AKTIV = false;
+            TIMER.forEach(function(t){ clearInterval(t); });
+            TIMER = [];
+            HORCHER.forEach(function(h){ try { h[0].removeEventListener(h[1], h[2], h[3]); } catch(e){} });
+            HORCHER = [];
+            try { if (BEOBACHTER) BEOBACHTER.disconnect(); } catch(e){}
+            klemmeAb(window);
+            rahmenListe().forEach(function(r){ klemmeAb(r.W); });
+            try { if (window.processDataStream && window.processDataStream.__rcFluss) window.processDataStream = window.processDataStream.__roh; } catch(e){}
+            sichern(true);
+            if (window.rcFluss && window.rcFluss.stop === stop) window.rcFluss.aktiv = false;
+            if (!still) sag('Mitschnitt beendet (' + E.length + ' Eintraege bleiben gespeichert). Bericht weiterhin mit rcFluss.bericht().');
+        }
+        function leeren(){
+            E = []; LETZTE = {};
+            try { localStorage.removeItem(schluessel(BASIS)); } catch(e){}
+            return 'Flugschreiber geleert.';
+        }
+        // Fuer die Speicher-Notbremse des Dashboards: aeltere Haelfte weg, das
+        // Juengste bleibt — gerade bei vollem Speicher ist es das Wertvollste.
+        function kappen(){
+            var vorher = E.length;
+            E.splice(0, Math.floor(E.length / 2));
+            SPEICHER_AUS_BIS = 0; sichern(true);
+            return vorher - E.length;
+        }
+        function takt(){
+            if (!AKTIV) return;
+            TAKTE++;
+            try { lueckeTakt(); } catch(e){}
+            try { rahmenTakt(); } catch(e){}
+            try { klemmeAn(window, oben()); wicklePds(); } catch(e){}
+            try { logbuchTakt(); } catch(e){}
+            if (Date.now() - T0 > 15000) { try { zustandTakt(); } catch(e){} }
+            if (TAKTE % 5 === 0) puls();
+            if (TAKTE % 60 === 0) minuteTakt();
+            if (TAKTE % 900 === 0) messTakt();
+            if (TAKTE % 15 === 0) sichern(false);
+        }
+
+        // ---- Start ----
+        try {
+            var altE = JSON.parse(localStorage.getItem(schluessel(BASIS)) || '[]');
+            if (Array.isArray(altE) && altE.length) E = altE;
+        } catch(e){ E = []; }
+        var nav = '', seitAufbau = 0;
+        try { var ne = performance.getEntriesByType('navigation')[0]; if (ne) nav = ne.type; } catch(e){}
+        try { seitAufbau = Math.round(performance.now() / 1000); } catch(e){}
+        var vorher = '';
+        if (E.length) {
+            var le = E[E.length - 1], leZeit = le.bis || le.t;
+            var pz = 0; try { pz = parseInt(localStorage.getItem(schluessel(PULS)), 10) || 0; } catch(e){}
+            vorher = 'setzt Mitschnitt fort (' + E.length + ' Eintraege, letzter um ' + uhr(leZeit) + ')';
+            // Lebenszeichen: kam zwischen dem letzten Puls und jetzt KEIN "Seite wird
+            // verlassen", war die Seite abgestuerzt, eingefroren oder der Browser zu.
+            if (!uebernahme && le.k !== 'ende' && pz && Date.now() - pz > 30000)
+                neu({ k:'haenger', art:'Seite war weg', ms: Date.now() - pz,
+                      wo: 'letztes Lebenszeichen ' + uhr(pz) + ', dann nichts bis ' + uhr(Date.now()) + ' - Absturz, Einfrieren oder Browser geschlossen' });
+        }
+        neu({ k:'start', v: VERSION, pfad: pfad(location.href), nav: nav + (uebernahme ? ', Re-Inject' : ''), seitAufbau: seitAufbau, vorher: vorher });
+        klemmeAn(window, oben());
+        langStart();
+        horche(window, 'message', nachricht);
+        horche(document, 'visibilitychange', sicht);
+        horche(window, 'online', netz);
+        horche(window, 'offline', netz);
+        horche(document, 'click', klick, true);
+        horche(document, 'change', wechsel, true);
+        horche(window, 'pagehide', beiVerlassen);
+        puls();
+        takt();
+        TIMER.push(setInterval(takt, 1000));
+        window.rcFluss = { aktiv: true, bericht: bericht, jetzt: jetzt, test: test, stop: stop, leeren: leeren, kappen: kappen,
+                           ausgeben: sag, eintraege: function(){ return E; }, text: berichtText, version: VERSION };
+        sag('Flugschreiber ' + VERSION + ' laeuft' + (vorher ? ' - ' + vorher : '') + '. Bericht: Knopf "Logbuch" oder rcFluss.bericht().');
+    }
+    try { rcFlugschreiberStarten(); } catch(e){ try { rcLog.warn('Flugschreiber startet nicht: ' + (e && e.message)); } catch(e2){} }
 
     // ---- RC_WAR HUD-Sichtbarkeit: Text-Overlays einzeln schaltbar ----
     // Konsole:  rcWarHud.chronik = true;  rcWarHudApply();
@@ -373,7 +2073,7 @@
         tnps:  { min: 70,  label: 'TNPS ≥ 70 %' },
         dds:   { max: 5,   label: 'DDS ≤ 5,0 %' },
         fq:    { min: 30,  label: 'FQ ≥ 30 %' },
-        aq:    { min: 85,  label: 'AQ ≥ 85 %' },
+        ftf:   { min: 80,  label: 'FTF ≥ 80 %' },
         calls: { min: 40,  label: '≥ 40 Calls/Tag' },
         // Nacharbeit (ACW) und Haltezeit (ACHT) — dieselben Grenzen wie im
         // Warteschleifen-Zeitwaechter (CFG.zeitAcwSek 30 / zeitAchtSek 60), aber
@@ -756,6 +2456,7 @@
 
     function ingestKpi(kpi){
         if (!kpi || !kpi.ccsId) return;
+        window.rcKpiStand = (window.rcKpiStand || 0) + 1;   // Liga-Anker neu rechnen (rcLigaTeamStack)
         window.rcKpiData[kpi.ccsId] = kpi;
         if (kpi.agentName) window.rcKpiByName[window.rcNormName(kpi.agentName)] = kpi;
     }
@@ -799,9 +2500,101 @@
         const map = window.rcWcaMapping || {};
         const m = (map.ccsMap || {})[k.ccsId];
         const team = ((m && m.team) || k.team || '').toString().trim();
+        // Stack ueber die EINE Regel (05.10.): Mapping, sonst eindeutiger Anker.
+        // Vorher nur stackMap[team] — ein Liga-Agent ohne Mapping-Eintrag fiel
+        // unter jedem Stack-Filter aus Calls, Qualitaet und Quoten heraus,
+        // waehrend der Excel-Export ihn ueber den Anker mitzaehlte.
         return { std: normalizeStandort((m && m.standort) || k.standort), team,
-                 stack: team ? ((map.stackMap || {})[team] || '') : '' };
+                 stack: rcStackVonTeam(team) };
     };
+
+    // ============================================================
+    //  STACK-ZUORDNUNG — EINE Regel fuer Live, Excel und Mail (05.10.)
+    // ============================================================
+    //  Nutzer-Befund 05.10.: "Viele werden nicht angezeigt." An den drei
+    //  gleichzeitigen ESL-Exporten vom 28.09. gemessen: ohne Filter 457 von 457
+    //  Agenten, ueber die sechs Stack-Filter zusammen aber nur 360 im
+    //  Live-Dashboard und 390 in der Excel. Der Stack kam live allein aus der
+    //  Mitarbeiter-Excel (stackMap[team]); nur der Export kannte seit 09.09.
+    //  zusaetzlich den Anker. Dieselbe Groesse, zwei Regeln (Fallstrick 8).
+    //  Jetzt gilt UEBERALL:
+    //    1. Mapping (Mitarbeiter-Excel: Team -> Stack) gewinnt.
+    //    2. Sonst der EINDEUTIGE Anker: der Stack der gemappten Kollegen
+    //       derselben Liga-Team-Nummer bzw. desselben ESL-Rohteams.
+    //    3. Sonst kein Stack (''): der Agent zaehlt im Projekt und unter
+    //       "Alle Stacks", aber in keinem einzelnen Stack — und steht sichtbar
+    //       in der Liste "ohne Stack-Zuordnung" (window.rcOhneStack).
+    //  Geraten wird nicht: ein Team, dessen gemappte Kollegen auf zwei Stacks
+    //  verteilt sind, bekommt keinen Anker.
+
+    // Liga-Anker { Liga-Team-Nummer: Stack }. Gemerkt, bis sich Liga-Bestand
+    // oder Mapping aendern (ingestKpi zaehlt rcKpiStand hoch) — rcLigaMeta ruft
+    // das je Liga-Zeile, ohne Merken waere es je Zeile ein Lauf ueber alle Agenten.
+    function rcLigaTeamStack(){
+        const map = window.rcWcaMapping, kd = window.rcKpiData || {};
+        const c = rcLigaTeamStack._c;
+        if (c && c.kd === kd && c.map === map && c.sm === (map && map.stackMap) && c.stand === window.rcKpiStand) return c.wert;
+        const ccsMap = (map && map.ccsMap) || {}, sm = (map && map.stackMap) || {}, tmp = {}, wert = {};
+        Object.keys(kd).forEach(function(id){
+            const k = kd[id]; if (!k) return;
+            const t = ((k.team || '') + '').trim(); if (!t) return;
+            const mm = ccsMap[k.ccsId];
+            const st = (mm && mm.team) ? (sm[mm.team] || '') : '';
+            if (st) (tmp[t] || (tmp[t] = new Set())).add(st);
+        });
+        Object.keys(tmp).forEach(function(t){ if (tmp[t].size === 1) wert[t] = Array.from(tmp[t])[0]; });
+        rcLigaTeamStack._c = { kd: kd, map: map, sm: (map && map.stackMap), stand: window.rcKpiStand, wert: wert };
+        return wert;
+    }
+    // Die Regel als Funktion (Team -> Stack) mit festgehaltenem Stand — fuer
+    // Schleifen einmal holen. regel.nurAnker(team): Stack nur ueber den Anker?
+    function rcStackRegel(){
+        const sm = (window.rcWcaMapping && window.rcWcaMapping.stackMap) || {};
+        const liga = rcLigaTeamStack(), roh = window.rcRohTeamStack || {};
+        const norm = function(team){ return (team == null ? '' : String(team)).trim(); };
+        // Mapping gewinnt immer; die Anker greifen nur, wo es schweigt.
+        const regel = function(team){ const t = norm(team); return t ? (sm[t] || liga[t] || roh[t] || '') : ''; };
+        regel.nurAnker = function(team){ const t = norm(team); return !!t && !sm[t] && !!(liga[t] || roh[t]); };
+        return regel;
+    }
+    function rcStackVonTeam(team){ return rcStackRegel()(team); }
+    window.rcStackVonTeam = rcStackVonTeam;
+    // Fuer Prueffaelle, die rcKpiData/Mapping an Ort und Stelle aendern.
+    window.rcStackAnkerNeu = function(){ rcLigaTeamStack._c = null; };
+
+    // Stack-Filter-Werte: 'ALL' · ein Stack-Name · 'P:<projekt>' = das GANZE
+    // ESL-Projekt. Das Projekt einer Zeile steht in der Lieferung (jeder Export
+    // gehoert zu Kabel, Mobile oder UM) und braucht kein Mapping — damit ist
+    // "Kabel gesamt" vollstaendig, auch wenn ein Agent in der Excel fehlt.
+    function rcIstProjektFilter(f){ return typeof f === 'string' && f.slice(0, 2) === 'P:'; }
+    function rcProjektVonTeam(team){
+        const t = (team == null ? '' : String(team)).trim();
+        return t ? ((window.rcTeamProjekt || {})[t] || '') : '';
+    }
+    function rcProjektVonAgent(id){
+        const k = (id == null ? '' : String(id)).trim();
+        return k ? ((window.rcVoProjekt || {})[k] || '') : '';
+    }
+    // Passt ein Team (und damit jeder Agent darin) zum Stack-Filter? Der EINE
+    // Vergleich fuer alle Stellen. projekt: das Projekt aus der Lieferung, wenn
+    // der Aufrufer es kennt (Agent mit ESL-Zeilen) — es schlaegt das Mapping.
+    function rcStackFilterPasst(team, filter, projekt){
+        if (!filter || filter === 'ALL') return true;
+        const st = rcStackVonTeam(team);
+        if (!rcIstProjektFilter(filter)) return !!st && st === filter;
+        return (projekt || (st ? rcProjektVonStack(st) : rcProjektVonTeam(team))) === filter.slice(2);
+    }
+    window.rcStackFilterPasst = rcStackFilterPasst;
+    // Lesbarer Name eines Filterwerts ('P:kabel' -> "Kabel gesamt") und eines
+    // Stacks in Blaettern ('' -> "ohne Stack-Zuordnung").
+    function rcStackFilterText(f){
+        if (!f || f === 'ALL') return '';
+        if (!rcIstProjektFilter(f)) return f;
+        const p = rcProjEintrag(f.slice(2));
+        return (p ? p.name : f.slice(2)) + ' gesamt';
+    }
+    window.rcStackFilterText = rcStackFilterText;
+    function rcStackName(s){ return s ? String(s) : 'ohne Stack-Zuordnung'; }
 
     // Aktiver Dashboard-Scope (Standort + Team + Stack) — an EINER Stelle gelesen.
     window.rcActiveScope = function(){
@@ -820,8 +2613,10 @@
         const meta = window.rcLigaMeta(k);
         if (sc.std   !== 'ALL' && meta.std  !== sc.std)  return false;
         if (sc.team  !== 'ALL' && meta.team !== sc.team) return false;
-        // ohne Team-Zuordnung nicht dem Stack zurechenbar
-        if (sc.stack !== 'ALL' && (!meta.team || meta.stack !== sc.stack)) return false;
+        // Ohne Team-Zuordnung nicht dem Stack zurechenbar. Der Projekt-Filter
+        // ('P:kabel') nimmt zusaetzlich jeden, dessen ESL-Zeilen aus diesem
+        // Projekt kamen — auch ohne Mapping-Eintrag.
+        if (sc.stack !== 'ALL' && !rcStackFilterPasst(meta.team, sc.stack, rcProjektVonAgent(k.ccsId))) return false;
         return true;
     };
 
@@ -864,10 +2659,14 @@
         try {
             const keys = Object.keys(cur).sort();
             keys.slice(0, Math.max(0, keys.length - 40)).forEach(k => delete cur[k]);
-            localStorage.setItem(rcKey('rcLigaHistDash'), JSON.stringify(cur));
+            // Datendienst: rcLigaHistory ist dort die Vereinigung aller drei Projekte —
+            // im Kabel-Schluessel abgelegt, zaehlte die naechste Vereinigung Mobile/UM
+            // doppelt. Vortage legt im Dienst-Betrieb nur rcDienstHistorieAblegen ab.
+            if (!rcDienstModus()) localStorage.setItem(rcKey('rcLigaHistDash'), JSON.stringify(cur));
         } catch(e){}
     }
-    try { window.rcLigaHistory = Object.assign(JSON.parse(localStorage.getItem(rcKey('rcLigaHistDash')) || '{}'), window.rcLigaHistory || {}); } catch(e){}
+    // Datendienst (27.10.): die Vortage aller drei Projekte, je Tag vereint.
+    try { window.rcLigaHistory = rcDienstModus() ? rcHistorieVereint('rcLigaHistDash') : Object.assign(JSON.parse(localStorage.getItem(rcKey('rcLigaHistDash')) || '{}'), window.rcLigaHistory || {}); } catch(e){}
 
     // Gemeinsamer Handler fuer alle Kanaele (BroadcastChannel same-origin + postMessage cross-origin)
     // Eigenes Projekt in der Schreibweise der Crawler-Pakete ('kabel'/'mobile'/'um').
@@ -886,7 +2685,10 @@
         // Pakete OHNE Kennung (aelterer Crawler, von Hand geoeffneter Tab)
         // werden weiter angenommen — sonst stuende nach einem Teil-Update ein
         // Dashboard komplett ohne Daten da.
-        if (d.projekt && d.projekt !== rcEigenesProjekt()) return false;
+        // Ausnahme Alle-Projekte-Betrieb (27.09.): EIN Dashboard fuer alle drei
+        // Projekte, EINE Ligaliste (Nutzer: "die von jedem Stack auf einmal") —
+        // jedes Paket gehoert hierher, gleich welche Vorlage geladen ist.
+        if (d.projekt && d.projekt !== rcEigenesProjekt() && !window.rcAlleProjekteModus) return false;
         // Der Crawler meldet einen Sitzungsverlust der Ligaliste. Er laedt seine
         // Seite selbst neu; hier wird die Stoerung nur festgehalten, damit der
         // Quellen-Waechter sie sofort sichtbar macht statt erst nach 20 Minuten.
@@ -907,6 +2709,23 @@
         if (d.type === 'RC_LIVE_NOW_DONE') {
             rcLog.log('Sofort-Aktualisierung der Ligaliste: ' + (d.ok ? d.agenten + ' Agenten' : 'fehlgeschlagen — ' + d.error));
             if (window.rcLiveNowDone) window.rcLiveNowDone(d);
+            return true;
+        }
+        // Klartext-Zeile des Crawlers (05.10.): "Tab war 13 Min eingefroren",
+        // "Takt stand still", "Wachhalter nicht moeglich". Bis dahin stand so
+        // etwas nur in der Konsole des Ligalisten-Tabs, die im Betrieb niemand
+        // sieht. Nur Text ins Logbuch — gekuerzt, nie ausgefuehrt. Dieselbe
+        // Zeile kommt ueber zwei Kanaele an: einmal zaehlt. Und derselbe Text
+        // zaehlt FUENF MINUTEN lang nur einmal: steht der Ligalisten-Tab auf der
+        // Fehlerseite des Browsers, meldet der Autopilot das bei jedem Neuversuch
+        // (alle 20 s) — der Ringpuffer waere nach zwei Stunden nur noch diese Zeile.
+        if (d.type === 'KPI_HINWEIS') {
+            const txt = String(d.text == null ? '' : d.text).slice(0, 300);
+            if (!txt) return true;
+            const alt = window.rcLigaHinweis;
+            if (alt && alt.text === txt && Math.abs((d.zeit || 0) - (alt.roh || 0)) < 300000) return true;
+            window.rcLigaHinweis = { text: txt, zeit: Date.now(), roh: d.zeit || 0 };
+            rcLog.warn(txt);
             return true;
         }
         if (d.type === 'KPI_BATCH' && Array.isArray(d.payload)) {
@@ -935,7 +2754,9 @@
             }
             else if (!window._rcWarnedLiveDr) {
                 window._rcWarnedLiveDr = true;
-                rcLog.warn('Ligaliste steht auf "' + drL + '" — Zeilen nicht als LIVE uebernommen (Historie schon). Auf der Ligaliste "Intraday" + Ok waehlen.');
+                // Kein Handgriff mehr noetig (05.10.): der Crawler holt nach einem
+                // Ok-Klick mit anderem Zeitraum den Intraday-Stand selbst nach.
+                rcLog.warn('Ligaliste steht auf "' + drL + '" — Zeilen nicht als LIVE uebernommen (Historie schon). Der Crawler holt den Intraday-Stand gleich selbst nach, nichts umzustellen.');
             }
             // Crawler v3 liefert zusaetzlich die Liga-Tageshistorie (Snapshots je Tag)
             if (d.history && typeof d.history === 'object') rcMergeLigaHistory(d.history);
@@ -1009,7 +2830,21 @@
         // Typ in der Whitelist wurde die Antwort verworfen und der Knopf lief
         // JEDES MAL in den 45-s-Timeout ("Ligaliste hat nicht geantwortet"),
         // obwohl die Daten als KPI_BATCH laengst eingelaufen waren.
-        if (d && (d.type === 'KPI_BATCH' || d.type === 'KPI_UPDATE' || d.type === 'RC_HARVEST_RANGE_DONE' || d.type === 'RC_LIVE_NOW_DONE')) {
+        // KPI_QUELLE_TOT fehlte hier seit dem 08.08. (gefunden 05.10.): der Crawler
+        // meldet damit "Sitzung der Ligaliste abgelaufen", handleKpiMessage
+        // behandelt den Typ — aber dieses Tor liess ihn nie durch. Dieselbe
+        // Zwei-Listen-Falle wie bei RC_LIVE_NOW_DONE.
+        if (d && (d.type === 'KPI_BATCH' || d.type === 'KPI_UPDATE' || d.type === 'RC_HARVEST_RANGE_DONE' || d.type === 'RC_LIVE_NOW_DONE' || d.type === 'KPI_HINWEIS' || d.type === 'KPI_QUELLE_TOT')) {
+            // Der Absender IST das Ligalisten-Fenster (05.10.). Nach einem Neuladen
+            // des Dashboards liefert die Ligaliste ueber ihren opener weiter, aber
+            // rcKpiWin war leer — "Jetzt" meldete "nicht verbunden" und jede Stufe
+            // des Watchdogs "(nicht ausfuehrbar)" (Logbuch 29.09.). Die Antwort-
+            // adresse steht auf dem Umschlag: uebernehmen statt neu suchen.
+            try {
+                let offen = false;
+                try { offen = !!(window.rcKpiWin && !window.rcKpiWin.closed); } catch(e){}
+                if (!offen && d.type === 'KPI_BATCH' && event.source && event.source !== window) window.rcKpiWin = event.source;
+            } catch(e){}
             handleKpiMessage(d);
             try { rcKpiChannel.postMessage(d); } catch(e){}
         }
@@ -1042,6 +2877,8 @@
     // Konsole: rcUeberStartSeite = true erzwingt wieder den Umweg.
     window.rcUeberStartSeite = false;
     window.rcOpenKpiQuelle = function(){
+        // Datendienst: kein Fenster aus dieser Seite — die Ligaliste betreut der Dienst.
+        if (rcDienstModus()) { if (window.rcToast) window.rcToast('Die Ligaliste holt der Datendienst.', 5000); return false; }
         try { if (window.rcKpiWin && !window.rcKpiWin.closed) { window.rcKpiWin.focus(); return true; } } catch(e){}
         // Fenstername ueber rcKey PROJEKTSPEZIFISCH (05.08.): 'rcKpiQuelle',
         // 'rcKpiQuelle_mob', 'rcKpiQuelle_um'. Zwei Wirkungen, beide noetig:
@@ -1053,7 +2890,29 @@
         //     (kpi_crawler.js projektAusName): tab-eigen, reload-fest, ohne
         //     neuen Kommando-Kanal. Kabel behaelt den Namen OHNE Zusatz — wie
         //     bei allen rcKey-Schluesseln, sonst waere der Bestand weg.
-        window.rcKpiWin = window.open(window.rcUeberStartSeite ? window.RC_CCS_START : window.RC_LIGA_URL, rcKey('rcKpiQuelle'));
+        // Laeuft die Ligaliste schon (Dashboard in derselben Seite neu aufgebaut)?
+        // window.open('', name) holt das bestehende Fenster, OHNE es neu zu laden;
+        // window.open(url, name) lud es neu — Nutzer 27.09.: "startet neu, obwohl
+        // der laeuft". Fremde Adresse (ccs.vodafone.de) = Ligaliste laeuft:
+        // verbinden und sofort eine Lieferung anfordern. Leeres Fenster = gab es
+        // noch nicht: jetzt erst hinnavigieren.
+        const kpiName = rcKey('rcKpiQuelle');
+        const kpiUrl = window.rcUeberStartSeite ? window.RC_CCS_START : window.RC_LIGA_URL;
+        let w = null;
+        try { w = window.open('', kpiName); } catch(e){}
+        if (w) {
+            let laeuft = false;
+            try { laeuft = w.location.href !== 'about:blank'; } catch(e){ laeuft = true; }   // cross-origin = Ligaliste
+            window.rcKpiWin = w;
+            if (laeuft) {
+                try { w.postMessage({ type:'RC_LIVE_NOW' }, '*'); } catch(e){}
+                rcLog.log('KPI-Quelle laeuft schon — neu verbunden, nicht neu geladen (Lieferung angefordert).');
+                return true;
+            }
+            try { w.location.href = kpiUrl; } catch(e){ window.rcKpiWin = window.open(kpiUrl, kpiName); }
+        } else {
+            window.rcKpiWin = null;
+        }
         if (!window.rcKpiWin) {
             rcLog.warn('KPI-Quelle: Popup wurde blockiert — oeffnet beim naechsten Klick ins Fenster automatisch.');
             rcKpiRetryBeiGeste();
@@ -1093,6 +2952,7 @@
     // $LigaSelbstOeffnen ueberschreibt den Wert weiterhin einmal je Aufbau.
     window.rcAutoKpiOff = (function(){ try{ return localStorage.getItem('rcLigaOeffnenAus')==='1'; }catch(e){ return false; } })();
     function rcAutoKpiQuelle(){
+        if (rcDienstModus()) return;                  // Datendienst: die Ligaliste betreut der Dienst
         setTimeout(() => {
             if (window.rcAutoKpiOff) return;
             if (Object.keys(window.rcKpiData || {}).length) return;     // Crawler funkt schon
@@ -1118,6 +2978,26 @@
                               && Object.keys(window.rcWcaMapping.ccsMap).length);
         let b64 = null;
         try { b64 = (window.__rcFiles && window.__rcFiles.mapping) || null; } catch(e){}
+        // Datendienst (27.10., Ruling R14): die Excel des Dienstes gilt bei JEDEM Start,
+        // wenn sie sich von der gesicherten unterscheidet (rcWcaMappingXlsx, dieselbe
+        // Base64-Form wie beim Ziehen auf die Mapping-Flaeche). Sonst liesse das
+        // gespeicherte Mapping den Import unten aussteigen, und eine geaenderte
+        // Mitarbeiter-Excel kaeme ab dem zweiten Start nie an. Gleich -> wie bisher.
+        if (b64 && rcDienstModus()) {
+            let gesichert = null;
+            try { gesichert = localStorage.getItem('rcWcaMappingXlsx'); } catch(e){}
+            if (gesichert !== b64) {
+                const vorher = window.rcWcaMapping;
+                try { verarbeiteMappingExcel(rcB64ZuBuffer(b64)); } catch(e){ rcLog.error('Mapping vom Datendienst nicht lesbar:', e); }
+                // Nur ein gelungener Import wird gesichert — sonst versucht es der naechste Start erneut.
+                if (window.rcWcaMapping !== vorher && window.rcWcaMapping && Object.keys(window.rcWcaMapping.ccsMap || {}).length) {
+                    try { localStorage.setItem('rcWcaMappingXlsx', b64); }
+                    catch(e){ rcLog.warn('Mapping-Excel konnte nicht gesichert werden (' + e.message + ') — der naechste Start liest sie erneut ein.'); }
+                    rcLog.log('Mitarbeiter-Mapping vom Datendienst uebernommen (Excel neu oder geaendert).');
+                }
+                return;
+            }
+        }
         if (!b64) { try { b64 = localStorage.getItem('rcWcaMappingXlsx'); } catch(e){} }
         if (!b64) {
             if (!hatMapping) rcLog.warn('Kein Mitarbeiter-Mapping vorhanden — bitte die Excel einmal auf die Mapping-Flaeche ziehen (danach merkt sich das Dashboard sie).');
@@ -1229,11 +3109,36 @@
            Kompaktiert 30.07.: die Leiste lief bei 1920 px um 347 px ueber (gemessen),
            bei 120 % Zoom war die rechte Haelfte gar nicht mehr erreichbar. Deshalb
            kleinere Innenabstaende, ein einziges Werkzeug-Menue statt sieben
-           Einzelknoepfen und schmalere Filter-Auswahlen. */
+           Einzelknoepfen und schmalere Filter-Auswahlen.
+           05.10.: DREI Bereiche statt zwei — Marke (fest) · Info (nimmt den Rest und
+           kuerzt mit "…") · Bedienung (rechtsbuendig). Nutzer-Befund: der neue Zaehler
+           "ohne Stack" schob das Werkzeug-Menue aus dem Bild, und jeder Filterklick
+           verschob alle Knoepfe. Deshalb drei Regeln:
+           1. Laeuft die Bedienung ueber, wird sie LINKS beschnitten — Menue und
+              Schliessen am rechten Rand bleiben immer erreichbar.
+           2. Vorher blendet rcKopfEinpassen nach Rangfolge ganze Elemente aus
+              (.rc-eng1 … .rc-eng4), statt halbe stehen zu lassen.
+           3. Nichts, was erscheint oder seinen Text wechselt, verschiebt ein anderes
+              Bedienelement: feste Breiten, reservierter Platz, Zaehler ganz links. */
         .rc-header{height:52px; background:var(--vf-surface); border-bottom:1px solid var(--vf-line);
-            display:flex; justify-content:space-between; align-items:center; padding:0 13px; flex-shrink:0; position:relative; gap:10px;}
+            display:flex; align-items:center; padding:0 13px; flex-shrink:0; position:relative; gap:10px;}
         .rc-header::after{content:''; position:absolute; left:0; right:0; top:0; height:3px; background:var(--vf-red);}
-        .rc-header-brand{display:flex; align-items:center; gap:9px; min-width:0;}
+        .rc-header-brand{display:flex; align-items:center; gap:9px; flex:0 0 auto;}
+        .rc-header-info{display:flex; align-items:center; gap:9px; flex:1 1 0; min-width:0; overflow:hidden; white-space:nowrap;}
+        .rc-header-info > span{flex:0 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis;}
+        .rc-header-info > #rcFetchStatus{flex-shrink:1000;}
+        .rc-header-ctl{display:flex; align-items:center; justify-content:flex-end; gap:14px; flex:0 1 auto; min-width:0;
+            overflow-x:clip; overflow-y:visible;}
+        .rc-header-ctl > *{flex:0 0 auto;}
+        /* "Auto" wird zu "Auto AN": feste Mindestbreite, sonst ruecken die Knoepfe links davon. */
+        .rc-header-ctl #rcBtnAutoRot{min-width:60px; text-align:center;}
+        .rc-header.rc-eng1 .rc-header-ctl{gap:10px;}
+        .rc-header.rc-eng1 .rc-live-pill, .rc-header.rc-eng1 .rc-flt-ohne span{display:none;}
+        .rc-header.rc-eng2 .rc-clock, .rc-header.rc-eng2 #rcBtnAutoRotQuali{display:none;}
+        .rc-header.rc-eng2 .rc-filtergroup .rc-flt{width:92px;}
+        .rc-header.rc-eng2 .rc-page-btn, .rc-header.rc-eng2 .rc-proj-btn{padding:5px 7px;}
+        .rc-header.rc-eng3 .rc-arena-tag, .rc-header.rc-eng3 #rcBtnAutoRot{display:none;}
+        .rc-header.rc-eng4 .rc-quellen{display:none;}
         /* Datenstand beider Quellen — dauerhaft sichtbar, nicht nur im Tooltip.
            Auf einem Wandmonitor ist "wie alt sind diese Zahlen" die erste Frage,
            wenn etwas nicht stimmt. */
@@ -1241,7 +3146,7 @@
             padding:3px 9px; border-radius:7px; background:#181818; border:1px solid #2A2A2A;}
         .rc-quellen div{display:flex; align-items:center; gap:6px; white-space:nowrap;}
         .rc-quellen .q{color:#7A7A7A; font-weight:700; letter-spacing:.6px; min-width:26px;}
-        .rc-quellen b{color:#D8D8D8; font-weight:700; font-variant-numeric:tabular-nums;}
+        .rc-quellen b{color:#D8D8D8; font-weight:700; font-variant-numeric:tabular-nums; display:inline-block; min-width:78px;}
         .rc-quellen b.warn{color:#EB9700;}
         .rc-quellen b.tot{color:#FF6666;}
         /* Markenschriftzug: von 19 auf 22 px und der 9-px-Untertitel raus.
@@ -1268,6 +3173,16 @@
             transition:background 0.2s cubic-bezier(0.22,1,0.36,1), color 0.2s;}
         .rc-page-btn:hover{color:var(--vf-ink);}
         .rc-page-btn.active{background:var(--vf-red); color:#fff;}
+        /* Projekt nach Wahl (28.09.): aktiv = Rot wie die Seitenwahl. Amber-Unterkante =
+           Stand fehlt oder ist aelter als 15 Min; waehrend des Umstellens pulsiert der Knopf. */
+        .rc-projwahl{display:flex; background:#2A2A2A; border-radius:9999px; padding:2px; gap:1px;}
+        .rc-proj-btn{background:transparent; border:none; color:var(--vf-abbey); font-family:var(--vf-font);
+            font-weight:700; font-size:11.5px; padding:5px 10px; cursor:pointer; border-radius:9999px; white-space:nowrap;
+            box-shadow:inset 0 -2px 0 transparent;}
+        .rc-proj-btn:hover{color:var(--vf-ink);}
+        .rc-proj-btn.on{background:var(--vf-red); color:#fff;}
+        .rc-proj-btn.alt{box-shadow:inset 0 -2px 0 #EB9700;}
+        .rc-proj-btn.lauf{animation:rc-pulse 1s ease-in-out infinite;}
         .rc-btn-on{background:var(--vf-red) !important; color:#fff !important; border-color:var(--vf-red) !important;}
         /* Liga-Zahlen sind zu alt — Amber, nicht Rot: es ist ein Hinweis, kein Ausfall. */
         .rc-btn-warn{border-color:#EB9700 !important; color:#EB9700 !important;}
@@ -1279,7 +3194,7 @@
            fuer drei Auswahlfelder. Der volle Name steht weiter im Aufklapp-Menue. */
         .rc-filtergroup{display:flex; align-items:center; gap:4px; padding:3px 4px; border-radius:8px;
             background:rgba(230,0,0,0.05); border:1px solid var(--vf-line);}
-        .rc-filtergroup .rc-flt{max-width:112px; text-overflow:ellipsis;}
+        .rc-filtergroup .rc-flt{width:112px; text-overflow:ellipsis;}
         .rc-flt-lbl{display:none;}
         .rc-flt.rc-flt-on{border-color:var(--vf-red,#E60000); border-width:2px; background:rgba(230,0,0,0.09);
             color:var(--vf-red,#E60000); font-weight:700;}
@@ -1287,6 +3202,12 @@
         .rc-flt-reset{border:none; background:var(--vf-red,#E60000); color:#fff; width:22px; height:22px;
             border-radius:9999px; cursor:pointer; font-size:12px; line-height:1; font-weight:700;}
         .rc-flt-reset:hover{filter:brightness(1.15);}
+        /* Zaehler "ohne Stack-Zuordnung" (05.10.): Amber = Hinweis, kein Fehler.
+           Steht als ERSTES Element der Bedienung (ganz links): dort verschiebt sein
+           Erscheinen nichts. Im Filterblock schob er alle Knoepfe links davon. */
+        .rc-flt-ohne{border:1px solid #EB9700; background:rgba(235,151,0,0.14); color:#FFC14D; height:22px; padding:0 8px;
+            border-radius:9999px; cursor:pointer; font-family:var(--vf-font); font-size:10.5px; font-weight:700; white-space:nowrap;}
+        .rc-flt-ohne:hover{filter:brightness(1.2);}
         .rc-btn{padding:6px 11px; border:none; border-radius:9999px; font-family:var(--vf-font); font-weight:700;
             font-size:11.5px; cursor:pointer; color:#fff; white-space:nowrap;
             transition:background 0.2s, color 0.2s, border-color 0.2s;}
@@ -2083,10 +4004,13 @@
                 ${vfLogoSvg}
                 <span class="rc-arena-tag">veyse<em>LL</em><small>Vodafone Sales-Cockpit &middot; regiocom</small></span>
                 <span class="rc-live-pill"><span class="rc-live-dot"></span>LIVE</span>
+            </div>
+            <div class="rc-header-info">
                 <span id="rcFetchStatus" style="font-size:11px; color:#9C9C9C;">— warte auf Abruf</span>
                 <span id="rcLastSale" class="rc-lastsale"></span>
             </div>
-            <div style="display:flex; align-items:center; gap:14px;">
+            <div class="rc-header-ctl">
+                <button class="rc-flt-ohne" id="rcOhneStackChip" style="display:none;"></button>
                 <div class="rc-quellen" id="rcQuellenZeit" title="Wann ESL und Ligaliste zuletzt Daten geliefert haben">
                     <div><span class="q">ESL</span><b id="rcZeitEsl">—</b></div>
                     <div><span class="q">Liga</span><b id="rcZeitLiga">—</b></div>
@@ -2098,7 +4022,12 @@
                     <button class="rc-page-btn" id="rcPageRadar" data-page="radar">Radar</button>
                     <button class="rc-page-btn" id="rcPageCockpit" data-page="cockpit">Steuerung</button>
                 </div>
-                <button class="rc-btn rc-btn-ghost" id="rcBtnJetzt" title="Ligaliste und ESL sofort neu holen, ohne auf den Takt zu warten">Jetzt</button>
+                <div class="rc-projwahl" id="rcProjWahl" style="display:none;" title="ESL-Projekt: das aktive wird alle 20 s aktualisiert, die anderen beim Umschalten">
+                    <button class="rc-proj-btn" data-rc-proj="kabel">Kabel</button>
+                    <button class="rc-proj-btn" data-rc-proj="mobile">Mobile</button>
+                    <button class="rc-proj-btn" data-rc-proj="um">UM</button>
+                </div>
+                <button class="rc-btn rc-btn-ghost" id="rcBtnJetzt" title="Ligaliste und ESL (aktives Projekt) sofort neu holen, ohne auf den Takt zu warten">Jetzt</button>
                 <button class="rc-btn rc-btn-ghost" id="rcBtnAutoRot" title="Automatisch alle 60 s zwischen den Seiten wechseln (fuer die Wandmonitore)">Auto</button>
                 <button class="rc-btn rc-btn-ghost" id="rcBtnAutoRotQuali" title="Qualität zusätzlich in den Auto-Wechsel aufnehmen">+Q</button>
                 <div class="rc-filtergroup" title="Ansicht filtern: Standort · Stack (Abteilung, z. B. VKD_Tech) · Team">
@@ -2106,7 +4035,7 @@
                     <select id="rcStandortFilter" class="rc-select rc-flt" title="Standort waehlen">${standortOptions}</select>
                     <select id="rcStackFilter" class="rc-select rc-flt" title="Stack / Abteilung (z. B. VKD_Tech) — grenzt die Liga-Calls auf die Verkaufsteams ein"><option value="ALL">Alle Stacks</option></select>
                     <select id="rcTeamFilter" class="rc-select rc-flt" title="Team (erst Standort waehlen)"><option value="ALL">Alle Teams</option></select>
-                    <button class="rc-flt-reset" id="rcFltReset" title="Alle Filter zuruecksetzen" style="display:none;">&#10005;</button>
+                    <button class="rc-flt-reset" id="rcFltReset" title="Alle Filter zuruecksetzen" style="visibility:hidden;">&#10005;</button>
                 </div>
                 <div class="rc-tools">
                     <button class="rc-btn rc-btn-ghost" id="rcToolsBtn" title="Werkzeuge: Vergleich, Zeitraum, KPI-Quelle, Mapping, Einstellungen, Zoom" aria-haspopup="true" aria-expanded="false" style="font-size:15px; line-height:1; padding:6px 10px;">&#9776;</button>
@@ -2119,7 +4048,7 @@
                         <button class="rc-btn rc-btn-ghost" id="rcBtnZiele" title="Vertriebsziele je Standort, Team, Stack und Mitarbeiter setzen (Stueck pro Tag)">Ziele</button>
                         <button class="rc-btn rc-btn-ghost" id="rcCfgBtn" title="Konfigurator: Seiten, Module, Kriegsfeld-Texte, Info-Seite">Einstellungen</button>
                         <button class="rc-btn rc-btn-ghost" id="rcBtnTest">Test</button>
-                        <button class="rc-btn rc-btn-ghost" id="rcBtnLogbuch" title="Logbuch als Textdatei herunterladen: Zustand aller Waechter plus Verlauf der letzten Warnungen. Diese Datei bei Stoerungen weitergeben.">Logbuch</button>
+                        <button class="rc-btn rc-btn-ghost" id="rcBtnLogbuch" title="Logbuch als Textdatei herunterladen: Zustand aller Waechter, Flugschreiber (jeder Abruf, Fehler, Haenger) und Verlauf der Warnungen. Diese Datei bei Stoerungen weitergeben.">Logbuch</button>
                         <div class="rc-tools-trenner"></div>
                         <div class="rc-zoomctl" title="Fernsicht: Anzeige vergroessern, wenn der Monitor hoch/weit haengt (Strg + / Strg - / Strg 0)">
                             <button class="rc-zoom-btn" id="rcZoomOut" title="Kleiner (Strg -)">&#8722;</button>
@@ -2262,16 +4191,17 @@
         <!-- ===================== SEITE 2: QUALITÄT ===================== -->
         <div class="rc-quali" id="rcPageQualiContent" style="display:none;">
             <div class="rc-quali-strip">
-                <div class="rc-kpi"><div class="rc-kpi-l">Ø CS · Ziel ≥ 90 %<span id="qLigaStand" style="float:right; font-size:10px; color:#9C9C9C; font-weight:400;"></span></div><div class="rc-kpi-v" id="qKpiCs">—</div></div>
-                <div class="rc-kpi"><div class="rc-kpi-l">Ø TNPS · Ziel ≥ 70 %</div><div class="rc-kpi-v" id="qKpiTnps">—</div></div>
-                <div class="rc-kpi"><div class="rc-kpi-l">Ø AQ · Ziel ≥ 85 %</div><div class="rc-kpi-v" id="qKpiAufleger">—</div></div>
-                <div class="rc-kpi"><div class="rc-kpi-l">Ø FQ · Ziel ≥ 30 %</div><div class="rc-kpi-v" id="qKpiFq">—</div></div>
-                <div class="rc-kpi"><div class="rc-kpi-l">Ø AHT · Ziel ≤ 13 Min</div><div class="rc-kpi-v" id="qKpiAht">—</div></div>
-                <div class="rc-kpi"><div class="rc-kpi-l">Ø ACW · Ziel ≤ 60 s</div><div class="rc-kpi-v" id="qKpiAcw">—</div></div>
-                <div class="rc-kpi"><div class="rc-kpi-l">Ø ACHT · Ziel ≤ 60 s</div><div class="rc-kpi-v" id="qKpiAcht">—</div></div>
-                <div class="rc-kpi orange"><div class="rc-kpi-l">Detraktoren heute</div><div class="rc-kpi-v" id="qKpiDet">—</div></div>
-                <div class="rc-kpi orange"><div class="rc-kpi-l">FF7-Risiko unter 8 Min</div><div class="rc-kpi-v" id="qKpiKurz">—</div></div>
-                <div class="rc-kpi orange"><div class="rc-kpi-l">Nicht-Tracker</div><div class="rc-kpi-v" id="qKpiNonTrack">—</div></div>
+                <div class="rc-kpi" title="Calls (Summe der Liga-Calls im Filter)"><div class="rc-kpi-l">Calls<span id="qLigaStand" style="float:right; font-size:10px; color:#9C9C9C; font-weight:400;"></span></div><div class="rc-kpi-v" id="qKpiCalls">—</div></div>
+                <div class="rc-kpi"><div class="rc-kpi-l">Ø ACW ≤ 60 s</div><div class="rc-kpi-v" id="qKpiAcw">—</div></div>
+                <div class="rc-kpi" title="Ø AHT — Ziel ≤ 13 Min"><div class="rc-kpi-l">Ø AHT ≤ 13 Min</div><div class="rc-kpi-v" id="qKpiAht">—</div></div>
+                <div class="rc-kpi"><div class="rc-kpi-l">Ø ACHT ≤ 60 s</div><div class="rc-kpi-v" id="qKpiAcht">—</div></div>
+                <div class="rc-kpi" title="Ø CS — Ziel ≥ 90 %"><div class="rc-kpi-l">Ø CS ≥ 90 %</div><div class="rc-kpi-v" id="qKpiCs">—</div></div>
+                <div class="rc-kpi" title="CS Deep Detractor % — Ziel ≤ 5 %"><div class="rc-kpi-l">CS DDS ≤ 5 %</div><div class="rc-kpi-v" id="qKpiCsDds">—</div></div>
+                <div class="rc-kpi" title="Ø TNPS — Ziel ≥ 70 %"><div class="rc-kpi-l">Ø TNPS ≥ 70 %</div><div class="rc-kpi-v" id="qKpiTnps">—</div></div>
+                <div class="rc-kpi" title="TNPS Antwortquote % (die Ligaliste liefert sie nur, wenn sie im Portal angehakt ist)"><div class="rc-kpi-l">TNPS Antw.-Quote</div><div class="rc-kpi-v" id="qKpiTnpsAq">—</div></div>
+                <div class="rc-kpi" title="TNPS Deep Detractor % — Ziel ≤ 5 %"><div class="rc-kpi-l">TNPS DDS ≤ 5 %</div><div class="rc-kpi-v" id="qKpiDds">—</div></div>
+                <div class="rc-kpi" title="First-Time-Fix — Ziel ≥ 80 %"><div class="rc-kpi-l">FTF ≥ 80 %</div><div class="rc-kpi-v" id="qKpiFtf">—</div></div>
+                <div class="rc-kpi" title="Ø FQ — TNPS-Antworten je Call, Ziel ≥ 30 %"><div class="rc-kpi-l">Ø FQ ≥ 30 %</div><div class="rc-kpi-v" id="qKpiFq">—</div></div>
             </div>
             <div class="rc-quali-grid">
                 <!-- LINKS: Standort-Chart + rotierende Rangliste -->
@@ -2302,7 +4232,6 @@
                             <button class="rc-btn-tab" id="qSortCs">CS</button>
                             <button class="rc-btn-tab" id="qSortTnps">TNPS</button>
                             <button class="rc-btn-tab" id="qSortFq">FQ</button>
-                            <button class="rc-btn-tab" id="qSortAufleger">AQ</button>
                             <button class="rc-btn-tab" id="qSortAcw" title="Nacharbeit — laengste zuerst">ACW</button>
                             <button class="rc-btn-tab" id="qSortAcht" title="Haltezeit (Call on Hold) — laengste zuerst">ACHT</button>
                         </div>
@@ -2316,13 +4245,13 @@
                                 <th style="width:52px; text-align:center;">AHT</th>
                                 <th style="width:50px; text-align:center;" title="Nacharbeit je Call (After Call Work)">ACW</th>
                                 <th style="width:50px; text-align:center;" title="Haltezeit je Call (Call on Hold)">ACHT</th>
-                                <th style="width:48px; text-align:center;">AQ %</th>
                                 <th style="width:48px; text-align:center;">CS %</th>
+                                <th style="width:52px; text-align:center;" title="CS Deep Detractor %">CS DDS %</th>
                                 <th style="width:52px; text-align:center;">TNPS %</th>
+                                <th style="width:56px; text-align:center;" title="TNPS Antwortquote %">TNPS Antw. %</th>
+                                <th style="width:56px; text-align:center;" title="TNPS Deep Detractor %">TNPS DDS %</th>
+                                <th style="width:46px; text-align:center;" title="First-Time-Fix">FTF %</th>
                                 <th style="width:46px; text-align:center;">FQ %</th>
-                                <th style="width:48px; text-align:center;">DDS %</th>
-                                <th style="width:40px; text-align:center; color:#E60000;">Det</th>
-                                <th style="width:52px; text-align:center; color:#F5F5F5;">Anspr.</th>
                             </tr></thead>
                             <tbody id="rcQualiBody"><tr><td colspan="13" style="text-align:center; padding:24px; color:#9C9C9C;">Warte auf KPI-Quelle — Button oben rechts nutzen</td></tr></tbody>
                         </table>
@@ -2642,7 +4571,7 @@
     modal.innerHTML = `
         <div class="rc-card" style="width:400px; text-align:center;">
             <h3 style="font-weight:700; color:#F5F5F5; margin:0 0 10px;">Mitarbeiter-Mapping</h3>
-            <p style="font-size:12px; color:#9C9C9C; margin-bottom:14px;">Lade die Mitarbeiter_ID_Und_Namen.xlsx hoch.</p>
+            <p style="font-size:12px; color:#9C9C9C; margin-bottom:14px;">Lade die Mitarbeiter_IDS_Final_komplett.xlsx hoch.</p>
             <p style="font-size:11px; color:#9C9C9C; margin-bottom:20px; text-align:left; line-height:1.5;">
                 <b style="color:#F5F5F5;">Mehrere Dateien moeglich</b> — sie ergaenzen sich: Fehlen in der aktuellen Liste
                 die VO-Nummern, zuerst die aeltere Datei mit den VO-Spalten laden, danach die aktuelle.
@@ -2786,16 +4715,34 @@
     // Ein 1920-px-Monitor zeigt bei Zoom 1 dieselbe Schrift in Millimetern wie
     // ein 1280-px-Laptop — nur wird er aus dreifacher Entfernung abgelesen. Die
     // Automatik setzt zusaetzliche Flaeche deshalb in GROESSE um statt in mehr
-    // leeren Raum. Sie ist ab Werk an und schaltet sich ab, sobald jemand den
-    // Regler von Hand anfasst — sonst kaempfen beide gegeneinander.
+    // leeren Raum. Sie schaltet sich ab, sobald jemand den Regler von Hand
+    // anfasst — sonst kaempfen beide gegeneinander.
+    // AB WERK AUS seit 05.10. (Nutzer-Vorgabe: "immer auf 100 % Zoom und nicht 150").
+    // Vorher an: 1920 px ergaben 150 %, der Kopfleiste blieben 1280 px und das
+    // Werkzeug-Menue lag ausserhalb des Bildes. Einschalten: Zahnrad -> Anzeige ->
+    // "Groesse folgt dem Fenster", Klick auf die Prozent-Anzeige oder rcZoomAuto(true).
     const RC_ZOOM_BASIS = 1280;
     function rcZoomAutoWert(){
         const b = window.innerWidth || RC_ZOOM_BASIS;
         const z = b / RC_ZOOM_BASIS;
         return Math.round(Math.max(RC_ZOOM_MIN, Math.min(RC_ZOOM_MAX, z)) * 20) / 20;
     }
+    // Der geaenderte Vorgabewert allein greift nicht, wo schon etwas gespeichert ist
+    // (Automatik von Hand angeschaltet, Handwert 150 %). Deshalb EINMAL auf
+    // "Automatik aus, 100 %" stellen; die Marke verhindert, dass eine spaetere
+    // Einstellung des Nutzers bei jedem Start wieder zurueckgesetzt wird.
+    function rcZoomAufHundertMigrieren(){
+        try {
+            if (localStorage.getItem('rcZoom100Migriert') === '1') return false;
+            localStorage.setItem('rcZoomAuto', '0');
+            localStorage.setItem('rcZoom', '1');
+            localStorage.setItem('rcZoom100Migriert', '1');
+            return true;
+        } catch(e){ return false; }
+    }
+    rcZoomAufHundertMigrieren();
     window.rcZoomAutoAn = function(){
-        try { return localStorage.getItem('rcZoomAuto') !== '0'; } catch(e){ return true; }
+        try { return localStorage.getItem('rcZoomAuto') === '1'; } catch(e){ return false; }
     };
     window.rcZoomAuto = function(an){
         try { localStorage.setItem('rcZoomAuto', an ? '1' : '0'); } catch(e){}
@@ -2858,31 +4805,81 @@
         else if (e.key === '0') { e.preventDefault(); try { localStorage.setItem('rcZoomAuto','0'); } catch(err){} window.rcApplyZoom(1); }
     }, true);
     (function(){
-        if (window.rcZoomAutoAn()) {
-            window.rcApplyZoom(rcZoomAutoWert(), false);
-            // Groessenaenderung nachziehen (Fenster, Monitorwechsel, Citrix-Neustart).
-            // Entprellt, weil resize im Dutzend feuert und rcApplyZoom selbst ein
-            // resize ausloest — ohne Entprellung waere das eine Schleife.
-            // Der Horcher wird am window gemerkt und vor dem Neuanlegen entfernt.
-            // Ohne das haengt nach jedem Re-Inject einer mehr an der Seite — genau
-            // der Fehler, der bei den KPI-Paketen schon einmal zu Vervielfachung
-            // gefuehrt hat (gemessen: nach EINEM Re-Inject kam alles doppelt).
-            try { if (window.__rcZoomResize) window.removeEventListener('resize', window.__rcZoomResize); } catch(e){}
-            let t = null;
-            window.__rcZoomResize = function(){
-                if (!window.rcZoomAutoAn()) return;
-                clearTimeout(t);
-                t = setTimeout(function(){
-                    const z = rcZoomAutoWert();
-                    if (z !== window.rcZoom) window.rcApplyZoom(z, false);
-                }, 400);
-            };
-            window.addEventListener('resize', window.__rcZoomResize);
-            return;
-        }
+        // Groessenaenderung nachziehen (Fenster, Monitorwechsel, Citrix-Neustart).
+        // Entprellt, weil resize im Dutzend feuert und rcApplyZoom selbst ein
+        // resize ausloest — ohne Entprellung waere das eine Schleife.
+        // Der Horcher wird am window gemerkt und vor dem Neuanlegen entfernt.
+        // Ohne das haengt nach jedem Re-Inject einer mehr an der Seite — genau
+        // der Fehler, der bei den KPI-Paketen schon einmal zu Vervielfachung
+        // gefuehrt hat (gemessen: nach EINEM Re-Inject kam alles doppelt).
+        // Er haengt IMMER und tut nichts, solange die Automatik aus ist: seit sie
+        // ab Werk aus ist (05.10.), folgte eine spaeter eingeschaltete Automatik
+        // dem Fenster sonst erst nach dem naechsten Neuladen.
+        try { if (window.__rcZoomResize) window.removeEventListener('resize', window.__rcZoomResize); } catch(e){}
+        let t = null;
+        window.__rcZoomResize = function(){
+            if (!window.rcZoomAutoAn()) return;
+            clearTimeout(t);
+            t = setTimeout(function(){
+                const z = rcZoomAutoWert();
+                if (z !== window.rcZoom) window.rcApplyZoom(z, false);
+            }, 400);
+        };
+        window.addEventListener('resize', window.__rcZoomResize);
+        if (window.rcZoomAutoAn()) { window.rcApplyZoom(rcZoomAutoWert(), false); return; }
+        // Auch 100 % wird GESETZT, nicht uebersprungen: --rc-zoom haengt am Dokument
+        // und ueberlebt einen Re-Inject — die neue Fassung erbte sonst die 150 % der alten.
         let z = 1; try { z = parseFloat(localStorage.getItem('rcZoom')) || 1; } catch(e){}
-        if (z && z !== 1) window.rcApplyZoom(z, false);
+        window.rcApplyZoom(z, false);
     })();
+
+    // ---- Kopfleiste passt sich selbst ein (05.10.) --------------------------
+    // Passt die Bedienung nicht in die Breite, werden nach Rangfolge ganze
+    // Elemente ausgeblendet (CSS .rc-eng1 … .rc-eng4), bis sie passt. Gemessen
+    // wird am ERSTEN sichtbaren Bedienelement: ragt es links aus seinem Bereich,
+    // passt es nicht (die Bedienung ist rechtsbuendig und wird links beschnitten —
+    // scrollWidth zaehlt Ueberstand in dieser Richtung nicht mit). Beide Werte
+    // kommen aus getBoundingClientRect, also aus demselben Massstab: der
+    // Fernsicht-Zoom faellt dabei heraus (Fallstrick 22a).
+    function rcKopfEinpassen(){
+        const STUFEN = 4;
+        const hd = document.querySelector('#rcLiveDashboard .rc-header');
+        const ctl = hd && hd.querySelector('.rc-header-ctl');
+        if (!ctl) return 0;
+        let stufe = 0;
+        for (; stufe <= STUFEN; stufe++) {
+            for (let i = 1; i <= STUFEN; i++) hd.classList.toggle('rc-eng' + i, i <= stufe);
+            let erstes = null;
+            for (let k = 0; k < ctl.children.length; k++) { if (ctl.children[k].getClientRects().length) { erstes = ctl.children[k]; break; } }
+            if (!erstes || erstes.getBoundingClientRect().left >= ctl.getBoundingClientRect().left - 0.5) break;
+        }
+        if (stufe > STUFEN) stufe = STUFEN;     // passt auch dann nicht: links beschnitten, Menue bleibt
+        window.rcKopfStufe = stufe;
+        return stufe;
+    }
+    window.rcKopfEinpassen = rcKopfEinpassen;
+    // Ausloeser ist ein ResizeObserver auf Leiste UND jedes Bedienelement: neue
+    // Reiter, Projekt-Knoepfe, der Zaehler, Zoom, Fenstergroesse — alles aendert
+    // eine dieser Groessen, ohne dass der jeweilige Code hier anrufen muesste.
+    // Eingepasst wird per setTimeout NACH der Zustellung (nicht rAF, das steht in
+    // Hintergrund-Tabs): ein Groessenwechsel IM Rueckruf wirft "ResizeObserver
+    // loop"-Fehler, die im Flugschreiber landen wuerden.
+    try { if (window.__rcKopfRO) window.__rcKopfRO.disconnect(); } catch(e){}
+    window.__rcKopfRO = null;
+    if (typeof ResizeObserver === 'function') {
+        let kopfWartet = false;
+        window.__rcKopfRO = new ResizeObserver(function(){
+            if (kopfWartet) return;
+            kopfWartet = true;
+            setTimeout(function(){ kopfWartet = false; try { rcKopfEinpassen(); } catch(e){} }, 0);
+        });
+        const kopf = document.querySelector('#rcLiveDashboard .rc-header');
+        if (kopf) {
+            window.__rcKopfRO.observe(kopf);
+            Array.prototype.forEach.call(kopf.querySelectorAll('.rc-header-ctl > *'), function(c){ window.__rcKopfRO.observe(c); });
+        }
+    }
+    try { rcKopfEinpassen(); } catch(e){}
 
     // Arena-Kennzahlen anklickbar: Klick zeigt, WER hinter der Zahl steht
     [['kpiBnt','bnt'],['kpiKip','kip'],['kpiMob','mob'],['kpiVvl','vvl'],['kpiPitches','pitches'],['kpiRej','rej'],['kpiCalls','calls'],['kpiOffers','offers']].forEach(([id,kind]) => {
@@ -2990,6 +4987,7 @@
       if (_jb) {
           _jb.addEventListener('click', () => window.rcJetztAktualisieren && window.rcJetztAktualisieren());
           window.rcJetztBtnInterval = setInterval(() => {
+              try { rcProjektKnoepfe(); } catch(e){}   // Alter je Projekt im Tooltip (28.09.)
               try {
                   const s = window.rcLigaStandText && window.rcLigaStandText();
                   if (!s) return;
@@ -3001,7 +4999,7 @@
     rcAutoRotSyncBtns();
 
     // ---- Qualität Sortier-Tabs ----
-    const Q_SORT_TABS = [['qSortCalls','calls'],['qSortCs','cs'],['qSortTnps','tnps'],['qSortFq','fq'],['qSortAufleger','auflegerquote'],
+    const Q_SORT_TABS = [['qSortCalls','calls'],['qSortCs','cs'],['qSortTnps','tnps'],['qSortFq','fq'],
                          ['qSortAcw','acwSec'],['qSortAcht','achtSec']];
     Q_SORT_TABS.forEach(([id,key]) => {
         const btn = document.getElementById(id); if (!btn) return;
@@ -3208,12 +5206,34 @@
             // radarHidden, das einzelne Seitenspalten des Radars meint).
             c.radarAus=!!c.radarAus;
             c.custom=c.custom||{}; ['arena','quali','radar','cockpit','info'].forEach(function(p){ c.custom[p]=c.custom[p]||[]; }); c.pages=c.pages||[]; c.pages.forEach(function(pg){ c.custom['cp_'+pg.id]=c.custom['cp_'+pg.id]||[]; if(pg.cols==null) pg.cols=3; });
+            aqAussortieren(c);
             c.info=c.info||{}; c.info.enabled=!!c.info.enabled; c.info.inRotation=!!c.info.inRotation;
             c.info.title=c.info.title||'Info & Verkaufshilfe'; c.info.cols=c.info.cols||3;
             // Migration: altes c.info.modules -> c.custom.info
             if(c.info.modules && c.info.modules.length && !c.custom.info.length){ c.custom.info = c.info.modules.map(function(m){ m.zone='seite'; return m; }); }
             delete c.info.modules;
             return c; }
+        // ---- Auflegerquote entfernt (30.10.) -------------------------------
+        // Nutzer-Entscheidung: die Auflegerquote steht nirgends mehr. Gespeicherte Kacheln, die sie als
+        // Kennzahl fuehren, wuerden sonst still auf BNT zurueckfallen (mbKenn) bzw. eine leere Kachel zeigen.
+        // Beim Laden: Kachel mit Einzel-Kennzahl 'aq' (kenn/kx/ky, freie Portal-Kennzahl "feld", Typ 'aq')
+        // entfaellt, die Tabelle k1..k4 verliert nur die Spalte. Idempotent, ohne Marker (die Oberflaeche
+        // kann 'aq' nicht mehr erzeugen); das Ergebnis wird sofort festgeschrieben.
+        function aqAussortieren(c){
+            var weg=0, istAq=function(v){ return v==='aq' || /^auflegerquote/i.test(String(v==null?'':v)); };
+            Object.keys(c.custom||{}).forEach(function(pg){
+                c.custom[pg]=(c.custom[pg]||[]).filter(function(m){
+                    if(!m) return true;
+                    ['k1','k2','k3','k4'].forEach(function(f){ if(istAq(m[f])){ delete m[f]; weg++; } });
+                    if(m.type==='aq' || istAq(m.kenn) || istAq(m.kx) || istAq(m.ky) || istAq(m.feld)){ weg++; return false; }
+                    return true;
+                });
+            });
+            if(weg){
+                try{ localStorage.setItem(CFG_KEY, JSON.stringify(c)); }catch(e){}
+                if(window.rcLog && window.rcLog.warn) window.rcLog.warn('Auflegerquote entfernt: ' + weg + ' gespeicherte Kachel-Einstellung(en) aussortiert.');
+            }
+        }
         // ---- Migration v1 -> Layout-Engine v2 (14.08.) ---------------------
         // Die alten Schluessel waren TITEL-SLUGS ('arena:meistverkaufte-produkte').
         // Seit v2 tragen alle nativen Kartentitel eine id und keyOf nutzt sie —
@@ -3360,7 +5380,7 @@
             if(sc.folgt){
                 var t=[]; if(sc.std!=='ALL') t.push(H.std(sc.std));
                 if(sc.team!=='ALL') t.push(sc.team);
-                if(sc.stack!=='ALL') t.push(sc.stack);
+                if(sc.stack!=='ALL') t.push(rcStackFilterText(sc.stack));
                 return t.length? ('Dashboard-Filter: '+t.join(' / ')) : 'ganzes Haus';
             }
             if(sc.nation!=='ALL') return 'Land: '+mbNationName(sc.nation);
@@ -3384,10 +5404,9 @@
         function mbAgentIn(a, sc){
             if(!mbStdIn(a.standort, sc)) return false;
             if(sc.team!=='ALL' && a.team!==sc.team) return false;
-            if(sc.stack!=='ALL'){
-                var sm=(window.rcWcaMapping&&window.rcWcaMapping.stackMap)||{};
-                if(!a.team || sm[a.team]!==sc.stack) return false;
-            }
+            // Die EINE Stack-Regel (05.10.): Mapping, sonst Anker; 'P:<projekt>'
+            // nimmt das ganze Projekt — nie selbst gegen stackMap vergleichen.
+            if(sc.stack!=='ALL' && !rcStackFilterPasst(a.team, sc.stack, a.projekt)) return false;
             return true;
         }
         // ---------- Der ungefilterte Agenten-Bestand ----------
@@ -3412,11 +5431,11 @@
                      bnt:0, vvl:0, ansprachen:0, kontakte:null };
         }
         function mbAgentenFrei(sc){
-            var per={}, sm=(window.rcWcaMapping&&window.rcWcaMapping.stackMap)||{};
+            var per={};
             (window.rcAllSales||[]).forEach(function(v){
                 if(!mbStdIn(v.standort, sc)) return;
                 if(sc.team!=='ALL' && v.team!==sc.team) return;
-                if(sc.stack!=='ALL' && (!v.team || sm[v.team]!==sc.stack)) return;
+                if(sc.stack!=='ALL' && !rcStackFilterPasst(v.team, sc.stack, v.projekt)) return;
                 var k=v.vo||v.name; if(!k) return;
                 var a=per[k]||(per[k]=mbLeerAgent(v.vo, v.name, v.team, v.standort));
                 var n=Number(v.anzahl)||1;
@@ -3449,11 +5468,10 @@
             return (d.agents||[]).filter(function(a){ return mbAgentIn(a, sc); });
         }
         function mbTeams(d, sc){
-            var sm=(window.rcWcaMapping&&window.rcWcaMapping.stackMap)||{};
             return (d.teams||[]).filter(function(t){
                 if(!mbStdIn(t.standort, sc)) return false;
                 if(sc.team!=='ALL' && t.name!==sc.team) return false;
-                if(sc.stack!=='ALL' && sm[t.name]!==sc.stack) return false;
+                if(sc.stack!=='ALL' && !rcStackFilterPasst(t.name, sc.stack)) return false;
                 return true;
             });
         }
@@ -3462,6 +5480,9 @@
             return (d.sales||[]).filter(function(v){
                 if(!mbStdIn(v.standort, sc)) return false;
                 if(sc.team!=='ALL' && v.team!==sc.team) return false;
+                // Der Stack fehlte hier (05.10.): d.sales ist die UNGEFILTERTE Liste, eine
+                // Kachel unter Stack-Filter zeigte die Verkaeufe aller Stacks.
+                if(sc.stack!=='ALL' && !rcStackFilterPasst(v.team, sc.stack, v.projekt)) return false;
                 return true;
             });
         }
@@ -3510,7 +5531,6 @@
             tnps:       {label:'TNPS',              quelle:'liga',feld:'tnps',  z:'tnpsZ', n:'tnpsN', art:'quote', fmt:'proz', hoch:true,  ziel:'tnps'},
             fq:         {label:'TNPS-Antwortquote', quelle:'liga',feld:'fq',    z:'fqZ',   n:'fqN',   art:'quote', fmt:'proz', hoch:true,  ziel:'fq'},
             dds:        {label:'Deep Detractor',    quelle:'liga',feld:'dds',   z:'ddsZ',  n:'ddsN',  art:'quote', fmt:'proz', hoch:false, ziel:'dds'},
-            aq:         {label:'Auflegerquote',     quelle:'liga',feld:'auflegerquote', z:'aqZ', n:'aqN', art:'quote', fmt:'proz', hoch:true, ziel:'aq'},
             ff7:        {label:'FF7',               quelle:'liga',feld:'ff7',   n:'ff7N',  art:'quote', fmt:'proz', hoch:true,  ziel:'ff7'},
             ftf:        {label:'First-Time-Fix',    quelle:'liga',feld:'ftf',   z:'ftfZ',  n:'ftfN',  art:'quote', fmt:'proz', hoch:true},
             wq:         {label:'Weiterleitungen',   quelle:'liga',feld:'wq',    art:'quote', fmt:'proz', hoch:false},
@@ -3531,6 +5551,9 @@
         }
         function mbKenn(id){ return MB_KENN[id] || MB_KENN.bnt; }
         function mbKennListe(){ return Object.keys(MB_KENN); }
+        // Die Auflegerquote ist nirgends mehr sichtbar (Nutzer-Entscheidung 30.10.) — auch nicht
+        // als "freie Portal-Kennzahl" aus kpi.alle (alphabetisch waere sie sogar die erste).
+        function mbPortalName(n){ return !/^auflegerquote/i.test(String(n)); }
         // Der Wert einer Kennzahl fuer eine MENGE von Agenten/Einheiten.
         // Liefert {wert, n, geliefert} — 'geliefert:false' heisst "die
         // Ligaliste hat diese Spalte gar nicht geschickt" und ist etwas
@@ -4389,12 +6412,12 @@
                 }},
 
             qual_ampel:{label:'Ampel-Tabelle Qualitaet',cat:'Qualitaet',hoch:6,live:true,acc:'#EB9700',
-                hilfe:'CS, TNPS, AHT, ACW und Auflegerquote nebeneinander — wo muss ich eingreifen?',
+                hilfe:'CS, TNPS, AHT und ACW nebeneinander — wo muss ich eingreifen?',
                 def:function(){ return {title:'Qualitaet auf einen Blick',ebene:'team',limit:12,scope:'dash'}; },
                 fields:[['title','Titel','text'],['scope','Zuschnitt','scope'],['ebene','Ebene','ebene'],['limit','Zeilen','number']],
                 render:function(m,d){
                     var sc=modScope(m), lim=Math.max(1,Math.min(40,Number(m.limit)||12));
-                    var spalten=['calls','cs','tnps','ahtSec','acwSec','aq'];
+                    var spalten=['calls','cs','tnps','ahtSec','acwSec'];
                     var eh=mbEinheiten(d, sc, m.ebene||'team').filter(function(e){ return e.liga.length; });
                     if(!eh.length) return mbKopf(sc)+mbLeer('Fuer diesen Zuschnitt liefert die Ligaliste noch nichts.');
                     eh.sort(function(a,b){ return (mbEinheitWert(b,'calls').wert||0)-(mbEinheitWert(a,'calls').wert||0); });
@@ -4499,7 +6522,7 @@
                     // Die Auswahlliste entsteht zur LAUFZEIT aus kpi.alle — damit
                     // braucht eine neue Portal-Kennzahl keine Code-Aenderung mehr.
                     var namen={};
-                    liga.forEach(function(k){ var a=k.alle||{}; Object.keys(a).forEach(function(n){ namen[n]=1; }); });
+                    liga.forEach(function(k){ var a=k.alle||{}; Object.keys(a).filter(mbPortalName).forEach(function(n){ namen[n]=1; }); });
                     var feld=m.feld||Object.keys(namen).sort()[0];
                     if(!feld) return mbKopf(sc)+mbLeer('Die Ligaliste schickt gerade keine zusaetzlichen Kennzahlen mit.');
                     if(!namen[feld]) return mbKopf(sc, esc(feld))+mbLeer('Die Kennzahl "'+esc(feld)+'" ist im aktuellen Paket nicht enthalten. '
@@ -5303,7 +7326,7 @@
                 h+=rowr('Takt Modul-Carousel','<input type="number" id="cfgCarSec" class="rc-cfg-num" min="4" max="60" value="'+(window.rcRadarCarouselSec||12)+'"> s');
                 h+='<div class="rc-cfg-sec">Fernsicht</div>';
                 h+=rowr('Groesse folgt dem Fenster', swc('cfgZoomAuto', window.rcZoomAutoAn ? window.rcZoomAutoAn() : false));
-                h+='<div class="rc-cfg-hint" style="padding:2px 2px 6px;">Fuer Wandmonitore: je breiter das Fenster, desto groesser die Schrift. Der Regler darunter schaltet sie ab.</div>';
+                h+='<div class="rc-cfg-hint" style="padding:2px 2px 6px;">Ab Werk aus (100 %). Fuer Wandmonitore: je breiter das Fenster, desto groesser die Schrift. Der Regler darunter schaltet sie ab.</div>';
                 h+=rowr('Zoom','<button class="rc-cfg-mini" id="cfgZoomM">&minus;</button> <span id="cfgZoomV">'+Math.round((window.rcZoom||1)*100)+'%</span> <button class="rc-cfg-mini" id="cfgZoomP">+</button>');
             } else if(curTab==='krieg'){
                 h+='<div class="rc-cfg-note">Weniger Text auf dem Kriegsfeld = mehr Burgen und Krieger sichtbar. Schalter wirken sofort.</div>';
@@ -5380,7 +7403,7 @@
                 var _stdDa=_sc.standorte.some(function(o){ return o.code===rc.std; });
                 var _stkDa=_sc.stacks.indexOf(rc.stack)>=0;
                 var _stdOpt='<option value="ALL"'+(!rc.std||rc.std==='ALL'?' selected':'')+'>Alle Standorte</option>'+_fehlOpt(rc.std,_stdDa)+_sc.standorte.map(function(o){ return '<option value="'+esc(o.code)+'"'+(rc.std===o.code?' selected':'')+'>'+esc(o.name)+'</option>'; }).join('');
-                var _stkOpt='<option value="ALL"'+(!rc.stack||rc.stack==='ALL'?' selected':'')+'>Alle Stacks</option>'+_fehlOpt(rc.stack,_stkDa)+_sc.stacks.map(function(s){ return '<option value="'+esc(s)+'"'+(rc.stack===s?' selected':'')+'>'+esc(s)+'</option>'; }).join('');
+                var _stkOpt='<option value="ALL"'+(!rc.stack||rc.stack==='ALL'?' selected':'')+'>Alle Stacks</option>'+_fehlOpt(rc.stack,_stkDa)+_sc.stacks.map(function(s){ return '<option value="'+esc(s)+'"'+(rc.stack===s?' selected':'')+'>'+esc(rcStackFilterText(s))+'</option>'; }).join('');
                 h+=rowr('Standort', '<select id="cfgRepStd" class="rc-cfg-txt" style="width:170px;">'+_stdOpt+'</select>');
                 h+=rowr('Stack / Abteilung', '<select id="cfgRepStack" class="rc-cfg-txt" style="width:170px;">'+_stkOpt+'</select>');
                 // Team-Filter (Nutzer-Vorgabe 04.08.: "auch Teams soll moeglich sein").
@@ -5514,7 +7537,7 @@
                 // still auf die erste Kennzahl (Fallstrick 10).
                 var kfNamen={};
                 try{ Object.keys(window.rcKpiData||{}).forEach(function(id){
-                    var a=(window.rcKpiData[id]||{}).alle||{}; Object.keys(a).forEach(function(n){ kfNamen[n]=1; }); }); }catch(e){}
+                    var a=(window.rcKpiData[id]||{}).alle||{}; Object.keys(a).filter(mbPortalName).forEach(function(n){ kfNamen[n]=1; }); }); }catch(e){}
                 var kfListe=Object.keys(kfNamen).sort();
                 var kfV=val||'';
                 ctrl='<select class="rc-cfg-txt" data-if="'+key+'" data-im="'+i+'">'
@@ -5668,12 +7691,19 @@
                 on(q('cfgRepSubj'),'input',function(e){ if(window.rcReport){ window.rcReport.cfg.subject=e.target.value; window.rcReport.save(); } });
                 on(q('cfgRepNow'),'click',function(){
                     if(!window.rcReportNow) return;
-                    var st=window.rcReportNow();
                     // Der Knopf sagt jetzt, was passiert ist. Vorher lief er auch
                     // bei 0 Zeilen scheinbar durch und es kam einfach nichts an.
-                    var el=q('cfgRepZeilen'); if(!el) return;
-                    if(st && st.zeilen){ el.style.color='#3DD68C'; el.innerHTML='Report '+st.base+' wird gebaut ('+st.zeilen+' Zeile(n)) &mdash; die Dateien landen im Download-Ordner.'; }
-                    else { el.style.color='#E60000'; el.textContent=(st&&st.grund)||'Es entstand kein Report.'; }
+                    var zeig=function(st){
+                        var el=q('cfgRepZeilen'); if(!el) return;
+                        if(st && st.zeilen){ el.style.color=st.frischHinweis?'#EB9700':'#3DD68C'; el.innerHTML='Report '+st.base+' wird gebaut ('+st.zeilen+' Zeile(n)) &mdash; die Dateien landen im Download-Ordner.'+(st.frischHinweis?' ACHTUNG: '+esc(st.frischHinweis):''); }
+                        else { el.style.color='#E60000'; el.textContent=(st&&st.grund)||'Es entstand kein Report.'; }
+                    };
+                    // Erst aktualisieren, dann bauen (05.10.) — sonst traegt der Report
+                    // fuer die nicht aktiven Projekte den Stand ihres letzten Abrufs.
+                    if(window.rcReport && window.rcReport.frischUndNow){
+                        var el0=q('cfgRepZeilen'); if(el0){ el0.style.color='#9C9C9C'; el0.textContent='Aktualisiere die Daten vor dem Report ...'; }
+                        window.rcReport.frischUndNow().then(zeig, function(){ zeig(window.rcReportNow()); });
+                    } else zeig(window.rcReportNow());
                 });
                 // Nach jeder Filteraenderung die Trefferzahl neu zeigen — sonst
                 // faellt ein leerer Zuschnitt erst beim ausbleibenden Versand auf.
@@ -5795,7 +7825,7 @@
         //  rcLigaHistDash, Logbuch, Code-Blobs) gehoeren NICHT in die Datei —
         //  zu gross, projektfremd, und beim Einspielen brandgefaehrlich.
         // ============================================================
-        var RC_SICHERN_PLAIN = ['rcCfgLayout_v1','rcWarHud','rcZoom','rcZoomAuto','rcRadarMode',
+        var RC_SICHERN_PLAIN = ['rcCfgLayout_v1','rcWarHud','rcZoom','rcZoomAuto','rcZoom100Migriert','rcRadarMode',
                                 'rcSelectedStandorte','rcFeierAus','rcReportCfg_v1','rcMgmtCfg_v1'];
         var RC_SICHERN_RCKEY = ['rcQueueCfg_v1','rcVertriebsZiele','rcExportWahl_v1'];
         function sichernSchluessel(){
@@ -5923,9 +7953,12 @@
             var ag=(window.rcLetzteStats&&window.rcLetzteStats.agentStats)||{};
             var stacks=[]; Object.keys(sm).forEach(function(t){ var s=sm[t]; if(s&&stacks.indexOf(s)<0) stacks.push(s); });
             Object.keys(ag).forEach(function(k){ var s=ag[k].stack; if(s&&stacks.indexOf(s)<0) stacks.push(s); });
-            return { standorte:stds.sort().map(function(c){ return {code:c, name:STD[c]||c}; }), stacks:stacks.sort() };
+            // "<Projekt> gesamt" ('P:<projekt>', 05.10.) vorn: der Report laesst sich damit
+            // auf ein ganzes ESL-Projekt zuschneiden, unabhaengig vom Mapping.
+            var proj=window.rcAlleProjekteModus ? rcProjRahmenListe().map(function(p){ return 'P:'+p.key; }) : [];
+            return { standorte:stds.sort().map(function(c){ return {code:c, name:STD[c]||c}; }), stacks:proj.concat(stacks.sort()) };
         }
-        function scopeLabel(){ var s=(CFG.std&&CFG.std!=='ALL')?(STD[CFG.std]||CFG.std):'Alle Standorte'; var k=(CFG.stack&&CFG.stack!=='ALL')?CFG.stack:'Alle Stacks';
+        function scopeLabel(){ var s=(CFG.std&&CFG.std!=='ALL')?(STD[CFG.std]||CFG.std):'Alle Standorte'; var k=(CFG.stack&&CFG.stack!=='ALL')?rcStackFilterText(CFG.stack):'Alle Stacks';
             var t=(CFG.team&&CFG.team!=='ALL')?(' · '+CFG.team):''; return k+' · '+s+t; }
         function deuts(k){ var t=String(k||'').split('-'); return t.length===3 ? (t[2]+'.'+t[1]+'.'+t[0]) : k; }
         function datumLabel(){
@@ -5981,7 +8014,7 @@
                 return { name:r.name, standort:r.standort||'', team:r.team||'',
                     kip:kip, mob:mob, vvl:vvl, bnt:bnt, ansprachen:anspr, calls:calls,
                     cs:(r.cs&&r.cs.v!=null?Number(r.cs.v):null), tnps:(r.tnps&&r.tnps.v!=null?Number(r.tnps.v):null),
-                    aq:(r.aq&&r.aq.v!=null?Number(r.aq.v):null), fq:(r.fq&&r.fq.v!=null?Number(r.fq.v):null),
+                    fq:(r.fq&&r.fq.v!=null?Number(r.fq.v):null),
                     ahtMin:(r.ahtSec!=null?Number(r.ahtSec)/60:null),
                     // Kein Nenner heisst KEINE Quote (Nutzer-Entscheidung 07.08.) —
                     // nicht 0 %, sonst liest sich "nicht gemessen" wie "nichts getan".
@@ -6037,7 +8070,7 @@
                 +'<td style="padding:5px 8px; border-bottom:1px solid #232323; color:#9C9C9C; text-align:center;">'+(i+1)+'</td>'
                 +'<td style="padding:5px 8px; border-bottom:1px solid #232323; font-weight:700; white-space:nowrap;">'+esc(a.name)+' <span style="color:#9C9C9C; font-weight:400;">'+esc(a.standort)+'</span><div style="color:#7E7E7E; font-weight:400; font-size:10px;">'+esc(a.team)+'</div></td>'
                 +'<td style="padding:5px 8px; border-bottom:1px solid #232323; text-align:center; color:'+zielColor(a.calls,RC_ZIELE.calls)+';">'+(a.calls||0)+'</td>'
-                +qc(a.ahtMin,RC_ZIELE.ahtMin,1)+qc(a.aq,RC_ZIELE.aq,0,'%')+qc(a.cs,RC_ZIELE.cs,0,'%')+qc(a.tnps,RC_ZIELE.tnps,0,'%')+qc(a.fq,RC_ZIELE.fq,0,'%')
+                +qc(a.ahtMin,RC_ZIELE.ahtMin,1)+qc(a.cs,RC_ZIELE.cs,0,'%')+qc(a.tnps,RC_ZIELE.tnps,0,'%')+qc(a.fq,RC_ZIELE.fq,0,'%')
                 +'<td style="padding:5px 8px; border-bottom:1px solid #232323; text-align:center; color:'+zielColor(a.anspQuote,{min:40})+';">'+(a.anspQuote!=null?Math.round(a.anspQuote)+'%':'—')+'</td>'
                 +'<td style="padding:5px 8px; border-bottom:1px solid #232323; text-align:right; color:#FFB300;">'+a.kip+'</td>'
                 +'<td style="padding:5px 8px; border-bottom:1px solid #232323; text-align:right; color:#22C7E6;">'+a.mob+'</td>'
@@ -6045,8 +8078,8 @@
                 +'<td style="padding:5px 8px; border-bottom:1px solid #232323; text-align:right;">'+a.vvl+'</td></tr>'; }).join('');
             var asTable=d.agents.length? '<div style="font-size:14px; font-weight:800; margin:18px 0 6px; color:#C9C9C9;">Aktueller Stand &mdash; je Agent</div>'
                 +'<table style="border-collapse:collapse; width:100%; font-size:12px;"><thead><tr style="color:#9C9C9C; font-size:10px; text-transform:uppercase;">'
-                +'<th style="padding:5px 8px; width:24px;">#</th><th style="padding:5px 8px; text-align:left;">Verkaeufer</th><th style="padding:5px 8px;">Calls</th><th style="padding:5px 8px;">AHT</th><th style="padding:5px 8px;">AQ</th><th style="padding:5px 8px;">CS</th><th style="padding:5px 8px;">TNPS</th><th style="padding:5px 8px;">FQ</th><th style="padding:5px 8px;">Ansp</th><th style="padding:5px 8px; text-align:right;">KIP</th><th style="padding:5px 8px; text-align:right;">MOB</th><th style="padding:5px 8px; text-align:right;">BNT</th><th style="padding:5px 8px; text-align:right;">VVL</th></tr></thead><tbody>'+asRows+'</tbody></table>'
-                +'<div style="font-size:10px; color:#7E7E7E; margin-top:4px;">Ampeln: CS&ge;90 &middot; TNPS&ge;70 &middot; AQ&ge;85 &middot; FQ&ge;30 &middot; AHT&le;13 Min &middot; &ge;40 Calls. Ansprache-Quote auf Liga-Call-Basis.</div>':'';
+                +'<th style="padding:5px 8px; width:24px;">#</th><th style="padding:5px 8px; text-align:left;">Verkaeufer</th><th style="padding:5px 8px;">Calls</th><th style="padding:5px 8px;">AHT</th><th style="padding:5px 8px;">CS</th><th style="padding:5px 8px;">TNPS</th><th style="padding:5px 8px;">FQ</th><th style="padding:5px 8px;">Ansp</th><th style="padding:5px 8px; text-align:right;">KIP</th><th style="padding:5px 8px; text-align:right;">MOB</th><th style="padding:5px 8px; text-align:right;">BNT</th><th style="padding:5px 8px; text-align:right;">VVL</th></tr></thead><tbody>'+asRows+'</tbody></table>'
+                +'<div style="font-size:10px; color:#7E7E7E; margin-top:4px;">Ampeln: CS&ge;90 &middot; TNPS&ge;70 &middot; FQ&ge;30 &middot; AHT&le;13 Min &middot; &ge;40 Calls. Ansprache-Quote auf Liga-Call-Basis.</div>':'';
             var body='<div style="font-family:Segoe UI,Arial,sans-serif; background:#121212; color:#F5F5F5; padding:20px; max-width:900px;">'
                 +'<div style="border-top:4px solid #E60000; background:#1D1D1D; padding:16px 18px; border-radius:6px;">'
                 +'<div style="font-size:20px; font-weight:800;">ESL Live-Arena &mdash; Aktueller Stand</div>'
@@ -6092,7 +8125,7 @@
                 // rcBuildProdukteSheet ohne Meldung — in der Stunden-Mappe fehlte
                 // das Blatt "Produkte" also wortlos, im Dialog-Export wurde
                 // derselbe Fehler gemeldet. Zwei Verhalten fuer denselben Aufruf.
-                var wb=XL.utils.book_new(); rcBuildStandSheets(XL, wb, !!XL.__styled, data); rcBuildSalesSheet(XL, wb, !!XL.__styled, data); try { rcBuildProdukteSheet(XL, wb, !!XL.__styled, data); } catch(e){ if(window.rcLog) rcLog.warn('Produkte-Blatt: '+e.message); } rcBuildAnalyseSheets(XL, wb, !!XL.__styled, data);
+                var wb=XL.utils.book_new(); rcBuildStandSheets(XL, wb, !!XL.__styled, data); rcBuildSalesSheet(XL, wb, !!XL.__styled, data); if (rcBlattAktiv(null, 'produkte')) { try { rcBuildProdukteSheet(XL, wb, !!XL.__styled, data); } catch(e){ if(window.rcLog) rcLog.warn('Produkte-Blatt: '+e.message); } } rcBuildAnalyseSheets(XL, wb, !!XL.__styled, data);
                 // Aggregat-Blaetter (Struktur, Liga Standorte/Teams, Standorte, Stacks,
                 // Teams, Agenten, Entwicklung) — damit ist die Stunden-Mappe DIESELBE
                 // vollstaendige Mappe wie der Bericht auf Knopfdruck.
@@ -6274,24 +8307,24 @@
         }
 
         // Bild 1: AKTUELLER_STAND — Spalten und Farben wie im Excel-Blatt.
-        // Reihenfolge identisch zu rcBuildStandSheets: je Kennzahl IST | IST %,
-        // dann Detraktoren (Anzahl), Sales Ansprache, MOB/KIP/BNT GES./VVL GES.
+        // Reihenfolge identisch zu rcBuildStandSheets (ohne AQ und Gelöst, 30.10.): je
+        // Kennzahl IST | IST %, dann Detraktoren (Anzahl), Sales Ansprache,
+        // MOB/KIP/BNT GES./VVL GES.
         function buildPng(base, cb, dataVor){ try{
             var data=dataVor||reportDaten();
             if(!data || !data.rows || !data.rows.length){ cb&&cb(null); return; }
             var rows=data.rows.slice().sort(function(a,b){ return String(a.team).localeCompare(String(b.team)) || String(a.name).localeCompare(String(b.name)); });
             var cols=[ {k:'Team',w:54}, {k:'Agent',w:152,a:'left'}, {k:'Calls',w:48}, {k:'Ø Min.',w:56},
                 {k:'IST',w:42}, {k:'IST %',w:58}, {k:'IST',w:42}, {k:'IST %',w:58},
-                {k:'IST',w:42}, {k:'IST %',w:58}, {k:'IST',w:42}, {k:'IST %',w:58},
                 {k:'IST',w:42}, {k:'IST %',w:58}, {k:'Anzahl',w:50}, {k:'IST %',w:78},
                 {k:'MOB',w:48,kern:true}, {k:'KIP',w:48,kern:true}, {k:'BNT GES.',w:58}, {k:'VVL GES.',w:58} ];
             // Gruppenkopf wie GRP im Excel: von-bis (Spaltenindex), Text, Farbe
-            var GRP=[ [0,3,'DATEN &  AHT / VOLUMEN',RC_XP.TXT], [4,5,'AQ  |  > 85 %',RC_XP.BLAU], [6,7,'CS  |  > 90 %',RC_XP.GRUEN],
-                [8,9,'TNPS  |  > 70 %',RC_XP.ORANGE], [10,11,'FQ  |  > 30 %',RC_XP.PINK], [12,13,'Gelöst',RC_XP.BLAU],
-                // Spalte 15 (Sales Ansprache) fehlt hier bewusst: sie laeuft wie im
-                // Excel (Q6:Q8 verbunden) ueber Band- UND Gruppenzeile und wird
+            var GRP=[ [0,3,'DATEN &  AHT / VOLUMEN',RC_XP.TXT], [4,5,'CS  |  > 90 %',RC_XP.GRUEN],
+                [6,7,'TNPS  |  > 70 %',RC_XP.ORANGE], [8,9,'FQ  |  > 30 %',RC_XP.PINK],
+                // Spalte 11 (Sales Ansprache) fehlt hier bewusst: sie laeuft wie im
+                // Excel (M6:M8 verbunden) ueber Band- UND Gruppenzeile und wird
                 // deshalb weiter unten am Stueck gezeichnet.
-                [14,14,'Detra',RC_XP.DUNKEL], [16,18,'BNT',RC_XP.ROT], [19,19,'VVL',RC_XP.ROT] ];
+                [10,10,'Detra',RC_XP.DUNKEL], [12,14,'BNT',RC_XP.ROT], [15,15,'VVL',RC_XP.ROT] ];
             var rowH=22, infoH=24, trennH=5, grpH=24, thH=22;
             var W=0; cols.forEach(function(c){ W+=c.w; });
             var maxRows=Math.min(rows.length, 60);
@@ -6306,14 +8339,14 @@
                 x.fillStyle=css(RC_XP.DUNKEL); x.fillRect(0,y,W,infoH);
                 x.fillStyle='#FFFFFF'; x.font='10px '+FONT; x.textAlign='left';
                 x.fillText(typeof rcZeitraumText==='function'?rcZeitraumText(data):('Zeitraum: '+(data.label||'')), 8, y+infoH/2+.5);
-                band(x, xs[4], y, breite(4,14), infoH, 'QUALITÄT', css(RC_XP.DUNKEL));
-                band(x, xs[16], y, breite(16,19), infoH, 'VERTRIEB', css(RC_XP.DUNKEL));
+                band(x, xs[4], y, breite(4,10), infoH, 'QUALITÄT', css(RC_XP.DUNKEL));
+                band(x, xs[12], y, breite(12,15), infoH, 'VERTRIEB', css(RC_XP.DUNKEL));
                 y+=infoH+trennH;
                 // Gruppenkopf
                 GRP.forEach(function(g){ band(x, xs[g[0]], y, breite(g[0],g[1]), grpH, g[2], css(g[3]), 10); });
                 // "Sales Ansprache" am Stueck ueber Band-, Trenn- und Gruppenzeile —
                 // in eine 78 px breite Kopfzelle allein passt der Name nicht.
-                band(x, xs[15], KOPF_H, cols[15].w, infoH+trennH+grpH, 'Sales\nAnsprache', css(RC_XP.DUNKEL), 10);
+                band(x, xs[11], KOPF_H, cols[11].w, infoH+trennH+grpH, 'Sales\nAnsprache', css(RC_XP.DUNKEL), 10);
                 y+=grpH;
                 // Unterkopf — MOB/KIP hervorgehoben (Kerngeschaeft)
                 cols.forEach(function(c,i){ zelle(x, xs[i], y, c.w, thH, { t:c.k, bg:css(c.kern?RC_XP.BLAU:RC_XP.DUNKEL), fc:'#FFFFFF', b:true, sz:c.kern?10:9.5, nb:true }); });
@@ -6324,7 +8357,7 @@
                 rows.forEach(function(r){
                     var calls=r.calls||0; sum.calls+=calls; if(r.ahtSec) sum.ahtW+=r.ahtSec*calls;
                     if(r.hasEsl){ sum.ansp+=r.ansp||0; sum.mob+=r.mob||0; sum.kip+=r.kip||0; sum.bnt+=r.bnt||0; sum.vvl+=r.vvl||0; }
-                    ['aq','cs','tnps','fq','ftf'].forEach(function(s){
+                    ['cs','tnps','fq'].forEach(function(s){
                         var kv=r[s]||{};
                         if(kv.z!=null) sum.zAll[s]=(sum.zAll[s]||0)+kv.z;
                         // Zaehler nur MIT Nenner poolen — sonst sprengen Zaehler bei
@@ -6344,22 +8377,22 @@
                     if(r.ahtSec==null) zelle(x, xs[3], y, cols[3].w, rowH, { bg:zeb });
                     else { var min=r.ahtSec/60, fc=min>12?css(RC_XP.ROT):(min>=10?css(RC_XP.ORANGE):null);
                         zelle(x, xs[3], y, cols[3].w, rowH, { t:('0'+fmtAht(r.ahtSec)).slice(-5), bg:zeb, fc:fc||undefined, b:!!fc }); }
-                    [['aq',4],['cs',6],['tnps',8],['fq',10],['ftf',12]].forEach(function(p){
+                    [['cs',4],['tnps',6],['fq',8]].forEach(function(p){
                         var kv=r[p[0]]||{}, c=p[1];
                         zelle(x, xs[c], y, cols[c].w, rowH, { t:(kv.z!=null?String(kv.z):''), bg:zeb });
                         ampZelle(x, xs[c+1], y, cols[c+1].w, rowH, vNull(kv), kv.v!=null?RC_SKALA[p[0]](kv.v):null, zeb);
                     });
-                    if(r.detr==null) zelle(x, xs[14], y, cols[14].w, rowH, { t:'Keine', bg:zeb, fc:'#8C959E', sz:9 });
-                    else zelle(x, xs[14], y, cols[14].w, rowH, { t:String(r.detr), bg:css(RC_AMPEL[RC_SKALA.detr(r.detr)]), fc:'#FFFFFF', b:true });
+                    if(r.detr==null) zelle(x, xs[10], y, cols[10].w, rowH, { t:'Keine', bg:zeb, fc:'#8C959E', sz:9 });
+                    else zelle(x, xs[10], y, cols[10].w, rowH, { t:String(r.detr), bg:css(RC_AMPEL[RC_SKALA.detr(r.detr)]), fc:'#FFFFFF', b:true });
                     // Keine Ansprache trotz Calls: eigener Alarmton, damit sich
                     // "gar nichts" von "wenig" (ebenfalls rot) abhebt.
-                    if(vq==null) zelle(x, xs[15], y, cols[15].w, rowH, { t:'Keine', bg:zeb, fc:'#8C959E', sz:9 });
-                    else if(vq<=0) zelle(x, xs[15], y, cols[15].w, rowH, { t:'0 %', bg:css(RC_ALARM), fc:'#FFFFFF', b:true });
-                    else zelle(x, xs[15], y, cols[15].w, rowH, { t:pctText(vq), bg:css(RC_AMPEL[RC_SKALA.vansp(vq)]), fc:'#FFFFFF', b:true });
-                    verkaufZelle(x, xs[16], y, cols[16].w, rowH, r.hasEsl?(r.mob||0):null, zeb, false, true);
-                    verkaufZelle(x, xs[17], y, cols[17].w, rowH, r.hasEsl?(r.kip||0):null, zeb, false, true);
-                    verkaufZelle(x, xs[18], y, cols[18].w, rowH, r.hasEsl?(r.bnt||0):null, zeb, true);
-                    verkaufZelle(x, xs[19], y, cols[19].w, rowH, r.hasEsl?(r.vvl||0):null, zeb, true);
+                    if(vq==null) zelle(x, xs[11], y, cols[11].w, rowH, { t:'Keine', bg:zeb, fc:'#8C959E', sz:9 });
+                    else if(vq<=0) zelle(x, xs[11], y, cols[11].w, rowH, { t:'0 %', bg:css(RC_ALARM), fc:'#FFFFFF', b:true });
+                    else zelle(x, xs[11], y, cols[11].w, rowH, { t:pctText(vq), bg:css(RC_AMPEL[RC_SKALA.vansp(vq)]), fc:'#FFFFFF', b:true });
+                    verkaufZelle(x, xs[12], y, cols[12].w, rowH, r.hasEsl?(r.mob||0):null, zeb, false, true);
+                    verkaufZelle(x, xs[13], y, cols[13].w, rowH, r.hasEsl?(r.kip||0):null, zeb, false, true);
+                    verkaufZelle(x, xs[14], y, cols[14].w, rowH, r.hasEsl?(r.bnt||0):null, zeb, true);
+                    verkaufZelle(x, xs[15], y, cols[15].w, rowH, r.hasEsl?(r.vvl||0):null, zeb, true);
                     y+=rowH;
                 });
                 // GESAMT — gepoolte Quoten, nicht der Mittelwert der Agenten-Prozente
@@ -6369,15 +8402,15 @@
                 zelle(x, xs[0], y, cols[0].w+cols[1].w, rowH, { t:'GESAMT', bg:css(RC_XP.BLAU), fc:'#FFFFFF', b:true, al:'left' });
                 gz(2,String(sum.calls));
                 gz(3, sum.calls>0&&sum.ahtW?('0'+fmtAht(sum.ahtW/sum.calls)).slice(-5):'');
-                [['aq',4],['cs',6],['tnps',8],['fq',10],['ftf',12]].forEach(function(p){
+                [['cs',4],['tnps',6],['fq',8]].forEach(function(p){
                     var s=p[0], c=p[1];
                     gz(c, sum.zAll[s]!=null?String(sum.zAll[s]):'');
                     var v=(sum.n[s]>0)?sum.z[s]/sum.n[s]*100:null;
                     gz(c+1, v!=null?pctText(v):'Keine');
                 });
-                gz(14, String(sum.detr||0));
-                gz(15, sum.calls>0?pctText(sum.ansp/sum.calls*100):'');
-                gz(16,String(sum.mob)); gz(17,String(sum.kip)); gz(18,String(sum.bnt)); gz(19,String(sum.vvl));
+                gz(10, String(sum.detr||0));
+                gz(11, sum.calls>0?pctText(sum.ansp/sum.calls*100):'');
+                gz(12,String(sum.mob)); gz(13,String(sum.kip)); gz(14,String(sum.bnt)); gz(15,String(sum.vvl));
                 y+=rowH;
                 if(rows.length>maxRows){ x.fillStyle='#7A828A'; x.font='10px '+FONT; x.textAlign='left'; x.fillText('… und '+(rows.length-maxRows)+' weitere Agenten (vollstaendig in der Excel-Mappe)', 8, y+12); }
             }, base+'.png', cb);
@@ -6574,6 +8607,38 @@
             return st;
         }
 
+        // ERST AKTUALISIEREN, DANN BAUEN (05.10., Nutzer: "Da muss das ja auch alles
+        // in Stacks erst mal sich aktualisieren und danach Daten exportieren").
+        // Der Report las bis dahin den Stand, der gerade im Dashboard lag — fuer
+        // die nicht aktiven Projekte den ihres letzten Abrufs, nach einem
+        // Neuladen gar keinen. Jetzt holt rcFrischHolen vorher, was der Zuschnitt
+        // braucht; nur wenn heute im Report liegt (ein Vortag kommt aus der Historie).
+        // download() selbst bleibt SYNCHRON: ESL_Start.cmd frischt vor der
+        // Stundenmail ueber rcFrischStart/rcFrischStand selbst auf (es muss die
+        // Zeilenzahl des Zuschnitts schon VOR dem Report kennen) und ruft danach
+        // rcReportNow. Durch diese Funktion gehen der Stundentakt im Dashboard
+        // und der Knopf "Report jetzt". Liefert ein Promise auf den Zustand.
+        function reportHatHeute(){
+            var d=new Date(), h=d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());
+            if(CFG.datumModus==='tag') return !CFG.von || CFG.von===h;
+            if(CFG.datumModus==='zeitraum') return !CFG.bis || CFG.bis>=h;
+            return true;
+        }
+        function downloadFrisch(){
+            if(!reportHatHeute() || typeof rcFrischHolen!=='function') return Promise.resolve(download());
+            var scope={ std:CFG.std||'ALL', stack:CFG.stack||'ALL', team:CFG.team||'ALL' };
+            return rcFrischHolen(scope).then(function(f){
+                var st=download();
+                // Nicht alles frisch: der Report geht trotzdem raus (Frist, keine
+                // Sperre) — der Grund steht im Zustand, den die .cmd und der Knopf lesen.
+                if(st && f && !f.ok) st.frischHinweis=f.text;
+                return st;
+            }, function(e){
+                if(window.rcLog) rcLog.warn('Report: Auffrischen fehlgeschlagen ('+(e&&e.message?e.message:e)+') — es gilt der vorhandene Stand.');
+                return download();
+            });
+        }
+
         // Alle benutzten Helfer sind FUNKTIONSDEKLARATIONEN im selben IIFE und
         // damit gehoistet — direkter Zugriff ist sicher (am window liegt keine).
         // Gerechnet wird identisch zum Dialog-Weg; es gibt keine zweite
@@ -6636,7 +8701,7 @@
             return { std:CFG.std, stack:CFG.stack, team:CFG.team, zeilen:zeilenImFilter(), label:scopeLabel() };
         }
 
-        window.rcReport={ cfg:CFG, buildHtml:buildHtml, scopes:scopes, buildXlsx:buildXlsx, buildPng:buildPng, buildPngVertrieb:buildPngVertrieb, daten:reportDaten, now:function(){ return download(); }, save:save,
+        window.rcReport={ cfg:CFG, buildHtml:buildHtml, scopes:scopes, buildXlsx:buildXlsx, buildPng:buildPng, buildPngVertrieb:buildPngVertrieb, daten:reportDaten, now:function(){ return download(); }, frischUndNow:downloadFrisch, save:save,
             setAuto:function(v){ CFG.autoHourly=!!v; save(); }, setTo:function(t){ CFG.to=t||''; save(); }, setCc:function(t){ CFG.cc=t||''; save(); },
             setScope:setScope,
             setDatum:function(modus, von, bis){
@@ -6665,14 +8730,17 @@
             if(!CFG.autoHourly) return;
             var n=new Date(); var hk=n.getFullYear()+'-'+pad(n.getMonth()+1)+'-'+pad(n.getDate())+'-'+pad(n.getHours());
             if(hk===CFG.lastHourKey || n.getMinutes()>=5) return;
-            try{ CFG.lastHourKey=hk; save(); download(); }
-            catch(e){
+            // Ein Wurf kann jetzt auch im Promise liegen (downloadFrisch holt erst
+            // die Daten frisch, 05.10.) — beide Wege enden in derselben Meldung.
+            var gescheitert=function(e){
                 var t='Stunden-Report '+hk+' fehlgeschlagen: '+(e&&e.message?e.message:e);
                 window.rcReportLetzter={ base:null, zeit:new Date().toISOString(), scope:scopeLabel(), datum:datumLabel(),
                                          zeilen:0, ok:false, fertig:true, grund:t, dateien:[], erwartet:[] };
                 try{ rcLog.warn(t); }catch(_){}
                 try{ if(window.rcToast) rcToast(t, 12000); }catch(_){}
-            }
+            };
+            try{ CFG.lastHourKey=hk; save(); downloadFrisch().catch(gescheitert); }
+            catch(e){ gescheitert(e); }
         },60000);
     })();
 
@@ -6831,7 +8899,9 @@
             el.classList.toggle('rc-flt-on', on);
             if (on) any = true;
         });
-        const rst = document.getElementById('rcFltReset'); if (rst) rst.style.display = any ? '' : 'none';
+        // visibility statt display: der Platz bleibt reserviert. Mit display sprangen bei
+        // JEDEM Filterklick alle Bedienelemente der Kopfleiste um 26 px (gemessen 05.10.).
+        const rst = document.getElementById('rcFltReset'); if (rst) rst.style.visibility = any ? 'visible' : 'hidden';
     }
     window.rcMarkFilters = rcMarkFilters;
 
@@ -6841,8 +8911,21 @@
         const stacks = [...new Set(Object.values((window.rcWcaMapping && window.rcWcaMapping.stackMap) || {}))].filter(Boolean).sort();
         const cur = sel.value;
         if (stacks.length) {
-            sel.innerHTML = '<option value="ALL">Alle Stacks</option>' + stacks.map(s => `<option value="${s}">${s}</option>`).join('');
-            sel.value = stacks.includes(cur) ? cur : 'ALL';
+            // Alle-Projekte-Betrieb (28.09.): Stacks nach ESL-Projekt gruppiert —
+            // ein Stack eines anderen Projekts stellt das ESL beim Waehlen dorthin um.
+            const multi = window.rcAlleProjekteModus !== undefined ? window.rcAlleProjekteModus : rcAlleProjekteAn();
+            const opt = s => `<option value="${s}">${s}</option>`;
+            let inhalt = stacks.map(opt).join('');
+            if (multi) {
+                // Je Projekt zuerst "<Projekt> gesamt" (Wert 'P:<projekt>', 05.10.): die
+                // ganze Lieferung, unabhaengig vom Mapping — dort zaehlen auch die
+                // Agenten mit, die unter keinem einzelnen Stack stehen.
+                const gruppe = (key, titel) => { const l = stacks.filter(s => rcProjektVonStack(s) === key);
+                    return `<optgroup label="${titel}"><option value="P:${key}">${titel} gesamt</option>${l.map(opt).join('')}</optgroup>`; };
+                inhalt = gruppe('kabel', 'Kabel') + gruppe('mobile', 'Mobile') + gruppe('um', 'UM') + stacks.filter(s => !rcProjektVonStack(s)).map(opt).join('');
+            }
+            sel.innerHTML = '<option value="ALL">Alle Stacks</option>' + inhalt;
+            sel.value = (stacks.includes(cur) || (multi && rcIstProjektFilter(cur) && rcProjektVonStack(cur))) ? cur : 'ALL';
             sel.disabled = false;
         } else {
             sel.innerHTML = '<option value="ALL">Alle Stacks (Mapping laden)</option>';
@@ -6857,6 +8940,14 @@
         const ts = document.getElementById('rcTeamFilter'); if (ts) { ts.value = 'ALL'; ts.dataset.sig = ''; }
         if (window.rcLetzterDatenstrom) window.processDataStream(window.rcLetzterDatenstrom);
         rcMarkFilters();
+        // Nutzer 28.09.: "wenn ich einen anderen Stack klicke, dass er auch ESL
+        // umwandelt und Daten liefert" — der Stack eines anderen Projekts macht
+        // dieses Projekt zum aktiven (ESL umstellen + Ligaliste nachholen).
+        if (window.rcAlleProjekteModus && window.rcProjektWechseln) {
+            const v = document.getElementById('rcStackFilter').value;
+            const key = (v && v !== 'ALL') ? rcProjektVonStack(v) : '';
+            if (key && key !== window.rcAktivProjekt) window.rcProjektWechseln(key, 'Stack ' + rcStackFilterText(v));
+        }
     });
     document.getElementById('rcFltReset').addEventListener('click', () => {
         ['rcStandortFilter','rcStackFilter','rcTeamFilter'].forEach(id => { const el = document.getElementById(id); if (el && !el.disabled) { el.value = 'ALL'; el.dataset.sig = ''; } });
@@ -7039,6 +9130,10 @@
     }
 
     function rcDriftNachholen(mono){
+        // Datendienst: der Dienst fuehrt seinen eigenen Takt, der Empfang holt nach
+        // dem Aufwachen von selbst nach. Den Wunsch verwerfen, sonst meldete der
+        // Quellen-Streifen dauerhaft "wird gerade nachgeholt".
+        if (rcDienstModus()) { window.rcDriftOffen = null; return; }
         var w = window.rcDriftOffen;
         if (!w) return;
         var L = window.rcDriftLage;
@@ -7236,7 +9331,7 @@
             window.rcDriftLiveGesehen = true;
         } else if (window.rcDriftLiveGesehen && !window.rcSessionRetryInterval &&
                    window.rcSessionState && window.rcSessionState.alive) {
-            window.rcLiveInterval = setInterval(holeExcelVomServer, 20000);
+            window.rcLiveInterval = setInterval(rcLiveTick, 20000);
             L.taktNeu++;
             try { rcLog.warn('Der 20-s-Live-Takt war nicht mehr angelegt — neu gestartet (' + L.taktNeu + '. Mal).'); } catch(e){}
             rcDriftNachholenAnmelden('Live-Takt fehlte und wurde neu angelegt');
@@ -7558,9 +9653,27 @@
     // ============================================================
     //  KATEGORISIERUNG
     // ============================================================
+    // Reine GERAETE gehoeren nicht ins Vertriebs-Blatt (Nutzer-Vorgabe 30.07.:
+    // "Router, Hardware, Verstaerker, SuperWLAN, Fritzbox, Ultrahub7 ... sollen da
+    // nicht reinkommen"). An echten Daten ist das die Gruppe "Hardware KIP- und PTV"
+    // (Homebox/Fritzbox, SuperWLAN, Ultra HUB 7 — 171 Stueck, komplett nicht
+    // BCR-relevant). Gemustert wird auf die GRUPPE, zusaetzlich decken die
+    // Geraetebegriffe den Fall ab, dass so etwas spaeter unter anderem Namen kommt.
+    // Steht HIER (vor classify), weil schon der Parser es braucht; rcIstGeraet
+    // weiter unten liest dieselbe Konstante. Seit 28.09. zusaetzlich "CI+ Modul"
+    // (der Kabel-Export fuehrt es unter "Hardware KIP- und PTV") und "Super WLAN"
+    // MIT Leerzeichen — das ESL schreibt den Umlaut dort teils als HTML-Entity
+    // ("Super WLAN Verst&#228;rker (Basic)", am Referenzexport vom 09.08. gemessen).
+    const RC_KEIN_VERTRIEB = /hardware|zubeh|router|repeater|verst(?:[aä]rk|&#228)|fritz|homebox|super ?wlan|ultra ?hub|modem|ci\+ ?modul/i;
     // Gibt zurueck: {cat, isBnt, isVvl}  cat in kip|mob|env|fibDsl|ptv|sonstBnt|kipVvl|mobVvl|fibVvl|null
     function classify(pgRaw){
         const pg = (pgRaw||'').toString().toUpperCase();
+        // Geraete sind KEIN Abschluss (Nutzer-Vorgabe 30.07.). Ohne diese Zeile griff
+        // unten die PTV-Regel ("Hardware KIP- und PTV" enthaelt "PTV"): jede Homebox
+        // zaehlte als PTV-NEUVERTRAG — in BNT, Radar, Laufband und allen Blaettern
+        // ausser "Vertrieb". Am 28.09. gegen die ESL-Exporte nachgerechnet: Alanya
+        // 23 BNT zu viel (Report 198, Export 175).
+        if (rcIstGeraet(pg)) return {cat:null, isBnt:false, isVvl:false};
         if (pg.includes('VVL')) {
             if (pg.includes('MOBILFUNK')) return {cat:'mobVvl', isBnt:false, isVvl:true};
             if (pg.includes('KIP')) return {cat:'kipVvl', isBnt:false, isVvl:true};
@@ -7603,10 +9716,26 @@
         if (/WINBACK/.test(u))                      return 'WINBACK';
         if (/STARTGUTHABEN|GUTSCHRIFT/.test(u))     return 'Abzug Startguthaben';
         const istVvl = /^VVL\b/.test(u), istBnt = /^BNT\b/.test(u);
-        // Ohne BNT-/VVL-Praefix bleibt im gemessenen Vokabular nur Hardware
-        // (HomeBox, Ultra Hub 7, SuperWLAN, Fritzbox) — dieselbe Gruppe, die auch
-        // der Kabel-Export dort schreibt.
-        if (!istVvl && !istBnt)                     return 'Hardware KIP- und PTV';
+        // "UM TV Connect" und "UM Internet&Phone <Tempo>" liefert der MOBILE-Export
+        // OHNE Gruppe (beide BCR-relevant) — Nutzer-Vorgabe 29.09.: die sind VVL.
+        // TV Connect fuehrt das Portal als VVL unter PTV (siehe TV-Connect-Zeile unten),
+        // Internet&Phone ist ein KIP-Tarif. Nur diese zwei Namen: was sonst mit "UM "
+        // beginnt und keine Gruppe traegt ("UM Netflix Premium") bleibt sichtbar "Ohne
+        // Produktgruppe" statt geraten zu werden. Das "&" tolerant (Entity/Leerzeichen).
+        if (/^UM\s+TV\s*CONNECT\b/.test(u))                                 return 'PTV VVL';
+        if (/^UM\s+INTERNET\s*(?:&AMP;|&#38;|&|\+|UND)?\s*PHONE\b/.test(u))  return 'KIP VVL';
+        // Ohne BNT-/VVL-Praefix: ein GERAET (HomeBox, Ultra Hub 7, SuperWLAN,
+        // Fritzbox) bekommt dieselbe Gruppe, die der Kabel-Export dort schreibt.
+        // Alles andere wird NICHT zu Hardware geraten (28.09.: der Mobile-Export
+        // lieferte gruppenlose UM-Produkte, sie landeten als Hardware und damit als
+        // PTV-Neuvertrag). Was keine Regel trifft, bleibt sichtbar "Ohne Produktgruppe":
+        // nicht BNT/VVL, aber in den Stueck-Summen, so wie das ESL es selbst fuehrt.
+        if (!istVvl && !istBnt) {
+            if (rcIstGeraet(p))                     return 'Hardware KIP- und PTV';
+            if (!window.rcProduktOhneGruppe) window.rcProduktOhneGruppe = {};
+            window.rcProduktOhneGruppe[p] = (window.rcProduktOhneGruppe[p] || 0) + 1;
+            return 'Ohne Produktgruppe';
+        }
         const art = istVvl ? 'VVL' : 'BNT';
         if (/PREVENTION/.test(u))                   return 'KIP VVL (Stay)';
         if (/GIGAMOBIL|FAMILYCARD|VODAFONE MOBIL|RED \+ DATA|GIGACUBE|DATAGO|SMART TECH|CALLYA|\bMOBIL/.test(u)) return 'Mobilfunk ' + art;
@@ -7667,6 +9796,58 @@
     window.rcNewsHistorie = [];
     window.rcMarqueeBuffer = [];
     window.rcRowHourMap = window.rcRowHourMap || new Map();
+    window.rcLueckenGemeldet = '';   // die Mapping-Luecke je Einspielen einmal ins Logbuch
+    // Tagesstand auch bei gesetztem Dashboard-Filter in die Historie schreiben:
+    // alle 5 Min ein ungefilterter Durchlauf (siehe Parser, "TAGESSTAND TROTZ FILTER").
+    const RC_ARCHIV_TAKT_MS = 300000;
+    window.rcArchivOhneFilterUm = 0;
+
+    // Stack-Anker und Projekt-Verzeichnisse aus dem GANZEN Datenstrom — vor der
+    // Zaehlung und unabhaengig vom Dashboard-Filter (05.10.). Bis dahin entstand
+    // der Anker waehrend des Laufs und stand erst DANACH bereit: der Parser
+    // filterte ohne ihn, nur der Export kannte ihn (VKD_Tech am 28.09.: 110
+    // Agenten live, 125 in der Excel).
+    //   rohTeamStack { ESL-Rohteam: Stack }  nur wenn ALLE gemappten Kollegen
+    //                                        desselben Rohteams denselben tragen
+    //   teamProjekt  { Team: Projekt }       aus der Lieferung, nur eindeutig
+    //   voProjekt    { VO-Nummer / CCS-ID: Projekt }
+    // Dieselben Zeilen-Ausschluesse wie der Parser (zu kurze Zeilen, Potential
+    // Tracking) — sonst belegte ein Testeintrag einen Stack, den es nicht gibt.
+    // Funktionsdeklaration: der Parser steht direkt darunter und ruft sie auf.
+    function rcAnkerAusZeilen(sheetData, idx, mapping, eigenProjekt){
+        const stackMap = (mapping && mapping.stackMap) || {};
+        const voMap = (mapping && mapping.voMap) || {}, ccsMap = (mapping && mapping.ccsMap) || {};
+        const rohStacks = {}, teamProj = {}, voProj = {};
+        const minLen = Math.max(idx.standort, idx.vo, idx.prod, idx.erg, idx.anz);
+        const iProj = (idx.projekt == null) ? -1 : idx.projekt;
+        for (let i = 1; i < sheetData.length; i++) {
+            const row = sheetData[i];
+            if (!row || row.length <= minLen) continue;
+            const merkmalL = idx.merkmal !== -1 ? (row[idx.merkmal]||'').toString().toLowerCase() : '';
+            const gruppeRoh = (idx.prod !== -1 ? (row[idx.prod]||'') : '').toString().trim();
+            const prodName = (idx.produkt !== -1 ? (row[idx.produkt]||'').toString().trim() : '') || gruppeRoh;
+            if (rcIstPotentialTracking(merkmalL, prodName)) continue;
+            const voRaw = (row[idx.vo]||'').toString().trim();
+            const teamRaw = (row[idx.team]||'').toString().trim();
+            const m = voMap[voRaw] || ccsMap[voRaw] || null;
+            const team = ((m && m.team) || teamRaw || '').toString().trim();
+            // Anker: dieser gemappte Kollege belegt, welcher Stack hinter seinem ESL-ROHTEAM steht.
+            if (m && m.team && teamRaw) {
+                const st = stackMap[(m.team + '').trim()] || '';
+                if (st) (rohStacks[teamRaw] || (rohStacks[teamRaw] = new Set())).add(st);
+            }
+            const proj = (iProj !== -1 ? (row[iProj]||'').toString().trim() : '') || eigenProjekt || '';
+            if (proj) {
+                if (team) (teamProj[team] || (teamProj[team] = new Set())).add(proj);
+                if (voRaw && !voProj[voRaw]) voProj[voRaw] = proj;
+                if (m && m.ccsId && !voProj[m.ccsId + '']) voProj[m.ccsId + ''] = proj;
+            }
+        }
+        // NUR eindeutige uebernehmen. Ein Rohteam, dessen gemappte Kollegen auf zwei
+        // Stacks verteilt sind, bekommt bewusst keinen Anker — es wird nicht geraten.
+        const eindeutig = function(o){ const r = {}; Object.keys(o).forEach(function(k){ if (o[k].size === 1) r[k] = Array.from(o[k])[0]; }); return r; };
+        return { rohTeamStack: eindeutig(rohStacks), teamProjekt: eindeutig(teamProj), voProjekt: voProj };
+    }
 
     window.processDataStream = function(sheetData) {
       try {
@@ -7682,17 +9863,34 @@
         // zusammen 7,7 % aller Abschluesse. Die faelen sonst lautlos unter den Tisch.
         window.rcProdGruppen = {};     // { 'KIP VVL': 1397, ... } — nur angenommene
         window.rcProdGruppenBcr = {};  // davon der BCR-relevante Anteil (produktmerkmal)
-        const filterVal = document.getElementById('rcStandortFilter').value;
+        // __rcParseOhneFilter (28.09.): EIN Durchlauf ohne Dashboard-Filter fuer
+        // rcAgentenVollbestand (Export/Report). Die Filter-Auswahl selbst bleibt
+        // dabei unangetastet — updateTeamFilter wird uebersprungen.
+        const ohneFilter = window.__rcParseOhneFilter === true;
+        const filterVal = ohneFilter ? 'ALL' : document.getElementById('rcStandortFilter').value;
         const teamSel = document.getElementById('rcTeamFilter');
         const filterTeam = (filterVal !== 'ALL' && teamSel) ? teamSel.value : 'ALL';
         const stackSel = document.getElementById('rcStackFilter');
-        const filterStack = stackSel ? stackSel.value : 'ALL';
+        const filterStack = (!ohneFilter && stackSel) ? stackSel.value : 'ALL';
         const mapping = window.rcWcaMapping;
-        const stackMap = (mapping && mapping.stackMap) || {};
-        const stackOf = t => stackMap[(t||'').toString().trim()] || '';
-        window.rcStackOf = stackOf; // fuer Qualitaet/Cockpit
+        // Stack-Filterwert 'P:<projekt>' = das ganze ESL-Projekt (05.10.).
+        const fProj = rcIstProjektFilter(filterStack) ? filterStack.slice(2) : '';
         const teamsByStd = {}; // { code: Set(team) }  fuer das Team-Dropdown
         const teamVoByStd = {}; // { code|team: Set(vo) } — wie viele ESL-Agenten hat ein Team wirklich?
+        // STACK-ANKER (09.09.): der Stack der GEMAPPTEN Kollegen desselben
+        // ESL-Rohteams. Zweck: ein Agent, der nicht in der Mitarbeiter-Excel steht,
+        // hat keinen Stack — und flog damit aus jedem stackgefilterten Export,
+        // lautlos. Am Export vom 09.09. gemessen: 10 Agenten aus "Vodafone AL 06"
+        // mit 93 ESL-Zeilen und 260 Liga-Calls fehlten in ALLEN 14 Blaettern.
+        // Das ist NICHT die 2026 abgeschaffte Team-Nummer-Bruecke: die riet bei
+        // mehrdeutigen Teams. Hier wird NUR abgeleitet, wenn ALLE gemappten
+        // Kollegen desselben Rohteams denselben Stack tragen. Abgeleitet wird
+        // ausschliesslich der STACK; das TEAM bleibt der Rohname (Nutzer-Vorgabe
+        // 06.08.: Teamzuordnung nur aus der Excel).
+        // Seit 05.10. entsteht der Anker VOR dem Lauf (rcAnkerAusZeilen, weiter
+        // unten nach dem Mehrtages-Schutz): der Filter in dieser Funktion braucht
+        // ihn selbst. Vorher stand er erst nach dem Lauf bereit — der Export
+        // zaehlte die Agenten mit, das Live-Dashboard unter demselben Filter nicht.
 
         // Spalten-Indizes (Defaults + Header-Erkennung)
         // ACHTUNG: 'prod' ist die KLASSE (Spalte "produktgrupe", z.B. "KIP VVL") —
@@ -7775,6 +9973,23 @@
         }
 
         const agentStats = {}, standortStats = {}, teamStats = {};
+        // ---- Anker und Projekt-Verzeichnisse VOR dem Lauf (05.10.) ----
+        // rc_projekt haengt rcVerarbeiteAlle an jede Zeile; fehlt die Spalte
+        // (Einzelprojekt, Pruefseiten), gilt das Projekt dieser Seite.
+        idx.projekt = h.indexOf('rc_projekt');
+        const eigenProjekt = rcEigenesProjektKey();
+        const anker = rcAnkerAusZeilen(sheetData, idx, mapping, eigenProjekt);
+        window.rcRohTeamStack = anker.rohTeamStack;
+        window.rcTeamProjekt = anker.teamProjekt;
+        window.rcVoProjekt = anker.voProjekt;
+        // Die EINE Stack-Regel (Mapping, sonst eindeutiger Anker) — dieselbe
+        // Funktion, mit der auch Export, Report und Liga-Filter rechnen.
+        const stackOf = rcStackRegel();
+        window.rcStackOf = stackOf; // fuer Qualitaet/Cockpit
+        // Agenten ohne Mapping-Eintrag oder ohne Stack — UNGEFILTERT gesammelt,
+        // damit Kopfleiste, Liste und Luecken-Export sie auch dann kennen, wenn
+        // der Dashboard-Filter sie gerade ausblendet.
+        const luecken = {};
         // UNGEFILTERTE Kriegskarten-Daten: die Schlacht auf dem Radar zeigt IMMER
         // alle Standorte (sonst hat der gefilterte Standort keinen Gegner und die
         // Soldaten der anderen verschwinden). Der Standort-/Stack-/Team-Filter wirkt
@@ -7874,10 +10089,13 @@
             // Team UND Standort kommen aus der Mitarbeiter-Excel, sobald der Agent
             // dort steht. Der ESL-Rohname bleibt nur, wenn es keinen Eintrag gibt —
             // dann wird NICHT geraten (siehe Block oben).
-            let realName = voRaw, team = teamRaw, realCcs = '';
+            let realName = voRaw, team = teamRaw, realCcs = '', imMapping = false;
             if (mapping && (mapping.voMap || mapping.ccsMap)) {
                 const m = (mapping.voMap && mapping.voMap[voRaw]) || (mapping.ccsMap && mapping.ccsMap[voRaw]);
-                if (m) { realName = m.name || voRaw; team = m.team || teamRaw; if (m.standort) code = normalizeStandort(m.standort); realCcs = m.ccsId || ''; }
+                // Der Stack-Anker (welcher Stack hinter dem ESL-ROHTEAM dieses
+                // gemappten Kollegen steht) entsteht seit 05.10. vor dem Lauf in
+                // rcAnkerAusZeilen — hier wird nur noch zugeordnet.
+                if (m) { imMapping = true; realName = m.name || voRaw; team = m.team || teamRaw; if (m.standort) code = normalizeStandort(m.standort); realCcs = m.ccsId || ''; }
                 else if (voRaw && !ohneMappingGesehen[voRaw]) {
                     ohneMappingGesehen[voRaw] = 1;
                     ohneMapping.push({ vo: voRaw, eslTeam: teamRaw, standort: code });
@@ -7890,11 +10108,20 @@
             if (code && team) { (teamsByStd[code] || (teamsByStd[code] = new Set())).add(team);
                 if (voRaw) (teamVoByStd[code + '|' + team] || (teamVoByStd[code + '|' + team] = new Set())).add(voRaw); }
 
+            // Stack ueber die EINE Regel (Mapping, sonst eindeutiger Anker). Projekt
+            // der Zeile: die LIEFERUNG schlaegt das Mapping — ein Agent, der laut
+            // Excel zu einem Mobile-Team gehoert, aber im Kabel-ESL bucht, zaehlt
+            // mit diesen Zeilen zu Kabel.
+            const stRow = stackOf(team);
+            const projRow = (idx.projekt !== -1 ? (row[idx.projekt]||'').toString().trim() : '') || eigenProjekt;
+            const projEff = projRow || (stRow ? rcProjektVonStack(stRow) : '');
+
             // Scope: Stack, Standort UND Team muessen passen -> bei Filter NUR diese Daten
-            // (Stacks sind getrennte Abteilungen, z.B. MF_CARE vs. onecoax_tech — kein Vergleich untereinander)
+            // (Stacks sind getrennte Abteilungen, z.B. MF_CARE vs. onecoax_tech — kein Vergleich untereinander).
+            // Projekt-Filter ('P:kabel'): die ganze Lieferung, auch Agenten ohne Stack.
             const inScope = (filterVal === 'ALL' || code === filterVal)
                          && (filterTeam === 'ALL' || team === filterTeam)
-                         && (filterStack === 'ALL' || stackOf(team) === filterStack);
+                         && (filterStack === 'ALL' || (fProj ? projEff === fProj : (!!stRow && stRow === filterStack)));
 
             // Zeit / Stunde bestimmen
             const dObj = parseDateTime(datumRaw);
@@ -7927,6 +10154,13 @@
                     (warAgentAnspr[voRaw] = { vo:voRaw, name:realName, standort:code, ansp:0, _s:new Set() });
                     if (!wa._s.has(rowId)) { wa._s.add(rowId); wa.ansp++; } }
             }
+            // UNGEFILTERT: Luecken-Verzeichnis. Wer nicht in der Mitarbeiter-Excel
+            // steht ODER keinen Stack hat, wird hier gefuehrt — mit denselben
+            // Zaehlregeln wie unten (Kontakt je id, Ansprache je id, Stueck = anzahl).
+            const lz = (voRaw && (!imMapping || !stRow)) ? (luecken[voRaw] || (luecken[voRaw] =
+                { vo:voRaw, name:realName, ccs:realCcs, team:team, teamRoh:teamRaw, standort:code, projekt:projEff,
+                  imMapping:imMapping, stack:stRow, _k:new Set(), _a:new Set(), stueck:0 })) : null;
+            if (lz) { lz._k.add(rowId); if (istAnsprache) lz._a.add(rowId); }
             if (inScope) {
                 gCallIds.add(rowId);
                 (std._c || (std._c = new Set())).add(rowId);
@@ -7954,14 +10188,19 @@
                 // NUR Zeilen im Scope anlegen -> bei Filter erscheinen ausschliesslich diese Agenten
                 if (voRaw) {
                     const ag = ensureAgent(voRaw, realName, team, code, realCcs);
-                    if (!ag.stack) ag.stack = stackOf(team);
+                    if (!ag.stack) ag.stack = stRow;
+                    // Projekt aus der Lieferung, ESL-Rohteam und "fehlt in der Excel"
+                    // reisen am Agenten mit (05.10.) — Export und Module fragen sie ab.
+                    if (!ag.projekt) ag.projekt = projEff;
+                    if (teamRaw && !ag.teamRoh) ag.teamRoh = teamRaw;
+                    if (!imMapping) ag.ohneMap = true;
                     (ag._cIds || (ag._cIds = new Set())).add(rowId); // Kontakte je Agent (fuer CR-Berechnung)
                     if (istAnsprache) {
                         if (!ag._anspIds) ag._anspIds = new Set();
                         if (!ag._anspIds.has(rowId)) { ag._anspIds.add(rowId); ag.ansprachen++; }
                     }
                 }
-                if (tm && !tm.stack) tm.stack = stackOf(team);
+                if (tm && !tm.stack) tm.stack = stRow;
             }
 
             // Ablehnungsgruende -> Marquee
@@ -7980,6 +10219,7 @@
             // "Angebot" = offenes/unterbreitetes Angebot, KEIN Verkauf -> zaehlt nicht als BNT/VVL
             const accepted = anzahl > 0 && ergL.includes('angenommen');
             if (accepted) {
+                if (lz) lz.stueck += anzahl;
                 // Produktgruppen-Zaehlung je Agent — VOR classify(), damit auch Gruppen
                 // mitgezaehlt werden, die classify() nicht kennt (siehe rcProdGruppen).
                 if (inScope && voRaw && prodRaw) {
@@ -7989,6 +10229,11 @@
                     // BCR-relevanten Anteil getrennt mitfuehren. Ganze Gruppen sind
                     // entweder-oder (Hardware/NBA/PTV VVL = komplett nicht relevant),
                     // ENV BNT und PTV BNT sind aber GEMISCHT — deshalb je Zeile.
+                    // Die BCR-Aufschluesselung existiert IMMER neben prodG, auch leer:
+                    // "nichts BCR-relevant" ist {} und nicht "keine Trennung". Fehlte sie,
+                    // nahm das Vertriebs-Blatt die GESAMTmenge als CR-relevant (28.09.:
+                    // 2x PTV VVL "nicht BCR-relevant" standen als CR-relevant im Blatt).
+                    if (!agP.prodGBcr) agP.prodGBcr = {};
                     if (isBcr) {
                         (agP.prodGBcr || (agP.prodGBcr = {}))[prodRaw] = (agP.prodGBcr[prodRaw] || 0) + anzahl;
                         window.rcProdGruppenBcr[prodRaw] = (window.rcProdGruppenBcr[prodRaw] || 0) + anzahl;
@@ -8014,7 +10259,7 @@
                         // prod = Klasse (Ticker/Radar bauen darauf), produkt = konkreter
                         // Name, datum = Tagesschluessel fuer Zeitraum-Auswertungen.
                         window.rcAllSales.push({ name:realName, vo:voRaw, team, cat, isBnt, isVvl,
-                            prod:prodRaw, produkt:prodNameRaw,
+                            prod:prodRaw, produkt:prodNameRaw, projekt:projEff,
                             kunde:(idx.kunde!==-1?(row[idx.kunde]||'').toString().trim():''),
                             standort:code, timeStr, datum:(rcRowDayKey(row, idx) || ''), isBcr, anzahl });
                     }
@@ -8101,7 +10346,7 @@
                 if (m && m.team && normalizeStandort((m.standort||'').toString()) === filterVal) teamsForDrop.add(m.team.toString().trim());
             });
         }
-        if (filterStack !== 'ALL') teamsForDrop = new Set([...teamsForDrop].filter(t => stackOf(t) === filterStack));
+        if (filterStack !== 'ALL') teamsForDrop = new Set([...teamsForDrop].filter(t => rcStackFilterPasst(t, filterStack)));
         // Liga-Agenten je Team (zentral ueber rcLigaMeta — Liga fuehrt Team-NUMMERN)
         const ligaProTeam = {};
         Object.values(window.rcKpiData || {}).forEach(k => {
@@ -8114,16 +10359,31 @@
             esl: (teamVoByStd[filterVal + '|' + t] || { size: 0 }).size,
             liga: ligaProTeam[t] || 0
         }));
-        updateTeamFilter(filterVal, teamInfo);
+        if (!ohneFilter) updateTeamFilter(filterVal, teamInfo);
 
         // Agenten ohne Eintrag in der Mitarbeiter-Excel: sie behalten den ESL-Rohnamen
         // als Team, weil ihre echte Zuordnung schlicht unbekannt ist. Das muss abrufbar
         // sein — sonst faellt eine wachsende Mapping-Luecke erst auf, wenn jemand die
         // Team-Zahlen anzweifelt. Konsole: rcOhneMapping()
         window.rcOhneMapping = ohneMapping.slice();
-        if (ohneMapping.length) {
+        // Luecken-Verzeichnis veroeffentlichen (05.10.). rcZuordnungLuecken: jeder
+        // Agent, der in der Excel fehlt ODER keinen Stack hat. rcOhneStack: davon
+        // die ohne Stack — sie zaehlen im Projekt, aber unter keinem Stack-Filter.
+        window.rcZuordnungLuecken = Object.keys(luecken).map(function(v){ const l = luecken[v];
+            return { vo:l.vo, name:l.name, ccs:l.ccs, team:l.team, teamRoh:l.teamRoh, standort:l.standort, projekt:l.projekt,
+                     imMapping:l.imMapping, stack:l.stack, kontakte:l._k.size, ansprachen:l._a.size, stueck:l.stueck }; });
+        window.rcOhneStack = window.rcZuordnungLuecken.filter(function(l){ return !l.stack; });
+        try { rcOhneStackChip(); } catch(e){}
+        // Entprellt: der Parser laeuft alle 20 s, die Lage aendert sich selten.
+        const lueckenSig = ohneMapping.length + '|' + window.rcOhneStack.length;
+        if (ohneMapping.length && window.rcLueckenGemeldet !== lueckenSig) {
+            window.rcLueckenGemeldet = lueckenSig;
+            const mitAnker = ohneMapping.filter(function(o){ return anker.rohTeamStack[o.eslTeam]; }).length;
             rcLog.warn('Team aus der Mitarbeiter-Excel: ' + ohneMapping.length + ' Agent(en) stehen NICHT darin '
-                + 'und behalten ihren ESL-Team-Namen (es wird nichts geraten). Liste: window.rcOhneMapping');
+                + 'und behalten ihren ESL-Team-Namen (es wird nichts geraten). Liste: window.rcOhneMapping'
+                + ' — davon ' + mitAnker + ' mit eindeutigem Stack-Anker (zaehlen unter ihrem Stack mit, live und im Export),'
+                + ' ' + (ohneMapping.length - mitAnker) + ' ohne Anker. Ohne Stack insgesamt: ' + window.rcOhneStack.length
+                + ' (Kopfleiste "ohne Stack-Zuordnung", Liste: window.rcOhneStack).');
         }
 
         window.rcLetzteStats = { agentStats, standortStats, teamStats, nationStats };
@@ -8173,14 +10433,22 @@
             // ausschliesslich die Summen bcr/bnt/vvl/mob/kip.
             Object.values(agentStats).forEach(a => { byAgentT[a.vo] = { k:a.kontakte, a:a.ansprachen, bcr:bcrOf(a), bnt:a.bnt, vvl:a.vvl, mob:a.mob||0, kip:a.kip||0, ccs:(a.ccsId||'')+'', nm:a.name,
                 pg: (a.prodG && Object.keys(a.prodG).length) ? a.prodG : undefined,
-                pgB: (a.prodGBcr && Object.keys(a.prodGBcr).length) ? a.prodGBcr : undefined }; });
+                // pgB auch LEER sichern, sobald pg da ist — sonst hiesse "nichts
+                // BCR-relevant" im Vortag wieder "keine Trennung" (siehe prodGBcr).
+                pgB: (a.prodG && Object.keys(a.prodG).length) ? (a.prodGBcr || {}) : undefined }; });
             window.rcTodayAgg = { kontakte:gCalls, ansp:gPitches, bcr:gBcr, nonBcr:gNonBcr, bnt:gBnt, vvl:gVvl, byStd:byStdT, byAgent:byAgentT };
             // Selbst-Archivierung: der Heute-Stand wird laufend als Tages-Snapshot
             // gesichert. Damit waechst die Vortage-Historie GARANTIERT jeden Tag —
             // auch wenn das Portal keine rueckwirkenden Tages-Exporte liefert.
             try {
                 const hKey = now.getFullYear() + '-' + pad2(now.getMonth()+1) + '-' + pad2(now.getDate());
-                const histS = JSON.parse(localStorage.getItem(rcKey('rcEslHistory')) || '{}');
+                // Datendienst (27.10.): heute steht NUR im Speicher der Seite, die Vortage
+                // je Projekt legt rcDienstHistorieAblegen ab. Fortgeschrieben wird die
+                // vereinte Historie — beim Start aus dem Speicher geladen, sonst ersetzte
+                // der Heute-Eintrag sie ganz (Ruling R4). Gespeichert wird nichts.
+                const dienst = rcDienstModus();
+                const histS = dienst ? (window.rcEslHistory || rcLoadEslHistory())
+                                     : JSON.parse(localStorage.getItem(rcKey('rcEslHistory')) || '{}');
                 // NICHT bedingungslos ueberschreiben. Steht der Portal-Filter auf
                 // einem anderen Tag, sind alle Live-Zahlen 0 — und diese 0 loeschte
                 // bisher den echten, bereits archivierten Tagesstand. Ein Tag kann
@@ -8197,9 +10465,26 @@
                 }
                 Object.keys(histS).sort().slice(0, -40).forEach(k => delete histS[k]);
                 rcKappeProdHistorie(histS);      // alte Tage: nur die Aufschluesselung raus
-                localStorage.setItem(rcKey('rcEslHistory'), JSON.stringify(histS));
+                if (!dienst) localStorage.setItem(rcKey('rcEslHistory'), JSON.stringify(histS));
                 window.rcEslHistory = histS;
             } catch(e){ window.rcHistorieSpeicherFehler('Selbst-Archivierung heute', e); }
+        } else if (!ohneFilter && Date.now() - (window.rcArchivOhneFilterUm || 0) > RC_ARCHIV_TAKT_MS) {
+            // TAGESSTAND TROTZ FILTER SICHERN (05.10., im Browser gemessen). Der Block
+            // oben laeuft nur OHNE Dashboard-Filter. Seit der Stack-Filter das Projekt
+            // waehlt (28.09.), steht fast immer einer — und dann schrieb der Live-Takt
+            // den Tagesstand gar nicht mehr in die Historie: nach drei gefilterten
+            // Laeufen kein Eintrag fuer heute. Archiviert wurde nur noch, wenn zufaellig
+            // jemand exportierte — "Gestern" und die Woche trugen dann den Stand des
+            // letzten Exports (oder nichts) statt den des Tagesendes.
+            // Jetzt alle paar Minuten EIN ungefilterter Durchlauf (derselbe Weg wie beim
+            // Export: rcAgentenVollbestand rechnet ungefiltert und sofort wieder
+            // gefiltert). Der Zeitstempel steht VOR dem Lauf — der gefilterte Durchlauf
+            // darin kaeme sonst wieder hier an.
+            window.rcArchivOhneFilterUm = Date.now();
+            setTimeout(function(){
+                try { rcAgentenVollbestand(); }
+                catch(e){ rcLog.warn('Tagesstand sichern (ungefilterter Durchlauf): ' + (e && e.message ? e.message : e)); }
+            }, 0);
         }
 
         // KPI-Strip
@@ -8500,7 +10785,7 @@
             if (kpi && kpi.callCount >= 3) {
                 const q = Math.round((ag.ansprachen||0) / kpi.callCount * 100);
                 const qc = q >= 40 ? '#3FBF8F' : q >= 20 ? '#E8A33C' : '#FF6B6B';
-                anspSub = ` · <span style="color:${qc};">AQ ${q}%</span>`;
+                anspSub = ` · <span style="color:${qc};">Ansp. ${q}%</span>`;
             }
             html += `<tr class="${hl}" data-rc-vo="${rcAttr(ag.vo)}" data-rc-name="${rcAttr(ag.name)}" title="Klick: Agenten-Details">
                 <td style="text-align:center;"><div class="rc-rank-badge ${rc}">${i+1}</div></td>
@@ -8690,10 +10975,10 @@
         if (!list.length) {
             const leerTxt = !alleKpi.length
                 ? 'Warte auf KPI-Quelle — Button oben rechts nutzen'
-                : 'Keine Liga-Agenten in diesem Filter (' + [scope.std, scope.stack, scope.team].filter(x => x && x !== 'ALL').join(' / ') +
+                : 'Keine Liga-Agenten in diesem Filter (' + [scope.std, rcStackFilterText(scope.stack), scope.team].filter(x => x && x !== 'ALL').join(' / ') +
                   ') — ' + alleKpi.length + ' Agenten geladen. Team-/Stack-Zuordnung kommt aus dem Mapping: ggf. Mitarbeiter-Excel neu importieren.';
             body.innerHTML = `<tr><td colspan="13" style="text-align:center; padding:24px; color:#9C9C9C;">${leerTxt}</td></tr>`;
-            ['qKpiCs','qKpiTnps','qKpiAufleger','qKpiFq','qKpiAht','qKpiAcw','qKpiAcht','qKpiDet','qKpiKurz','qKpiNonTrack'].forEach(id => setV(id,'—','#7E7E7E'));
+            ['qKpiCalls','qKpiAcw','qKpiAht','qKpiAcht','qKpiCs','qKpiCsDds','qKpiTnps','qKpiTnpsAq','qKpiDds','qKpiFtf','qKpiFq'].forEach(id => setV(id,'—','#7E7E7E'));
             const tzLeer = document.getElementById('rcQualiTeamZeiten');
             if (tzLeer) tzLeer.innerHTML = '<div style="padding:8px; color:#9C9C9C; font-size:11px;">Warte auf Daten</div>';
             return;
@@ -8723,8 +11008,22 @@
         };
         const avgCs   = pool('csZ',   'csN',   'cs');
         const avgTnps = pool('tnpsZ', 'tnpsN', 'tnps');
-        const avgAq   = pool('aqZ',   'aqN',   'auflegerquote');
         const avgFq   = pool('fqZ',   'fqN',   'fq');
+        const avgDds  = pool('ddsZ',  'ddsN',  'dds');
+        const avgFtf  = pool('ftfZ',  'ftfN',  'ftf');
+        // CS Deep Detractor % und TNPS Antwortquote % kommen ohne Zaehler/Nenner aus der
+        // Ligaliste: gewichteter Mittelwert ueber die Bezugsmenge (CS-Antworten bzw. Calls),
+        // ohne Gewichte arithmetisch. Fehlt die Spalte ganz, bleibt es null ("—", nie 0).
+        const wMittel = (kKey, wKey) => {
+            const v = list.filter(k => k[kKey] != null);
+            if (!v.length) return null;
+            const gw = v.filter(k => k[wKey] > 0);
+            if (gw.length) return gw.reduce((s, k) => s + k[kKey] * k[wKey], 0) / gw.reduce((s, k) => s + k[wKey], 0);
+            return v.reduce((s, k) => s + k[kKey], 0) / v.length;
+        };
+        const avgCsDds  = wMittel('csDds',  'csN');
+        const avgTnpsAq = wMittel('tnpsAq', 'callCount');
+        const callsSum  = list.some(k => k.callCount != null) ? list.reduce((s, k) => s + (k.callCount || 0), 0) : null;
         // AHT ist ein Mittelwert JE CALL, also ueber die Calls gewichtet — mit
         // eigenem Nenner. Ein Agent ohne AHT-Meldung darf den Nenner nicht
         // aufblaehen, sonst faellt der Wert kuenstlich.
@@ -8735,12 +11034,9 @@
         // ACW (Nacharbeit) und ACHT (Haltezeit) — dieselbe Gewichtung wie AHT.
         const mAcw  = rcZeitMittel(list, 'acwSec');
         const mAcht = rcZeitMittel(list, 'achtSec');
-        const detSum = list.reduce((s,k)=>s+(k.det||0),0);
         // FF7-Schutz: unter 8 Min AHT leidet die 7-Tage-Loesungsquote — sofort gegensteuern
         const kurzArr = list.filter(k => k.ahtSec != null && k.ahtSec > 0 && k.ahtSec < 480 && k.callCount >= 5)
                             .sort((a,b) => a.ahtSec - b.ahtSec);
-        let nonTrack = 0;
-        list.forEach(k => { const a = eslAnsp(k) || 0; if ((k.callCount>=10 && (a/k.callCount)<0.2) || (k.callCount>=5 && a===0)) nonTrack++; });
 
         // Alter der Liga-Daten anschreiben (Korrektur 04.08.). Die Ligaliste kommt
         // im 5-Minuten-Takt, der ESL-Strom alle 20 Sekunden — wer beide Seiten
@@ -8763,8 +11059,12 @@
         const pct = v => v!=null ? v.toFixed(1).replace('.',',')+' %' : '—';
         setV('qKpiCs',   pct(avgCs),   zielColor(avgCs,  RC_ZIELE.cs));
         setV('qKpiTnps', pct(avgTnps), zielColor(avgTnps,RC_ZIELE.tnps));
-        setV('qKpiAufleger', pct(avgAq), zielColor(avgAq, RC_ZIELE.aq));
         setV('qKpiFq',   pct(avgFq),   zielColor(avgFq,  RC_ZIELE.fq));
+        setV('qKpiCalls', callsSum != null ? callsSum : '—', callsSum != null ? '#F5F5F5' : RC_AMPEL_LEER);
+        setV('qKpiCsDds', pct(avgCsDds), zielColor(avgCsDds, RC_ZIELE.dds));
+        setV('qKpiTnpsAq', pct(avgTnpsAq), avgTnpsAq != null ? '#F5F5F5' : RC_AMPEL_LEER);
+        setV('qKpiDds',  pct(avgDds),  zielColor(avgDds, RC_ZIELE.dds));
+        setV('qKpiFtf',  pct(avgFtf),  zielColor(avgFtf, RC_ZIELE.ftf));
         setV('qKpiAht',  avgAhtMin!=null ? avgAhtMin.toFixed(1).replace('.',',')+' Min' : '—', zielColor(avgAhtMin, RC_ZIELE.ahtMin));
         // Zwei Zustaende auseinanderhalten: Spalte fehlt (Portal-Auswahl) vs.
         // Spalte da, aber noch kein Wert. Ohne diese Unterscheidung steht bei
@@ -8782,9 +11082,6 @@
         };
         setZeit('qKpiAcw',  mAcw,  RC_ZIELE.acwSek);
         setZeit('qKpiAcht', mAcht, RC_ZIELE.achtSek);
-        setV('qKpiDet',  detSum, detSum>0 ? '#E60000' : '#F5F5F5');
-        setV('qKpiKurz', kurzArr.length, kurzArr.length>0 ? RC_AMPEL_WARN : '#F5F5F5');
-        setV('qKpiNonTrack', nonTrack, nonTrack>0 ? '#E60000' : '#F5F5F5');
 
         // Chart links: CS & TNPS je Standort (horizontale Balken)
         (function(){
@@ -8946,13 +11243,13 @@
                 <td style="text-align:center; color:${zielColor(k.ahtSec!=null?k.ahtSec/60:null, RC_ZIELE.ahtMin)};" class="rc-mono">${fmtAht(k.ahtSec)}</td>
                 ${zeitZelle(k.acwSec,  RC_ZIELE.acwSek)}
                 ${zeitZelle(k.achtSec, RC_ZIELE.achtSek)}
-                ${cell(k.auflegerquote, RC_ZIELE.aq)}
                 ${cell(k.cs, RC_ZIELE.cs)}
+                ${cell(k.csDds, RC_ZIELE.dds)}
                 ${cell(k.tnps, RC_ZIELE.tnps)}
-                ${cell(k.fq, RC_ZIELE.fq)}
+                <td style="text-align:center; color:#F5F5F5;" class="rc-mono">${k.tnpsAq!=null?k.tnpsAq.toFixed(1).replace('.',','):'—'}</td>
                 ${cell(k.dds, RC_ZIELE.dds)}
-                <td style="text-align:center; color:${(k.det||0)>0?'#E60000':'#F5F5F5'};" class="rc-mono">${k.det!=null?k.det:'—'}</td>
-                <td style="text-align:center; color:#F5F5F5; font-size:12px;" class="rc-mono">${ansp!=null?ansp:'—'}</td>
+                ${cell(k.ftf, RC_ZIELE.ftf)}
+                ${cell(k.fq, RC_ZIELE.fq)}
             </tr>`;
         });
         body.innerHTML = html;
@@ -13215,7 +15512,7 @@
 
     // ============================================================
     //  VERTRIEBS-BLOCKER-ANALYSE — welche Qualitaets-Kennzahl bremst
-    //  gerade den Verkauf? Nutzt ALLE Ligalisten-Werte (WQ, ACW, AQ,
+    //  gerade den Verkauf? Nutzt ALLE Ligalisten-Werte (WQ, ACW,
     //  FQ, CS, AHT) und verknuepft sie mit den ESL-Vertriebszahlen zu
     //  konkreten Ursache-Wirkungs-Befunden.
     // ============================================================
@@ -13247,9 +15544,6 @@
             // Vertrauen da, Abschluss fehlt: CS hoch, Ansprache niedrig
             if (k.cs != null && k.cs >= 90 && ansp != null && calls >= 15 && ansp/calls < 0.3) out.push({ p: 72, cat:'POTENZIAL',
                 txt: nm(k) + ': CS ' + pct0(k.cs) + ' % — die Kunden vertrauen. Aber nur ' + Math.round(ansp/calls*100) + ' % Ansprache: hier liegt der Abschluss schon bereit, er wird nur nicht abgeholt.' });
-            // Auflegerquote: Kunden brechen ab, bevor eine Ansprache moeglich ist
-            if (k.auflegerquote != null && k.auflegerquote < 75) out.push({ p: 95 - k.auflegerquote, cat:'AUFLEGER',
-                txt: nm(k) + ': Auflegerquote ' + pct0(k.auflegerquote) + ' % — jeder vierte Kunde ist vor Gespraechsende weg. Dort stirbt jede Verkaufschance zuerst.' });
             // TNPS stark, aber kaum Feedback: gute Arbeit bleibt unsichtbar
             if (k.fq != null && k.fq < 15 && k.tnps != null && k.tnps >= 70) out.push({ p: 24, cat:'FEEDBACK',
                 txt: nm(k) + ': TNPS ' + pct0(k.tnps) + ' % stark, aber nur ' + pct0(k.fq) + ' % Feedbackquote — aktiv um Bewertung bitten, sonst zaehlt die gute Arbeit nicht.' });
@@ -13365,7 +15659,7 @@
         // Vertriebs-Blocker: die Ligalisten-Kennzahlen erklaeren die Vertriebsquote
         const insEl = document.getElementById('rcCkInsights');
         if (insEl) {
-            const CAT_COL = { WEITERLEITUNG:'#FF6666', AHT:'#E60000', NACHARBEIT:'#FF6666', POTENZIAL:'#F5F5F5', AUFLEGER:'#E60000', FEEDBACK:'#9C9C9C' };
+            const CAT_COL = { WEITERLEITUNG:'#FF6666', AHT:'#E60000', NACHARBEIT:'#FF6666', POTENZIAL:'#F5F5F5', FEEDBACK:'#9C9C9C' };
             const ins = window.rcBuildInsights ? window.rcBuildInsights() : [];
             insEl.innerHTML = ins.length ? ins.map(x => `<div style="padding:7px 10px; margin-bottom:5px; background:#232323; border-left:3px solid ${CAT_COL[x.cat]||'#9C9C9C'}; border-radius:4px;">
                     <div style="font-size:10px; font-weight:700; letter-spacing:0.5px; color:${CAT_COL[x.cat]||'#9C9C9C'};">${x.cat}</div>
@@ -13578,21 +15872,20 @@
         const f = rcCkFilters();
         const filterActive = !(f.std === 'ALL' && f.team === 'ALL' && f.stack === 'ALL');
         const voMap = (window.rcWcaMapping && window.rcWcaMapping.voMap) || {};
-        const stackMap = (window.rcWcaMapping && window.rcWcaMapping.stackMap) || {};
         const liveAg = (window.rcLetzteStats && window.rcLetzteStats.agentStats) || {};
         const scopeOf = vo => {
             const mm = voMap[vo] || {}, la = liveAg[vo] || {};
             const std = normalizeStandort(mm.standort || la.standort || '');
             const team = ((mm.team || la.team || '') + '').trim();
-            const stack = (mm.team && stackMap[mm.team]) || la.stack || (window.rcStackOf ? window.rcStackOf(team) : '') || '';
-            return { std, team, stack };
+            // projekt: aus der Lieferung von heute, sonst aus dem Stack (rcStackFilterPasst).
+            return { std, team, projekt: la.projekt || rcProjektVonAgent(vo) };
         };
         const inScope = vo => {
             if (!filterActive) return true;
             const sc = scopeOf(vo);
             if (f.std !== 'ALL' && sc.std !== f.std) return false;
             if (f.team !== 'ALL' && sc.team !== f.team) return false;
-            if (f.stack !== 'ALL' && sc.stack !== f.stack) return false;
+            if (f.stack !== 'ALL' && !rcStackFilterPasst(sc.team, f.stack, sc.projekt)) return false;
             return true;
         };
         const mVal = e => metric === 'bnt' ? (e.bnt || 0) : metric === 'vvl' ? (e.vvl || 0) : metric === 'kip' ? (e.kip || 0) : (e.mob || 0);
@@ -13956,9 +16249,16 @@
     // Liga-Agenten mit 0 Calls als reine Leerzeilen im Bericht.
     function rcStandRowHasData(r){
         if ((r.calls||0) > 0 || (r.ansp||0) > 0) return true;
+        // ESL-Kontakte zaehlen als Daten (09.09.). Ohne diese Zeile hob das Sieb
+        // hier den 19.08.-Fix von :14076 fuer genau dessen Zielfall wieder auf:
+        // ein Agent, der telefoniert und eintraegt, aber nichts abschliesst und
+        // keine BCR-Ansprache hat, wurde 118 Zeilen spaeter erneut verworfen.
+        // Am Export vom 09.09. gemessen: Araci Serpil, 22 Kontakte, 0 Ansprachen,
+        // 0 Stueck — die Kontakte fehlten im Nenner der Tracking-Quote.
+        if ((r.kont||0) > 0) return true;
         if ((r.bnt||0) > 0 || (r.vvl||0) > 0 || (r.mob||0) > 0 || (r.kip||0) > 0) return true;
         if ((r.ahtSec != null && r.ahtSec > 0) || (r.detr != null && r.detr > 0)) return true;
-        return [r.aq, r.cs, r.tnps, r.fq, r.dds, r.ftf].some(o => o && o.v != null);
+        return [r.cs, r.tnps, r.fq, r.dds, r.ftf].some(o => o && o.v != null);
     }
 
     // ============================================================
@@ -13972,6 +16272,31 @@
     // "Aktueller Stand"-Export gehen — damit laesst sich pruefen, ob eine Kennzahl
     // zu Recht leer ist ("Keine") oder faelschlich als 0 gemeldet wird.
     window.rcStandRowsDebug = function(dayKey, scope){ return rcStandRows(dayKey, scope); };
+    // Die ESL-Agenten von HEUTE ohne Dashboard-Filter (28.09.). rcLetzteStats ist
+    // schon beim Parsen auf den Dashboard-Filter geschnitten (Fallstrick 24) — ein
+    // Export oder Report mit EIGENEM Zuschnitt las damit nur die gefilterten
+    // Agenten. Seit der Stack-Filter das Projekt waehlt (MF_CARE = Mobile), ist das
+    // der Normalfall: im Browser gemessen (Schein-ESL, alle drei Projekte) trug
+    // "Alle Stacks" bei Filter VUM_Care 53 statt 614 Agenten. Einmal ungefiltert
+    // nachrechnen, den Filterstand sofort
+    // wiederherstellen — beides synchron, dazwischen zeichnet der Browser nichts.
+    // Neue Verkaeufe loesen dabei nichts aus (rcCelebratedSales merkt sie filterfrei).
+    function rcAgentenVollbestand(){
+        const wert = id => (document.getElementById(id) || {}).value || 'ALL';
+        const gefiltert = wert('rcStandortFilter') !== 'ALL' || wert('rcStackFilter') !== 'ALL';
+        if (!gefiltert || !window.rcLetzterDatenstrom || window.__rcParseOhneFilter)
+            return window.rcLetzteStats ? Object.values(window.rcLetzteStats.agentStats) : [];
+        let voll = [];
+        window.__rcParseOhneFilter = true;
+        try {
+            window.processDataStream(window.rcLetzterDatenstrom);
+            voll = window.rcLetzteStats ? Object.values(window.rcLetzteStats.agentStats) : [];
+        } finally {
+            window.__rcParseOhneFilter = false;
+            window.processDataStream(window.rcLetzterDatenstrom);
+        }
+        return voll;
+    }
     function rcStandRows(dayKey, scope){
         const tKey = (d => d.getFullYear()+'-'+pad2(d.getMonth()+1)+'-'+pad2(d.getDate()))(new Date());
         // __rcHistorieErzwingen (06.08. spaetabends): der Alle-Projekte-Export
@@ -13989,7 +16314,24 @@
         const sSelE = document.getElementById('rcStackFilter');
         const fsE = (scope && scope.stack != null) ? scope.stack : (sSelE ? (sSelE.value || 'ALL') : 'ALL');
         const mapM = window.rcWcaMapping || {};
-        const ccsMapE = mapM.ccsMap || {}, stackMapE = mapM.stackMap || {}, voMapE = mapM.voMap || {};
+        const ccsMapE = mapM.ccsMap || {}, voMapE = mapM.voMap || {};
+        // ---- Stack mit Anker-Rueckfall (09.09.) -------------------------------
+        // Der Stack steht NUR in der Mitarbeiter-Excel. Wer dort fehlt, hatte
+        // keinen — und flog aus jedem stackgefilterten Export, ohne jede Meldung
+        // (am Export vom 09.09. gemessen: 10 Agenten, 93 ESL-Zeilen, 260 Liga-Calls).
+        // Rueckfall ist der Stack der GEMAPPTEN Kollegen desselben Teams, und zwar
+        // nur bei Eindeutigkeit, aus zwei Quellen: der Liga-Team-NUMMER und dem
+        // ESL-ROHTEAM. Seit 05.10. steht diese Regel ZENTRAL (rcStackRegel /
+        // rcStackFilterPasst) und gilt genauso im Live-Parser, in den Modulen und
+        // im Liga-Filter — hier stand bis dahin eine eigene Fassung, und der
+        // Export zaehlte Agenten mit, die das Dashboard unter demselben Filter
+        // nicht zeigte (VKD_Tech am 28.09.: 125 gegen 110).
+        // Der unfiltrierte Agenten-Bestand ZUERST: sein Parser-Lauf legt den
+        // ESL-Anker (rcRohTeamStack) frisch an, den die Regel unten liest.
+        const agentsVoll = live ? rcAgentenVollbestand() : [];
+        const stackRegel = rcStackRegel();
+        // Traegt diese Einheit ihren Stack nur ueber den Anker? (fuer die Kennzeichnung)
+        const nurAnker = stackRegel.nurAnker;
         const useKey = live ? tKey : dayKey;
         const label = useKey.slice(8) + '.' + useKey.slice(5,7) + '.' + useKey.slice(0,4);
         const rows = [];
@@ -13999,8 +16341,8 @@
             const teamOfK = k => (((ccsMapE[k.ccsId] && ccsMapE[k.ccsId].team) || k.team || '') + '').trim();
             if (fvE !== 'ALL') ligaList = ligaList.filter(k => window.rcLigaMeta(k).std === fvE);
             if (ftE !== 'ALL') ligaList = ligaList.filter(k => teamOfK(k) === ftE);
-            if (fsE !== 'ALL') ligaList = ligaList.filter(k => { const tm = teamOfK(k); return tm && (stackMapE[tm] || '') === fsE; });
-            const agentsAll2 = window.rcLetzteStats ? Object.values(window.rcLetzteStats.agentStats) : [];
+            if (fsE !== 'ALL') ligaList = ligaList.filter(k => rcStackFilterPasst(teamOfK(k), fsE, rcProjektVonAgent(k.ccsId)));
+            const agentsAll2 = agentsVoll;
             const eslByCcs = {}, eslByName = {};
             agentsAll2.forEach(a => { if (a.ccsId) eslByCcs[a.ccsId] = a; eslByName[window.rcNormName(a.name)] = a; });
             // Notnagel fuer Agenten, die NICHT in der Mitarbeiter-Excel stehen (19.08.):
@@ -14034,7 +16376,7 @@
                     nenner != null ? nenner > 0 : (ersatz == null ? true : ersatz > 0);
                 rows.push({
                     team: teamOfK(k), name: k.agentName, calls, ahtSec: k.ahtSec,
-                    aq:   { z: k.aqZ   != null ? k.aqZ   : null, n: k.aqN   != null ? k.aqN   : null, v: (k.auflegerquote != null && hatBasis(k.aqN, calls)) ? k.auflegerquote : null },
+                    ohneMap: nurAnker(teamOfK(k)),   // Stack nur ueber den Anker (09.09.)
                     cs:   { z: k.csZ   != null ? k.csZ   : null, n: k.csN   != null ? k.csN   : npsCs, v: (k.cs   != null && hatBasis(k.csN, npsCs)) ? k.cs   : null },
                     tnps: { z: k.tnpsZ != null ? k.tnpsZ : null, n: k.tnpsN != null ? k.tnpsN : npsTn, v: (k.tnps != null && hatBasis(k.tnpsN, npsTn)) ? k.tnps : null },
                     fq:   { z: k.fqZ   != null ? k.fqZ   : null, n: k.fqN   != null ? k.fqN   : null, v: (k.fq   != null && hatBasis(k.fqN, calls)) ? k.fq : null },
@@ -14086,9 +16428,10 @@
                 if ((a.ccsId && coveredCcs.has(String(a.ccsId))) || coveredNm.has(nm)) return; // schon als Liga-Zeile
                 if (fvE !== 'ALL' && a.standort !== fvE) return;
                 if (ftE !== 'ALL' && (a.team||'') !== ftE) return;
-                if (fsE !== 'ALL' && (a.stack||'') !== fsE) return;
+                if (fsE !== 'ALL' && !rcStackFilterPasst(a.team, fsE, a.projekt)) return;
                 rows.push({ team: a.team||'', name: a.name, calls: 0, ahtSec: null,
-                    aq:{z:null,v:null}, cs:{z:null,v:null}, tnps:{z:null,v:null}, fq:{z:null,v:null}, dds:{z:null,v:null}, detr:null, ftf:{z:null,v:null},
+                    ohneMap: nurAnker(a.team),   // Stack nur ueber den Anker (09.09.)
+                    cs:{z:null,v:null}, tnps:{z:null,v:null}, fq:{z:null,v:null}, dds:{z:null,v:null}, detr:null, ftf:{z:null,v:null},
                     hasEsl: true, ansp: a.ansprachen||0, mob: a.mob||0, kip: a.kip||0, bnt: a.bnt||0, vvl: a.vvl||0,
                     standort: normalizeStandort(a.standort || ''), ccs: (a.ccsId || '') + '', kont: a.kontakte || 0,
                     prodG: a.prodG || null, prodGBcr: a.prodGBcr || null });
@@ -14136,19 +16479,20 @@
                 const std = normalizeStandort(meta.standort || '');
                 if (fvE !== 'ALL' && std !== fvE) return;
                 if (ftE !== 'ALL' && team !== ftE) return;
-                if (fsE !== 'ALL' && (!team || (stackMapE[team] || '') !== fsE)) return;
+                if (fsE !== 'ALL' && !rcStackFilterPasst(team, fsE, rcProjektVonAgent(id))) return;
                 const nm = meta.name || (window.rcKpiData && window.rcKpiData[id] && window.rcKpiData[id].agentName) || ('CCS ' + id);
                 const ag = eslByCcs[id] || (window.rcNormName ? eslByName[window.rcNormName(nm)] : null) || null;
                 rows.push({
                     team, name: nm, calls: v.c || 0, ahtSec: v.aht != null ? v.aht : null,
                     // Nenner (n*) kommen ab Crawler-Fassung 29.07. mit; fehlen sie in
                     // aelteren Snapshots, bleibt es beim bisherigen Verhalten.
-                    aq:   { z: v.za != null ? v.za : null, n: v.na != null ? v.na : null, v: (v.aq  != null && (v.na == null || v.na > 0)) ? v.aq  : null },
                     cs:   { z: v.zc != null ? v.zc : null, n: v.nc != null ? v.nc : null, v: (v.cs  != null && (v.nc == null || v.nc > 0)) ? v.cs  : null },
                     tnps: { z: v.zt != null ? v.zt : null, n: v.nt != null ? v.nt : null, v: (v.tn  != null && (v.nt == null || v.nt > 0)) ? v.tn  : null },
                     fq:   { z: v.zf != null ? v.zf : null, n: v.nf != null ? v.nf : null, v: (v.fq  != null && (v.nf == null || v.nf > 0)) ? v.fq  : null },
                     dds:  { z: v.zd != null ? v.zd : null, n: v.nd != null ? v.nd : null, v: (v.dds != null && (v.nd == null || v.nd > 0)) ? v.dds : null },
-                    detr: (v.dt != null ? v.dt : (v.det != null ? v.det : 0)),   // TNPS-Detraktoren (ANZAHL, nicht %)
+                    // TNPS-Detraktoren (ANZAHL, nicht %). nurCalls: der Dienst holt fuer Vortage
+                    // nur die Calls — dann ist "keine geliefert" nicht 0 Detraktoren.
+                    detr: (v.dt != null ? v.dt : (v.det != null ? v.det : (lig.nurCalls ? null : 0))),
                     ftf:  { z: v.zx != null ? v.zx : null, n: v.nx != null ? v.nx : null,
                             v: (v.ftf != null && (v.nx != null ? v.nx > 0 : (v.ftf > 0 || v.zx > 0))) ? v.ftf : null },
                     hasEsl: !!ag, ansp: ag ? ag.ansp : 0,
@@ -14182,9 +16526,9 @@
                 const std = normalizeStandort(m.standort || (cm && cm.standort) || la.standort || '');
                 if (fvE !== 'ALL' && std !== fvE) return;
                 if (ftE !== 'ALL' && team !== ftE) return;
-                if (fsE !== 'ALL' && (!team || (stackMapE[team] || '') !== fsE)) return;
+                if (fsE !== 'ALL' && !rcStackFilterPasst(team, fsE, la.projekt || rcProjektVonAgent(vo))) return;
                 rows.push({ team, name: nm, calls: 0, ahtSec: null,
-                    aq:{z:null,v:null}, cs:{z:null,v:null}, tnps:{z:null,v:null}, fq:{z:null,v:null}, dds:{z:null,v:null}, detr:null, ftf:{z:null,v:null},
+                    cs:{z:null,v:null}, tnps:{z:null,v:null}, fq:{z:null,v:null}, dds:{z:null,v:null}, detr:null, ftf:{z:null,v:null},
                     hasEsl: true, ansp: e.a || 0, mob: e.mob != null ? e.mob : null, kip: e.kip != null ? e.kip : null, bnt: bntV, vvl: e.vvl || 0,
                     standort: std, ccs: (ccs || '') + '', kont: e.k != null ? e.k : 0,
                     prodG: e.pg || null, prodGBcr: e.pgB || null });
@@ -14248,7 +16592,7 @@
     const RC_ALARM = 'FF9B0F08';
     // Erfolgstoene fuer Verkaufs-Stueckzahlen (1-2 / ab 3).
     const RC_TREFFER = 'FF009864', RC_TREFFER_HOCH = 'FF00684A';
-    // Marker-Fuellfarbe der Kopfband-Zelle O3:U5. Sie wird nach dem Schreiben durch
+    // Marker-Fuellfarbe der Kopfband-Zelle L3:Q5. Sie wird nach dem Schreiben durch
     // einen echten gradientFill ersetzt (rcXlsxVeredeln). Der Ton liegt dicht am
     // Verlaufsanfang #0033CC, damit ein fehlgeschlagener Patch nicht auffaellt.
     const RC_GRAD_MARKER = 'FF0134CD';
@@ -14278,7 +16622,6 @@
     // allesamt die schlechtesten Werte der Liste, und alle blieben unbunt.
     const rcGrad = (v, g, o) => v == null ? null : (v >= g ? 'G' : v >= o ? 'O' : 'R');
     const RC_SKALA = {
-        aq:    v => rcGrad(v, 85, 80),
         cs:    v => rcGrad(v, 90, 85),
         tnps:  v => rcGrad(v, 70, 60),
         fq:    v => rcGrad(v, 30, 25),
@@ -14855,8 +17198,8 @@
         const png = await rcLogoPngBytes();
         let anker = rcLogoAnker.slice();
         // Rueckfall, falls kein Blatt seinen Ankerpunkt gemeldet hat (z.B. weil der
-        // Aufrufer nur ein einzelnes Blatt erwartet): Stand-Blatt-Geometrie R..U.
-        if (!anker.length && blattName) anker = [ rcLogoAnkerBauen(blattName, 17, [7.00, 7.00, 8.50, 8.50]) ];
+        // Aufrufer nur ein einzelnes Blatt erwartet): Stand-Blatt-Geometrie N..Q.
+        if (!anker.length && blattName) anker = [ rcLogoAnkerBauen(blattName, 13, [7.00, 7.00, 8.50, 8.50]) ];
         return {
             gradient: { marker: RC_GRAD_MARKER, von: RC_GRAD_VON, bis: RC_GRAD_BIS, degree: rcGradDegree },
             logo: (png && anker.length) ? { png: png, blaetter: anker.map(a => a.blatt), anker: anker } : null
@@ -14906,10 +17249,10 @@
     // ============================================================
     //  "AKTUELLER STAND"-BLATT + Bewertungslogik —
     //  eigenstaendig, damit auch VORTAGE exportierbar sind.
-    //  Aufbau nach Nutzer-Vorgabe vom 30.07.: Spalten B..U (20),
-    //  Detraktoren nur noch EINE Spalte (Anzahl), First-Time-Fix
-    //  VOR den Detraktoren, Kopfband mit Farbverlauf, darunter
-    //  Verteilungsband und Fussnote.
+    //  Aufbau nach Nutzer-Vorgabe vom 30.07., gekuerzt am 30.10.: Spalten B..Q (16),
+    //  ohne AQ und ohne "Geloest" (First-Time-Fix); Detraktoren nur EINE
+    //  Spalte (Anzahl), Kopfband mit Farbverlauf, darunter Verteilungsband
+    //  und Fussnote.
     // ============================================================
     function rcBuildStandSheets(XL, wb, styled, data, opts){
         opts = opts || {};
@@ -14925,16 +17268,16 @@
 
         const verkaufZelle = (v, zeb, gesamt, kern) => rcVerkaufZelle(cell, v, zeb, gesamt, kern);
 
-        // ---------- Blatt A: Stand (A = Rand, Inhalt B..U, V = Rand) ----------
-        const NC = 22;              // Spalten A..V
-        const LETZTE = 20;          // Spalte U — letzte Inhaltsspalte
+        // ---------- Blatt A: Stand (A = Rand, Inhalt B..Q, R = Rand) ----------
+        const NC = 18;              // Spalten A..R
+        const LETZTE = 16;          // Spalte Q — letzte Inhaltsspalte
         const rows2 = [], rowH = [];
         const span = (row, c1, c2, mk) => { for (let c = c1; c <= c2; c++) row[c] = mk(c === c1, c); };
         const blank = () => { const r = []; r[0] = cell('', { nb:true }); return r; };
 
-        // Z1: Navigationstext rechtsbuendig (O1:U1)
+        // Z1: Navigationstext rechtsbuendig (L1:Q1)
         const rNav = blank();
-        span(rNav, 14, LETZTE, f => f
+        span(rNav, 11, LETZTE, f => f
             ? cell('AKTUELLER STAND      QUALITÄT      VERTRIEB', { fc:X.MUTED, sz:9, al:'right', nb:true })
             : cell('', { nb:true }));
         rows2.push(rNav); rowH.push({ hpt:16.5 });
@@ -14942,7 +17285,7 @@
         const rTop = blank(); span(rTop, 1, LETZTE, () => cell('', { bg:X.ORANGE, nb:true }));
         rows2.push(rTop); rowH.push({ hpt:5.1 });
         // Z3..Z5: Kopfband — links einfarbig blueDeep mit Titel, rechts EINE ueber
-        // O3:U5 verbundene Zelle mit echtem Excel-Farbverlauf und dem Logo darauf.
+        // L3:Q5 verbundene Zelle mit echtem Excel-Farbverlauf und dem Logo darauf.
         //
         // Weder der Verlauf noch das Bild lassen sich ueber die SheetJS-API schreiben.
         // Beides wird nach XLSX.write in die fertige Datei gepatcht (rcXlsxVeredeln,
@@ -14955,45 +17298,45 @@
         const standTitel = (data.today ? 'AKTUELLER STAND' : 'STAND ' + data.label) + (bereich ? ' · ' + bereich : '');
         for (let i = 0; i < 3; i++) {
             const r = blank();
-            span(r, 1, 13, f => f && i === 0
+            span(r, 1, 10, f => f && i === 0
                 ? cell(standTitel, { bg:X.BLAU, fc:X.WEISS, sz:14, al:'left', ind:1, nb:true })
                 : cell('', { bg:X.BLAU, nb:true }));
             // Alle Zellen des Merge-Bereichs tragen denselben Style — sonst zeichnet
             // Excel den Verlauf nur ueber die linke obere Zelle.
-            span(r, 14, LETZTE, () => cell('', { bg:RC_GRAD_MARKER, nb:true }));
+            span(r, 11, LETZTE, () => cell('', { bg:RC_GRAD_MARKER, nb:true }));
             rows2.push(r); rowH.push({ hpt: i === 0 ? 21.95 : i === 1 ? 25.5 : 21.75 });
         }
-        // Z6: Zeitraum (B:E) + QUALITAET (F:P) + Sales Ansprache (Q, hoch verbunden)
-        //     + VERTRIEB (R:U).
-        // "Sales Ansprache" laeuft ueber die Band- UND die Gruppenzeile (Q6:Q8),
+        // Z6: Zeitraum (B:E) + QUALITAET (F:L) + Sales Ansprache (M, hoch verbunden)
+        //     + VERTRIEB (N:Q).
+        // "Sales Ansprache" laeuft ueber die Band- UND die Gruppenzeile (M6:M8),
         // damit der lange Name umbrochen und zentriert lesbar ist, statt in einer
         // 8,5 Zeichen breiten Kopfzelle abgeschnitten zu werden.
         const r5 = blank();
         span(r5, 1, 4,  f => f ? cell(rcZeitraumText(data), { bg:X.DUNKEL, fc:X.WEISS, al:'left', ind:1, sz:9, fn:'Roboto', b:false }) : cell('', { bg:X.DUNKEL }));
-        span(r5, 5, 15, f => f ? cell('QUALITÄT', { bg:X.DUNKEL, fc:X.WEISS, sz:9.5 }) : cell('', { bg:X.DUNKEL }));
-        r5[16] = cell('Sales Ansprache', { bg:X.DUNKEL, fc:X.WEISS, sz:9, wrap:true });
-        span(r5, 17, LETZTE, f => f ? cell('VERTRIEB', { bg:X.DUNKEL, fc:X.WEISS, sz:9.5 }) : cell('', { bg:X.DUNKEL }));
+        span(r5, 5, 11, f => f ? cell('QUALITÄT', { bg:X.DUNKEL, fc:X.WEISS, sz:9.5 }) : cell('', { bg:X.DUNKEL }));
+        r5[12] = cell('Sales Ansprache', { bg:X.DUNKEL, fc:X.WEISS, sz:9, wrap:true });
+        span(r5, 13, LETZTE, f => f ? cell('VERTRIEB', { bg:X.DUNKEL, fc:X.WEISS, sz:9.5 }) : cell('', { bg:X.DUNKEL }));
         rows2.push(r5); rowH.push({ hpt:19.5 });
-        // Z7: weisse Trennzeile — in Spalte Q dunkel, sie gehoert zur verbundenen
+        // Z7: weisse Trennzeile — in Spalte M dunkel, sie gehoert zur verbundenen
         // "Sales Ansprache"-Zelle und darf dort keinen weissen Riss zeigen.
-        const rTrenn = blank(); rTrenn[16] = cell('', { bg:X.DUNKEL });
+        const rTrenn = blank(); rTrenn[12] = cell('', { bg:X.DUNKEL });
         rows2.push(rTrenn); rowH.push({ hpt:4.5 });
         // Z8: Gruppenkopf
         const r7 = blank();
-        const GRP = [ [1,4,'DATEN &  AHT / VOLUMEN',X.TXT], [5,6,'AQ  |  > 85 %',X.BLAU], [7,8,'CS  |  > 90 %',X.GRUEN],
-            // "Gelöst" ist die Nutzer-Beschriftung fuer die First-Time-Fix-Kennzahl —
-            // die Zahlen dahinter bleiben unveraendert die FTF-Werte.
-            [9,10,'TNPS  |  > 70 %',X.ORANGE], [11,12,'FQ  |  > 30 %',X.PINK], [13,14,'Gelöst',X.BLAU],
-            [15,15,'Detra',X.DUNKEL], [17,19,'BNT',X.ROT], [20,20,'VVL',X.ROT] ];
+        // AQ und "Gelöst" (First-Time-Fix) stehen seit 30.10. nicht mehr im Blatt
+        // (Nutzer-Vorgabe) — die Qualitaets-Gruppen sind CS, TNPS, FQ.
+        const GRP = [ [1,4,'DATEN &  AHT / VOLUMEN',X.TXT], [5,6,'CS  |  > 90 %',X.GRUEN],
+            [7,8,'TNPS  |  > 70 %',X.ORANGE], [9,10,'FQ  |  > 30 %',X.PINK],
+            [11,11,'Detra',X.DUNKEL], [13,15,'BNT',X.ROT], [16,16,'VVL',X.ROT] ];
         GRP.forEach(g => span(r7, g[0], g[1], f => f
             ? cell(g[2], { bg:g[3], fc:X.WEISS, sz:9, wrap:true })
             : cell('', { bg:g[3] })));
-        r7[16] = cell('', { bg:X.DUNKEL });   // gehoert zur verbundenen Sales-Ansprache-Zelle
+        r7[12] = cell('', { bg:X.DUNKEL });   // gehoert zur verbundenen Sales-Ansprache-Zelle
         rows2.push(r7); rowH.push({ hpt:20.25 });
-        // Z9: Unterkopf — 20 Eintraege fuer B..U
+        // Z9: Unterkopf — 16 Eintraege fuer B..Q
         // "Zähler" heisst jetzt "IST" (Nutzer-Vorgabe 31.07.). Gemeint ist dieselbe
         // Zahl — die absolute Stueckzahl neben der Quote.
-        const sub2 = ['Team','Agent','Calls','Ø Min.','IST','IST %','IST','IST %','IST','IST %','IST','IST %','IST','IST %','Anzahl','IST %','MOB','KIP','BNT GES.','VVL GES.'];
+        const sub2 = ['Team','Agent','Calls','Ø Min.','IST','IST %','IST','IST %','IST','IST %','Anzahl','IST %','MOB','KIP','BNT GES.','VVL GES.'];
         const r8 = blank();
         // MOB (17) und KIP (18) im Kopf hervorheben — dieselbe Logik wie im
         // Vertriebs-Blatt, damit beide Blaetter dieselbe Sprache sprechen.
@@ -15016,10 +17359,10 @@
         // z/n  = nur Zaehler MIT Nenner (Grundlage der gepoolten Quote) — beides
         //        auseinanderzuhalten ist noetig, siehe Kommentar bei der Summierung.
         const sum = { calls:0, ahtW:0, ahtN:0, mob:0, kip:0, bnt:0, vvl:0, ansp:0, detrSum:0,
-            zAll: { aq:null, cs:null, tnps:null, fq:null, ftf:null },
-            z: { aq:null, cs:null, tnps:null, fq:null, ftf:null },
-            n: { aq:null, cs:null, tnps:null, fq:null, ftf:null },
-            q: { aq:[], cs:[], tnps:[], fq:[], ftf:[] } };
+            zAll: { cs:null, tnps:null, fq:null },
+            z: { cs:null, tnps:null, fq:null },
+            n: { cs:null, tnps:null, fq:null },
+            q: { cs:[], tnps:[], fq:[] } };
         const vertG = { G:0, O:0, R:0, keine:0 };   // Verteilung fuer das Band unten
         data.rows.forEach((row, li) => {
             const zeb = (li % 2 === 1) ? X.ZEBRA : X.WEISS;
@@ -15028,7 +17371,7 @@
             sum.calls += calls; const ac = (row.ahtCalls != null) ? row.ahtCalls : calls; if (row.ahtSec != null && ac > 0) { sum.ahtW += row.ahtSec * ac; sum.ahtN += ac; }
             sum.ansp += row.hasEsl ? row.ansp : 0;
             if (row.hasEsl) { sum.mob += row.mob||0; sum.kip += row.kip||0; sum.bnt += row.bnt||0; sum.vvl += row.vvl||0; }
-            ['aq','cs','tnps','fq','ftf'].forEach(s2 => {
+            ['cs','tnps','fq'].forEach(s2 => {
                 const kv = row[s2];
                 if (kv.v != null) sum.q[s2].push(kv.v);
                 if (kv.z != null) sum.zAll[s2] = (sum.zAll[s2] || 0) + kv.z;
@@ -15044,7 +17387,7 @@
                     sum.n[s2] = (sum.n[s2] || 0) + kv.n;
                 }
             });
-            ['aq','cs','tnps','fq'].forEach(s2 => {
+            ['cs','tnps','fq'].forEach(s2 => {
                 const g = row[s2].v != null ? RC_SKALA[s2](row[s2].v) : null;
                 if (g) vertG[g]++; else vertG.keine++;
             });
@@ -15068,17 +17411,15 @@
                 return dz(('0' + fmtAht(row.ahtSec)).slice(-5),
                     farbe ? { fn:'Roboto', b:true, fc:farbe } : { fn:'Roboto', b:false });
             })();
-            r[5]  = zZ(row.aq.z);   r[6]  = mkAmp(row.aq.v,   RC_SKALA.aq(row.aq.v), zeb);
-            r[7]  = zZ(row.cs.z);   r[8]  = mkAmp(row.cs.v,   RC_SKALA.cs(row.cs.v), zeb);
-            r[9]  = zZ(row.tnps.z); r[10] = mkAmp(row.tnps.v, RC_SKALA.tnps(row.tnps.v), zeb);
-            r[11] = zZ(row.fq.z);   r[12] = mkAmp(row.fq.v,   RC_SKALA.fq(row.fq.v), zeb);
-            r[13] = zZ(row.ftf.z);  r[14] = mkAmp(row.ftf.v,  RC_SKALA.ftf(row.ftf.v), zeb);
+            r[5]  = zZ(row.cs.z);   r[6]  = mkAmp(row.cs.v,   RC_SKALA.cs(row.cs.v), zeb);
+            r[7]  = zZ(row.tnps.z); r[8]  = mkAmp(row.tnps.v, RC_SKALA.tnps(row.tnps.v), zeb);
+            r[9]  = zZ(row.fq.z);   r[10] = mkAmp(row.fq.v,   RC_SKALA.fq(row.fq.v), zeb);
             // Detraktoren: EINE Spalte (Anzahl), 0 ist Bestwert
-            r[15] = (row.detr == null) ? KEINE(zeb) : cell(row.detr, { bg:RC_AMPEL[RC_SKALA.detr(row.detr)], fc:X.WEISS, b:true });
+            r[11] = (row.detr == null) ? KEINE(zeb) : cell(row.detr, { bg:RC_AMPEL[RC_SKALA.detr(row.detr)], fc:X.WEISS, b:true });
             // Sales Ansprache: KEINE Ansprache trotz Calls ist der Fall, der auffallen
             // muss — dann steht 0 nicht nur rot, sondern zusaetzlich im dunklen
             // Alarmton, damit er sich von "wenig" (ebenfalls rot) abhebt.
-            r[16] = vq != null
+            r[12] = vq != null
                 ? (vq <= 0
                     ? cell(0, { nf:RC_PCT1, bg:RC_ALARM, fc:X.WEISS, b:true, sz:10 })
                     : cell(+vq.toFixed(1), { nf:RC_PCT1, bg:RC_AMPEL[RC_SKALA.vansp(vq)], fc:X.WEISS, b:true }))
@@ -15087,10 +17428,10 @@
             // Eine 0 bleibt bewusst blass — sonst konkurriert sie optisch mit den Treffern.
             // MOB und KIP sind das Kerngeschaeft und werden deshalb kraeftiger
             // gesetzt als BNT/VVL-Summen (Nutzer-Vorgabe 31.07.).
-            r[17] = verkaufZelle(row.mob, zeb, false, true);
-            r[18] = verkaufZelle(row.kip, zeb, false, true);
-            r[19] = verkaufZelle(row.bnt, zeb, true);
-            r[20] = verkaufZelle(row.vvl, zeb, true);
+            r[13] = verkaufZelle(row.mob, zeb, false, true);
+            r[14] = verkaufZelle(row.kip, zeb, false, true);
+            r[15] = verkaufZelle(row.bnt, zeb, true);
+            r[16] = verkaufZelle(row.vvl, zeb, true);
             rows2.push(r); rowH.push({ hpt:18.75 });
         });
 
@@ -15112,16 +17453,14 @@
         };
         const gAmp = key => { const v = gWert(key); return v == null ? gz('Keine') : gz(+v.toFixed(1), { nf:RC_PCT1 }); };
         const gZ = key => gz(sum.zAll[key] != null ? sum.zAll[key] : '');
-        gr2[5]  = gZ('aq');   gr2[6]  = gAmp('aq');
-        gr2[7]  = gZ('cs');   gr2[8]  = gAmp('cs');
-        gr2[9]  = gZ('tnps'); gr2[10] = gAmp('tnps');
-        gr2[11] = gZ('fq');   gr2[12] = gAmp('fq');
-        gr2[13] = gZ('ftf');  gr2[14] = gAmp('ftf');
-        gr2[15] = gz(sum.detrSum || 0);
+        gr2[5]  = gZ('cs');   gr2[6]  = gAmp('cs');
+        gr2[7]  = gZ('tnps'); gr2[8]  = gAmp('tnps');
+        gr2[9]  = gZ('fq');   gr2[10] = gAmp('fq');
+        gr2[11] = gz(sum.detrSum || 0);
         const gvq = sum.calls > 0 ? sum.ansp / sum.calls * 100 : null;
-        gr2[16] = gvq != null ? gz(+gvq.toFixed(1), { nf:RC_PCT1 }) : gz('');
-        gr2[17] = gz(sum.mob); gr2[18] = gz(sum.kip);
-        gr2[19] = gz(sum.bnt); gr2[20] = gz(sum.vvl);
+        gr2[12] = gvq != null ? gz(+gvq.toFixed(1), { nf:RC_PCT1 }) : gz('');
+        gr2[13] = gz(sum.mob); gr2[14] = gz(sum.kip);
+        gr2[15] = gz(sum.bnt); gr2[16] = gz(sum.vvl);
         rows2.push(gr2); rowH.push({ hpt:19.5 });
         const gesR = rows2.length - 1;
 
@@ -15132,7 +17471,7 @@
         const rBand = blank();
         const bandMerges = [];
         if (bewertet > 0) {
-            const BREITE = LETZTE - 1 + 1;      // Spalten B..U
+            const BREITE = LETZTE - 1 + 1;      // Spalten B..Q
             const teile = [
                 { g:'G', n:vertG.G, txt:'Ziel erfüllt' },
                 { g:'O', n:vertG.O, txt:'knapp verfehlt' },
@@ -15165,29 +17504,50 @@
             { bg:X.DUNKEL, fc:X.WEISS, sz:9, it:true }) : cell('', { bg:X.DUNKEL }));
         rows2.push(rFuss); rowH.push({ hpt:19.5 });
 
+        // ---------- Mapping-Luecke benennen (09.09.) ----------
+        // Wer nicht in der Mitarbeiter-Excel steht, hat kein Team und keinen Stack.
+        // Bis 09.09. flogen diese Leute lautlos aus dem Blatt; jetzt stehen sie drin
+        // (Stack ueber den eindeutigen Team-Anker), tragen aber ihren ROHWERT als
+        // Team. Ohne diese Zeile liest niemand, warum dort eine Nummer steht statt
+        // "VKD-TECH-86" — und niemand pflegt die Excel nach.
+        const ohneMapR = (data.rows || []).filter(function(r){ return r.ohneMap; });
+        let mapR = -1;
+        if (ohneMapR.length) {
+            mapR = rows2.length;
+            const namen = ohneMapR.map(function(r){ return r.name; }).slice(0, 12).join(', ')
+                + (ohneMapR.length > 12 ? ' …' : '');
+            const rMap = blank();
+            span(rMap, 1, LETZTE, f => f ? cell(
+                '⚠ ' + ohneMapR.length + ' Agent(en) stehen NICHT in der Mitarbeiter-Excel — Team unten als Rohwert, '
+                + 'Stack über den Team-Anker abgeleitet. Bitte Mapping pflegen: ' + namen,
+                { bg:X.DUNKEL, fc:X.ORANGE, sz:9, it:true }) : cell('', { bg:X.DUNKEL }));
+            rows2.push(rMap); rowH.push({ hpt:19.5 });
+        }
+
         const wsA = rcSheetAusZellen(XL, rows2);
-        wsA['!merges'] = [ M(0,14,0,LETZTE),
-            M(2,1,4,13),            // Titelblock B3:N5
-            M(2,14,4,LETZTE),       // Kopfband O3:U5 — EINE Zelle, Verlauf + Logo liegen darauf
-            M(5,1,5,4), M(5,5,5,15),
-            M(5,16,7,16),           // "Sales Ansprache" ueber Band-, Trenn- und Gruppenzeile
-            M(5,17,5,LETZTE),       // VERTRIEB nur noch R6:U6
+        wsA['!merges'] = [ M(0,11,0,LETZTE),
+            M(2,1,4,10),            // Titelblock B3:K5
+            M(2,11,4,LETZTE),       // Kopfband L3:Q5 — EINE Zelle, Verlauf + Logo liegen darauf
+            M(5,1,5,4), M(5,5,5,11),
+            M(5,12,7,12),           // "Sales Ansprache" ueber Band-, Trenn- und Gruppenzeile
+            M(5,13,5,LETZTE),       // VERTRIEB nur noch N6:Q6
             M(gesR,1,gesR,2), M(fussR,1,fussR,LETZTE) ]
+            .concat(mapR >= 0 ? [ M(mapR,1,mapR,LETZTE) ] : [])
             .concat(GRP.filter(g => g[1] > g[0]).map(g => M(7,g[0],7,g[1])))
             .concat(bandMerges);
-        // Spaltenbreiten laut Vorgabe (A und V sind Raender). Q ist auf 10,5
+        // Spaltenbreiten laut Vorgabe (A und R sind Raender). M ist auf 10,5
         // verbreitert (Nutzer-Vorgabe), damit "Sales Ansprache" umbrochen luftig steht.
-        wsA['!cols'] = w(11.13, 7.43, 18.13, 8.00, 8.00, 7.50, 8.50, 7.50, 8.50, 7.50, 8.50, 7.50, 8.50, 7.50, 8.50, 7.50, 10.50, 7.00, 7.00, 8.50, 8.50, 2.23);
+        wsA['!cols'] = w(11.13, 7.43, 18.13, 8.00, 8.00, 7.50, 8.50, 7.50, 8.50, 7.50, 8.50, 7.50, 10.50, 7.00, 7.00, 8.50, 8.50, 2.23);
         wsA['!rows'] = rowH;
         wsA['!freeze'] = { xSplit:'3', ySplit:'9', topLeftCell:'D10', activePane:'bottomRight', state:'frozen' };
         if (styled) wsA['!tabColor'] = { rgb: X.ORANGE };
         const blattName = data.today ? 'AKTUELLER_STAND' : ('STAND_' + data.label.replace(/\./g, '-')).slice(0, 31);
         // Erstes Blatt der Mappe -> Ankerliste zuruecksetzen, dann den eigenen melden.
-        rcLogoAnker = [ rcLogoAnkerBauen(blattName, 17, [7.00, 7.00, 8.50, 8.50]) ];   // R..U
+        rcLogoAnker = [ rcLogoAnkerBauen(blattName, 13, [7.00, 7.00, 8.50, 8.50]) ];   // N..Q
         XL.utils.book_append_sheet(wb, wsA, blattName);
 
         // Bei Mehrtages-Export (rcExportStandRange) die Bewertungslogik nur EINMAL anhaengen.
-        if (opts.skipBewertung) return;
+        if (opts.skipBewertung || !rcBlattAktiv(opts.wahl, 'bewertung')) return;   // ab Werk aus (30.10.)
 
         // ---------- Blatt B: Bewertungslogik (A..E, dunkler Aussenrahmen) ----------
         const rowsB = [], rowHB = [], mergesB = [];
@@ -15230,7 +17590,7 @@
         const g = id => { const el = document.getElementById(id); return (el && el.value && el.value !== 'ALL') ? el.value : ''; };
         const stack = g('rcStackFilter'), std = g('rcStandortFilter'), team = g('rcTeamFilter');
         const teile = [];
-        if (stack) teile.push(stack.replace(/_/g, 'G ').toUpperCase());
+        if (stack) teile.push((rcIstProjektFilter(stack) ? rcStackFilterText(stack) : stack.replace(/_/g, 'G ')).toUpperCase());
         if (std) teile.push((typeof stdFullName === 'function' ? stdFullName(std) : std).toUpperCase());
         if (team) teile.push('TEAM ' + rcTeamKurz(team));
         return teile.join(' · ');
@@ -15272,13 +17632,8 @@
     }
     function rcIstVvl(g){ return /\bVVL\b/i.test(g || ''); }
     function rcIstBnt(g){ return /\bBNT\b/i.test(g || ''); }
-    // Reine GERAETE gehoeren nicht ins Vertriebs-Blatt (Nutzer-Vorgabe 30.07.:
-    // "Router, Hardware, Verstaerker, SuperWLAN, Fritzbox, Ultrahub7 ... sollen da
-    // nicht reinkommen"). An echten Daten ist das die Gruppe "Hardware KIP- und PTV"
-    // (Homebox/Fritzbox, SuperWLAN, Ultra HUB 7 — 171 Stueck, komplett nicht
-    // BCR-relevant). Gemustert wird auf die GRUPPE, zusaetzlich decken die
-    // Geraetebegriffe den Fall ab, dass so etwas spaeter unter anderem Namen kommt.
-    const RC_KEIN_VERTRIEB = /hardware|zubeh|router|repeater|verst[aä]rk|fritz|homebox|superwlan|ultra ?hub|modem/i;
+    // RC_KEIN_VERTRIEB (Geraete) steht seit 28.09. vor classify() — dort wird es
+    // schon beim Parsen gebraucht (siehe KATEGORISIERUNG).
     // NBA-Tipps gehoeren NICHT ins Vertriebs-Blatt (Nutzer-Vorgabe 31.07.:
     // "NBA-Tipp machen wir komplett weg und achten wir darauf, dass wir nur
     // CR-relevantes rein haben"). Ein NBA-Tipp ist eine Empfehlung, kein
@@ -15464,7 +17819,7 @@
         z.push(blank()); rowH.push({ hpt:10 });
         const rE = blank();
         span(rE, ERSTE, LETZTE, f => f
-            ? cell('EINZELPRODUKTE', { bg:X.DUNKEL, fc:X.WEISS, sz:9.5, al:'left', ind:1 })
+            ? cell('EINZELPRODUKTE  ·  nur Abschlüsse BNT/VVL — Geräte, NBA-Tipps und Produkte ohne Gruppe stehen oben als Klasse', { bg:X.DUNKEL, fc:X.WEISS, sz:9.5, al:'left', ind:1 })
             : cell('', { bg:X.DUNKEL }));
         z.push(rE); rowH.push({ hpt:19.5 });
 
@@ -15474,7 +17829,20 @@
         // fuer den ganzen Zeitraum galt, ohne jeden Hinweis. Am Export
         // 01.-05.08.2026 nachgemessen: 711 Stueck hier gegen 2702 im Block darueber.
         const einTag = !(data.von && data.bis && data.von !== data.bis);
-        const alle = (data.today && einTag && Array.isArray(window.rcAllSales)) ? window.rcAllSales : null;
+        // NUR die Agenten dieser Mappe: rcAllSales ist UNGEFILTERT (Kriegskarte).
+        // Bis 28.09. standen hier bei Filter "Alanya" die Summen ALLER Standorte
+        // (113 von 144 Produkten, z. B. "VVL TV Connect Tarifwechsel" 76 statt 26)
+        // unter Block 1, der richtig gefiltert ist. Zuordnung wie in rcStandRows:
+        // CCS-ID (die ESL-vo_nummer ist in der Praxis die CCS-ID), sonst Name.
+        const imBlatt = new Set();
+        rows.forEach(r => { if (r.ccs) imBlatt.add('c:' + r.ccs); if (r.name) imBlatt.add('n:' + window.rcNormName(r.name)); });
+        const mp = window.rcWcaMapping || {};
+        const gehoertDazu = s => {
+            const m = (mp.voMap && mp.voMap[s.vo]) || (mp.ccsMap && mp.ccsMap[s.vo]);
+            return imBlatt.has('c:' + s.vo) || !!(m && m.ccsId && imBlatt.has('c:' + m.ccsId))
+                || imBlatt.has('n:' + window.rcNormName(s.name || s.vo || ''));
+        };
+        const alle = (data.today && einTag && Array.isArray(window.rcAllSales)) ? window.rcAllSales.filter(gehoertDazu) : null;
         if (alle && alle.length) {
             const prod = {};
             alle.forEach(s => {
@@ -15873,9 +18241,9 @@
             let t = map[k];
             if (!t) t = map[k] = { team:k, agenten:0, mitEsl:0, ohneAnsp:0, mitCalls:0,
                 calls:0, ahtW:0, ahtN:0, mob:0, kip:0, bnt:0, vvl:0, ansp:0, detr:0, detrBekannt:false,
-                z:{aq:null,cs:null,tnps:null,fq:null,ftf:null},
-                n:{aq:null,cs:null,tnps:null,fq:null,ftf:null},
-                q:{aq:[],cs:[],tnps:[],fq:[],ftf:[]} };
+                z:{cs:null,tnps:null,fq:null,ftf:null},
+                n:{cs:null,tnps:null,fq:null,ftf:null},
+                q:{cs:[],tnps:[],fq:[],ftf:[]} };
             t.agenten++;
             t.calls += r.calls || 0;
             if (r.calls > 0) t.mitCalls++;
@@ -15885,7 +18253,7 @@
                 t.mob += r.mob||0; t.kip += r.kip||0; t.bnt += r.bnt||0; t.vvl += r.vvl||0; t.ansp += r.ansp||0;
                 if ((r.calls||0) > 0 && !(r.ansp > 0)) t.ohneAnsp++;
             }
-            ['aq','cs','tnps','fq','ftf'].forEach(s => {
+            ['cs','tnps','fq','ftf'].forEach(s => {
                 const kv = r[s] || {};
                 if (kv.v != null) t.q[s].push(kv.v);
                 // Nur mit echter Bezugsmenge poolen — ein Zaehler auf Nenner 0 haette
@@ -15900,10 +18268,11 @@
         });
         return Object.values(map);
     }
-    // Wie viele der fuenf Qualitaetsziele erfuellt ein Datensatz? null = nicht bewertbar.
+    // Wie viele der vier Qualitaetsziele (CS, TNPS, FQ, FTF; AQ seit 30.10. nicht mehr)
+    // erfuellt ein Datensatz? null = nicht bewertbar.
     function rcZielScore(werte){
         let erf = 0, bew = 0;
-        ['aq','cs','tnps','fq','ftf'].forEach(s => {
+        ['cs','tnps','fq','ftf'].forEach(s => {
             const v = werte[s];
             if (v == null) return;
             const g = RC_SKALA[s](v);
@@ -15913,7 +18282,7 @@
         return bew ? { erf, bew } : null;
     }
 
-    function rcBuildAnalyseSheets(XL, wb, styled, data){
+    function rcBuildAnalyseSheets(XL, wb, styled, data, wahl){
         const cell = rcZelleFabrik(styled);
         const X = RC_XP;
         const M = (r1,c1,r2,c2) => ({ s:{r:r1,c:c1}, e:{r:r2,c:c2} });
@@ -16044,14 +18413,14 @@
         const zeitTxt = 'Datenstand ' + data.label + '  ·  ' + rows.length + ' Agenten im gewählten Filter'
             + (data.eslFehlt ? '  ·  ACHTUNG: keine ESL-Vertriebsdaten — Ansprache/BNT/VVL bleiben leer' : '');
 
-        // ================= BLATT: ANALYSE AGENTEN =================
-        (function(){
+        // ================= BLATT: ANALYSE AGENTEN (ab Werk aus) =================
+        if (rcBlattAktiv(wahl, 'analyseAgenten')) (function(){
             const st = neuesBlatt('ANALYSE  ·  AGENTEN', zeitTxt);
             const mitCalls = rows.filter(r => (r.calls || 0) > 0);
             const ohneAnsp = mitCalls.filter(r => r.hasEsl && !(r.ansp > 0));
             const detrAlle = rows.filter(r => (r.detr || 0) > 0);
             const auff = rows.map(r => {
-                const sc = rcZielScore({ aq:r.aq.v, cs:r.cs.v, tnps:r.tnps.v, fq:r.fq.v, ftf:r.ftf.v });
+                const sc = rcZielScore({ cs:r.cs.v, tnps:r.tnps.v, fq:r.fq.v, ftf:r.ftf.v });
                 return sc ? { r, verfehlt: sc.bew - sc.erf, bew: sc.bew } : null;
             }).filter(a => a && a.verfehlt >= 2);
 
@@ -16110,8 +18479,8 @@
 
             // ---- 3. Auffaellige Qualitaet ----
             sektion(st, 'AUFFÄLLIG  ·  QUALITÄT (2 oder mehr Ziele verfehlt)', X.PINK,
-                'Ziele: AQ 85 % · CS 90 % · TNPS 70 % · FQ 30 % · FTF 80 %. Gezählt wird nur, was bewertbar ist — "Keine" bedeutet fehlende Bezugsmenge, nicht Null.');
-            tabKopf(st, ['Verf.','Team','Agent','Calls','AQ','CS','TNPS','FQ','FTF','Detra','Verfehlt-Balken']);
+                'Ziele: CS 90 % · TNPS 70 % · FQ 30 % · FTF 80 %. Gezählt wird nur, was bewertbar ist — "Keine" bedeutet fehlende Bezugsmenge, nicht Null.');
+            tabKopf(st, ['Verf.','Team','Agent','Calls','CS','TNPS','FQ','FTF','Detra','Verfehlt-Balken']);
             if (!auff.length) leermeldung(st, 'Kein Agent verfehlt zwei oder mehr Qualitätsziele.');
             else {
                 auff.sort((a,b) => b.verfehlt - a.verfehlt || (b.r.calls||0) - (a.r.calls||0)).slice(0, 30).forEach((a, i) => {
@@ -16119,10 +18488,10 @@
                     datenZeile(st, [
                         { v:a.verfehlt + '/' + a.bew, bg:a.verfehlt >= 4 ? X.ROT : X.ORANGE, fc:X.WEISS, b:true },
                         rcTeamKurz(r.team), { v:heroName(r.name), al:'left', ind:1, b:false }, r.calls || 0,
-                        ampZelle(r.aq.v, 'aq'), ampZelle(r.cs.v, 'cs'), ampZelle(r.tnps.v, 'tnps'),
+                        ampZelle(r.cs.v, 'cs'), ampZelle(r.tnps.v, 'tnps'),
                         ampZelle(r.fq.v, 'fq'), ampZelle(r.ftf.v, 'ftf'),
                         r.detr != null ? { v:r.detr, b:true } : { v:'Keine', fc:'FF8C959E', sz:8, b:false },
-                        { v:rcBalken(a.verfehlt, 5), fc:X.ROT, al:'left', b:false }
+                        { v:rcBalken(a.verfehlt, 4), fc:X.ROT, al:'left', b:false }
                     ], i);
                 });
             }
@@ -16180,7 +18549,7 @@
             // ---- 6. Verteilung je Kennzahl ----
             sektion(st, 'VERTEILUNG DER ZIELERREICHUNG  ·  je Kennzahl', X.GRUEN,
                 'Wie viele Agenten erreichen das Ziel, wie viele verfehlen es knapp, wie viele deutlich. Grundlage sind nur bewertbare Werte.');
-            [['aq','AQ  ·  Ziel 85 %'],['cs','CS  ·  Ziel 90 %'],['tnps','TNPS  ·  Ziel 70 %'],['fq','FQ  ·  Ziel 30 %'],['ftf','FTF  ·  Ziel 80 %']].forEach(kk => {
+            [['cs','CS  ·  Ziel 90 %'],['tnps','TNPS  ·  Ziel 70 %'],['fq','FQ  ·  Ziel 30 %'],['ftf','FTF  ·  Ziel 80 %']].forEach(kk => {
                 let g = 0, o = 0, rr = 0, ohne = 0;
                 rows.forEach(r => {
                     const v = r[kk[0]].v;
@@ -16195,10 +18564,10 @@
         })();
 
         // ================= BLATT: ANALYSE TEAMS =================
-        (function(){
+        if (rcBlattAktiv(wahl, 'analyse')) (function(){
             const st = neuesBlatt('ANALYSE  ·  TEAMS', zeitTxt);
             const teams = rcAggTeams(rows);
-            const qv = t => ({ aq:rcPoolQuote(t,'aq'), cs:rcPoolQuote(t,'cs'), tnps:rcPoolQuote(t,'tnps'), fq:rcPoolQuote(t,'fq'), ftf:rcPoolQuote(t,'ftf') });
+            const qv = t => ({ cs:rcPoolQuote(t,'cs'), tnps:rcPoolQuote(t,'tnps'), fq:rcPoolQuote(t,'fq'), ftf:rcPoolQuote(t,'ftf') });
             const scored = teams.map(t => { const v = qv(t); return { t, v, sc: rcZielScore(v) }; });
             const teamsMitAnsp = teams.filter(t => t.mitEsl > 0);
 
@@ -16235,7 +18604,7 @@
             // ---- 2. Team-Rangliste Qualitaet ----
             sektion(st, 'TEAM-RANGLISTE  ·  QUALITÄT', X.BLAU,
                 'Quoten sind gepoolt (Summe Zähler / Summe Nenner), nicht der Mittelwert der Agenten-Prozente — sonst zählt ein Agent mit 2 Calls so viel wie einer mit 60. Score = erreichte von bewertbaren Zielen.');
-            tabKopf(st, ['Score','Team','Calls','AQ','CS','TNPS','FQ','FTF','Detra','Ø Min.','Score-Balken']);
+            tabKopf(st, ['Score','Team','Calls','CS','TNPS','FQ','FTF','Detra','Ø Min.','Score-Balken']);
             // Primaer die ANZAHL erreichter Ziele, erst danach die Quote. Nach reiner
             // Quote stand ein Team mit 1 von 1 bewertbaren Zielen (Quote 100 %) ueber
             // einem mit 4 von 5 — obwohl dort vier Ziele tatsaechlich erreicht wurden.
@@ -16253,11 +18622,11 @@
                     q.sc ? { v:q.sc.erf + '/' + q.sc.bew, bg: quote >= 0.8 ? X.GRUEN : quote >= 0.5 ? X.ORANGE : X.ROT, fc:X.WEISS, b:true }
                          : { v:'Keine', fc:'FF8C959E', sz:8, b:false },
                     { v:rcTeamKurz(t.team), b:true }, t.calls,
-                    ampZelle(v.aq, 'aq'), ampZelle(v.cs, 'cs'), ampZelle(v.tnps, 'tnps'),
+                    ampZelle(v.cs, 'cs'), ampZelle(v.tnps, 'tnps'),
                     ampZelle(v.fq, 'fq'), ampZelle(v.ftf, 'ftf'),
                     t.detrBekannt ? { v:t.detr, b:true } : { v:'Keine', fc:'FF8C959E', sz:8, b:false },
                     { v: t.ahtN > 0 && t.ahtW ? ('0' + fmtAht(t.ahtW / t.ahtN)).slice(-5) : '', fn:'Roboto', b:false },
-                    { v:rcBalken(q.sc ? q.sc.erf : 0, 5), fc: quote >= 0.8 ? X.GRUEN : quote >= 0.5 ? X.ORANGE : X.ROT, al:'left', b:false }
+                    { v:rcBalken(q.sc ? q.sc.erf : 0, 4), fc: quote >= 0.8 ? X.GRUEN : quote >= 0.5 ? X.ORANGE : X.ROT, al:'left', b:false }
                 ], i);
             });
 
@@ -16286,7 +18655,7 @@
             // ---- 4. Auffaellige Teams ----
             sektion(st, 'AUFFÄLLIG  ·  TEAMS mit 2 oder mehr verfehlten Zielen', X.PINK,
                 'Dieselbe Logik wie auf dem Agenten-Blatt, nur auf gepoolten Team-Quoten. Ein Team kann hier stehen, obwohl einzelne Agenten stark sind — und umgekehrt.');
-            tabKopf(st, ['Verf.','Team','Agenten','Calls','AQ','CS','TNPS','FQ','FTF','Detra','Verfehlt-Balken']);
+            tabKopf(st, ['Verf.','Team','Agenten','Calls','CS','TNPS','FQ','FTF','Detra','Verfehlt-Balken']);
             const auffT = scored.filter(q => q.sc && (q.sc.bew - q.sc.erf) >= 2)
                 .sort((a,b) => (b.sc.bew - b.sc.erf) - (a.sc.bew - a.sc.erf) || b.t.calls - a.t.calls);
             if (!auffT.length) leermeldung(st, 'Kein Team verfehlt zwei oder mehr Qualitätsziele.');
@@ -16295,10 +18664,10 @@
                 datenZeile(st, [
                     { v:verf + '/' + q.sc.bew, bg: verf >= 4 ? X.ROT : X.ORANGE, fc:X.WEISS, b:true },
                     { v:rcTeamKurz(t.team), b:true }, t.agenten, t.calls,
-                    ampZelle(v.aq, 'aq'), ampZelle(v.cs, 'cs'), ampZelle(v.tnps, 'tnps'),
+                    ampZelle(v.cs, 'cs'), ampZelle(v.tnps, 'tnps'),
                     ampZelle(v.fq, 'fq'), ampZelle(v.ftf, 'ftf'),
                     t.detrBekannt ? { v:t.detr, b:true } : '',
-                    { v:rcBalken(verf, 5), fc:X.ROT, al:'left', b:false }
+                    { v:rcBalken(verf, 4), fc:X.ROT, al:'left', b:false }
                 ], i);
             });
 
@@ -16327,7 +18696,7 @@
             // ---- 6. Verteilung je Kennzahl (Team-Ebene) ----
             sektion(st, 'VERTEILUNG DER ZIELERREICHUNG  ·  je Kennzahl (Team-Ebene)', X.GRUEN,
                 'Wie viele TEAMS erreichen das Ziel. Grundlage sind die gepoolten Team-Quoten von oben.');
-            [['aq','AQ  ·  Ziel 85 %'],['cs','CS  ·  Ziel 90 %'],['tnps','TNPS  ·  Ziel 70 %'],['fq','FQ  ·  Ziel 30 %'],['ftf','FTF  ·  Ziel 80 %']].forEach(kk => {
+            [['cs','CS  ·  Ziel 90 %'],['tnps','TNPS  ·  Ziel 70 %'],['fq','FQ  ·  Ziel 30 %'],['ftf','FTF  ·  Ziel 80 %']].forEach(kk => {
                 let g = 0, o = 0, rr = 0, ohne = 0;
                 scored.forEach(q => {
                     const v = q.v[kk[0]];
@@ -16407,7 +18776,7 @@
         // sicher traegt (die ccs-Id steht in der Zeile nicht). Normalisiert, damit
         // Schreibweisen-Unterschiede nicht zu zwei Zeilen fuehren.
         const schluessel = r => (window.rcNormName ? window.rcNormName(r.name) : String(r.name||'').toLowerCase());
-        const KENN = ['aq','cs','tnps','fq','dds','ftf'];
+        const KENN = ['cs','tnps','fq','dds','ftf'];
         const acc = new Map();
 
         proTag.forEach(({ tag, rows }) => {
@@ -16417,6 +18786,7 @@
                 if (!a) {
                     a = { team: r.team, name: r.name, calls: 0,
                           standort: r.standort, ccs: r.ccs || '',
+                          ohneMap: false,   // 09.09.: Mapping-Luecke muss den Zeitraum ueberleben
                           ahtW: 0, ahtN: 0,
                           ansp: 0, anspCalls: 0, hasEsl: false,
                           kont: null,
@@ -16427,6 +18797,7 @@
                     KENN.forEach(s => { a[s] = { z: null, n: null, zAll: null }; });
                     acc.set(k, a);
                 }
+                if (r.ohneMap) a.ohneMap = true;
                 // Team/Standort: der zuletzt gesehene Stand gewinnt. Die Historie
                 // fuehrt keine historische Zuordnung mit (siehe Kopfkommentar).
                 if (tag >= a.letzterTag) { a.team = r.team; a.standort = r.standort; a.letzterTag = tag; }
@@ -16492,7 +18863,8 @@
                 // AHT-Bezug offenlegen: die Zeitraum-AHT beruht auf ahtN Calls,
                 // nicht zwingend auf allen. rcAggTeams multipliziert spaeter mit
                 // r.calls — deshalb hier mitgeben, damit das nachvollziehbar bleibt.
-                ahtCalls: a.ahtN
+                ahtCalls: a.ahtN,
+                ohneMap: !!a.ohneMap   // 09.09.: Mapping-Luecke muss bis ins Blatt durchreichen
             };
             KENN.forEach(s => {
                 const q = a[s];
@@ -16562,10 +18934,10 @@
         }
         rcLoadStyledXlsx(function(XL){
             const wb = XL.utils.book_new();
-            if (rcBlattAktiv(wahl, 'stand')) rcBuildStandSheets(XL, wb, !!XL.__styled, data);
+            if (rcBlattAktiv(wahl, 'stand')) rcBuildStandSheets(XL, wb, !!XL.__styled, data, { wahl: wahl });
             if (rcBlattAktiv(wahl, 'vertrieb')) rcBuildSalesSheet(XL, wb, !!XL.__styled, data);
             if (rcBlattAktiv(wahl, 'produkte')) { try { rcBuildProdukteSheet(XL, wb, !!XL.__styled, data); } catch(e){ rcLog.warn("Produkte-Blatt: " + e.message); } }
-            if (rcBlattAktiv(wahl, 'analyse')) rcBuildAnalyseSheets(XL, wb, !!XL.__styled, data);
+            rcBuildAnalyseSheets(XL, wb, !!XL.__styled, data, wahl);
             if (voll) {
                 // DIESELBE Funktion wie im Tagesbericht — keine zweite Fassung
                 // dieser Blaetter fuer Zeitraeume (Fallstrick Nr. 3 im Projekt).
@@ -16578,10 +18950,10 @@
                         + 'ENV/DSL/PTV, die VVL-Arten und die BCR-Trennung sind fuer diese Tage leer, nicht 0.');
                 } catch(e){ rcLog.warn('Aggregat-Blaetter: ' + e.message); }
             }
-            try { rcBuildAbdeckungSheet(XL, wb, !!XL.__styled, data); } catch(e){ rcLog.warn('Abdeckungs-Blatt: ' + e.message); }
+            if (rcBlattAktiv(wahl, 'abdeckung')) { try { rcBuildAbdeckungSheet(XL, wb, !!XL.__styled, data); } catch(e){ rcLog.warn('Abdeckungs-Blatt: ' + e.message); } }
             const g = (id, sk) => (scope && scope[sk] != null) ? (scope[sk] !== 'ALL' ? scope[sk] : null)
                                 : (() => { const el = document.getElementById(id); return (el && el.value !== 'ALL') ? el.value : null; })();
-            const parts = [g('rcStandortFilter','std'), g('rcStackFilter','stack'),
+            const parts = [g('rcStandortFilter','std'), rcStackFilterText(g('rcStackFilter','stack')),
                            g('rcTeamFilter','team') ? 'Team' + g('rcTeamFilter','team') : null].filter(Boolean);
             // Der volle Bericht traegt denselben Namensstamm wie der Tagesbericht
             // (regiocom_ESL_Report_...) — daran erkennt der Nutzer, dass es
@@ -16591,7 +18963,7 @@
             // Blattname: Excel erlaubt 31 Zeichen. "STAND 01.07.-31.07.2026" passt.
             const blatt = ('STAND ' + rcDatumKurz(vonKey).slice(0,6) + '-' + rcDatumKurz(bisKey)).slice(0, 31);
             rcXlsxSpeichern(XL, wb, fn, blatt)
-                .then(() => sag('Fertig — ' + fn + ' liegt im Download-Ordner. Das Blatt "Abdeckung" nennt die Datenbasis.'))
+                .then(() => sag('Fertig — ' + fn + ' liegt im Download-Ordner.' + (rcBlattAktiv(wahl, 'abdeckung') ? ' Das Blatt "Abdeckung" nennt die Datenbasis.' : ' Die Datenbasis (Tage mit Daten) steht im Kopfband.')))
                 .catch(e => sag('Bericht fehlgeschlagen: ' + (e && e.message ? e.message : e), true));
             rcLog.log('Zeitraum-Export ' + data.label + ': ' + data.rows.length + ' Agenten aus '
                 + data.tageMitDaten + ' von ' + data.tageGesamt + ' Tagen -> ' + fn);
@@ -16635,7 +19007,7 @@
             }
             const g = (id, sk) => (scope && scope[sk] != null) ? (scope[sk] !== 'ALL' ? scope[sk] : null)
                                 : (() => { const el = document.getElementById(id); return (el && el.value !== 'ALL') ? el.value : null; })();
-            const parts = [g('rcStandortFilter','std'), g('rcStackFilter','stack'),
+            const parts = [g('rcStandortFilter','std'), rcStackFilterText(g('rcStackFilter','stack')),
                            g('rcTeamFilter','team') ? 'Team' + g('rcTeamFilter','team') : null].filter(Boolean);
             const spanne = (vonKey === bisKey) ? vonKey : (vonKey + '_bis_' + bisKey);
             const fn = 'regiocom_ESL_Reporting_' + spanne
@@ -16771,10 +19143,10 @@
                 bandR.push(aoa.length); merges.push({ s:{r:aoa.length,c:0}, e:{r:aoa.length,c:BREITE-1} });
                 aoa.push(['QUALITAET']);
                 kopfR.push(aoa.length);
-                // DATENSTAND liegt auf Spalte 12 (zwei Leer-Spalten davor), damit
+                // DATENSTAND liegt auf Spalte 12 (drei Leer-Spalten davor), damit
                 // die breite Spalte am Blattende liegt und nicht mit den schmalen
                 // Vertriebs-Spalten derselben Position kollidiert.
-                aoa.push(['PROJEKT','CALLS','AHT','CS %','TNPS','FQ %','DDS %','FTF %','AQ %','DETR.','','','DATENSTAND']);
+                aoa.push(['PROJEKT','CALLS','AHT','CS %','TNPS','FQ %','DDS %','FTF %','DETR.','','','','DATENSTAND']);
                 ergebnisse.forEach(function(e){
                     if (!e.agg) { aoa.push([e.p.name, '', '', '', '', '', '', '', '', '', '', '', e.stand]); return; }
                     const a = e.agg, lc = a.liga.total || 0;
@@ -16787,8 +19159,8 @@
                         a.stds.forEach(o => { if (o.tnpsN > 0) { z = (z||0) + o.tnpsZ; n = (n||0) + o.tnpsN; } });
                         if (n > 0) tn = +((z / n) * 100).toFixed(1); }
                     aoa.push([ e.p.name, lc > 0 ? lc : '', ahtN > 0 ? fmtAht(ahtW / ahtN) : '',
-                        q('cs'), tn, q('fq'), q('dds'), q('ftf'), q('aq'), (detr == null ? '' : detr),
-                        '', '', e.stand + (e.letzterTag ? ' - bis ' + rcDatumKurz(e.letzterTag) : '') ]);
+                        q('cs'), tn, q('fq'), q('dds'), q('ftf'), (detr == null ? '' : detr),
+                        '', '', '', e.stand + (e.letzterTag ? ' - bis ' + rcDatumKurz(e.letzterTag) : '') ]);
                 });
                 const ws = XL.utils.aoa_to_sheet(aoa);
                 const styled = !!XL.__styled;
@@ -16807,10 +19179,10 @@
                     else {
                         // %-Format je Tabelle: Vertriebs-Zeilen (vor der zweiten
                         // Kopfzeile) haben ihre Quoten in Spalte 4+5; die
-                        // Qualitaets-Zeilen (danach) in 3,5,6,7,8. TNPS (Spalte 4
+                        // Qualitaets-Zeilen (danach) in 3,5,6,7. TNPS (Spalte 4
                         // der Qualitaet) ist ein Punktwert und bleibt ohne %.
                         const inQual = kopfR.length > 1 && R > kopfR[1];
-                        const pctHier = inQual ? [3,5,6,7,8] : [4,5];
+                        const pctHier = inQual ? [3,5,6,7] : [4,5];
                         if (pctHier.indexOf(C) !== -1 && ws[addr].t === 'n') ws[addr].z = '0.0%';
                         st = { fill:FILL('FFFFFFFF'), font:{ sz:9.5, name: C===0?'Poppins':'Roboto', bold: C===0, color:{rgb:'FF0D0D0D'} }, alignment:{ horizontal: C===0?'left':'center', vertical:'center', indent: C===0?1:0 }, border:BORDER };
                     }
@@ -16937,7 +19309,10 @@
     //    sie fehlen, wird auf die Aufschluesselung ausgewichen.
     function rcAggAusRows(data){
         const rows = (data && data.rows) || [];
-        const stackMap = (window.rcWcaMapping || {}).stackMap || {};
+        // Stack je Team ueber die EINE Regel (05.10.): Mapping, sonst Anker. Vorher
+        // nur stackMap[team] — ein ueber den Anker mitgezaehlter Agent stand im
+        // Blatt "Stacks" trotzdem in der Zeile OHNE Stack.
+        const stackVon = rcStackRegel();
         // Feinkategorien aus classify(). kip/mob stehen zusaetzlich als eigenes
         // Historien-Feld zur Verfuegung und werden vorrangig von dort gelesen.
         const FEIN = ['env','fibDsl','ptv','sonstBnt','kipVvl','mobVvl','fibVvl'];
@@ -16952,7 +19327,7 @@
         // Die rows liefern je Kennzahl {z,n} bereits OHNE die Nenner-0-Faelle
         // (rcStandRows/rcStandRowsZeitraum, Regel 3) — hier nur noch summieren,
         // trotzdem mit n>0-Wache (aeltere Zeilenformen).
-        const QUAL = ['aq','cs','tnps','fq','dds','ftf'];
+        const QUAL = ['cs','tnps','fq','dds','ftf'];
         const neu = extra => {
             const o = { kip:null, mob:null, bnt:null, vvl:null, bcr:null, nonBcr:null,
                         total:null, calls:null, pitches:null,
@@ -17017,7 +19392,7 @@
 
             const ag = {
                 standort: std, name: r.name, ccsId: (r.ccs || '') + '',
-                team, stack: team ? (stackMap[team] || '') : '',
+                team, stack: stackVon(team),
                 // Eigenes Historien-Feld schlaegt die Aufschluesselung.
                 kip: r.kip != null ? r.kip : (pg ? (fein.kip || 0) : null),
                 mob: r.mob != null ? r.mob : (pg ? (fein.mob || 0) : null),
@@ -17030,7 +19405,7 @@
                 ligaCalls: lc, total: null,
                 // Qualitaet je Agent: die {z,n}-Paare der Zeile unveraendert
                 // durchreichen (fuer die Mitarbeiter-Bloecke im Qualitaets-Reporting).
-                aq:r.aq||null, cs:r.cs||null, tnps:r.tnps||null, fq:r.fq||null,
+                cs:r.cs||null, tnps:r.tnps||null, fq:r.fq||null,
                 dds:r.dds||null, ftf:r.ftf||null,
                 ahtSec: r.ahtSec != null ? r.ahtSec : null, detr: r.detr != null ? r.detr : null
             };
@@ -17047,7 +19422,7 @@
             if (std)  inBucket(stdBuckets[std]   || (stdBuckets[std]   = neu({ code: std })));
             if (team) {
                 const t = teamBuckets[team] || (teamBuckets[team] =
-                    neu({ code: team, name: team, standort: std, stack: stackMap[team] || '' }));
+                    neu({ code: team, name: team, standort: std, stack: stackVon(team) }));
                 if (!t.standort && std) t.standort = std;   // erste belegte Zuordnung gewinnt
                 inBucket(t);
             }
@@ -17144,22 +19519,28 @@
         { key:'fq',    label:'FQ %',         idx:[5] },
         { key:'dds',   label:'DDS %',        idx:[6] },
         { key:'ftf',   label:'FTF % (FF7)',  idx:[7] },
-        { key:'aq',    label:'AQ %',         idx:[8] },
-        { key:'detr',  label:'Detraktoren',  idx:[9] }
+        { key:'detr',  label:'Detraktoren',  idx:[8] }
     ];
     // Blatt-Registry fuer die Haekchen im Export-Dialog. 'stand' ist der
     // PIX-Nachbau und bleibt inhaltlich unangetastet (nur an/aus).
+    // Dritter Eintrag false = ab Werk AUS (Nutzer-Vorgabe 30.10.: nur die acht Blaetter
+    // seiner Vorlage). Im Dialog bleibt jedes Blatt per Haekchen zuschaltbar.
     const RC_BLAETTER = [
-        ['stand','AKTUELLER_STAND (+Bewertungslogik)'], ['vertrieb','Vertrieb (je Agent)'],
-        ['produkte','Produkte'], ['analyse','Analyse Agenten + Teams'],
-        ['reportingV','Vertrieb Reporting'], ['reportingQ','Qualitaet Reporting'],
-        ['struktur','Struktur'], ['standorte','Standorte'], ['stacks','Stacks'],
-        ['teams','Teams'], ['agenten','Agenten'], ['ligaStandorte','Liga Standorte'],
-        ['ligaTeams','Liga Teams'], ['entwicklung','Entwicklung (Trend)']
+        ['stand','AKTUELLER_STAND'], ['bewertung','Bewertungslogik (zum Stand-Blatt)',false], ['vertrieb','Vertrieb (je Agent)'],
+        ['produkte','Produkte',false], ['abdeckung','Abdeckung (Tage mit Daten, nur Zeitraum-Export)',false], ['analyse','Analyse Teams'], ['analyseAgenten','Analyse Agenten',false],
+        ['reportingV','Vertrieb Reporting'], ['reportingQ','Qualitaet Reporting',false],
+        ['struktur','Struktur'], ['standorte','Standorte',false], ['stacks','Stacks',false],
+        ['teams','Teams'], ['agenten','Agenten'], ['ligaStandorte','Liga Standorte',false],
+        ['ligaTeams','Liga Teams',false], ['entwicklung','Entwicklung (Trend)',false],
+        ['ohneStack','Ohne Stack (nicht zuordenbare Agenten)']
     ];
+    // Ausdrueckliche Wahl (true/false in wahl.blaetter) gewinnt, sonst gilt der Werkszustand —
+    // auch ohne Auswahl (Stundenmail, Direktexport).
     function rcBlattAktiv(wahl, key){
-        if (!wahl || !wahl.blaetter) return true;          // ohne Auswahl: alles (Stundenmail!)
-        return wahl.blaetter[key] !== false;
+        const w = (wahl && wahl.blaetter) ? wahl.blaetter[key] : undefined;
+        if (w != null) return !!w;
+        const b = RC_BLAETTER.find(x => x[0] === key);
+        return !b || b[2] !== false;
     }
     function rcKennzahlSieb(registry, auswahl, header, pctCols, widths){
         // Liefert {aktiv:[Spaltenindizes], header, pct, widths, zeile(fn)->fn}.
@@ -17177,6 +19558,9 @@
         };
     }
     function rcBuildReportingSheets(XL, wb, styled, agg, titel, nur, namen, wahl){
+        // Die schlanke Reporting-Mappe (weder nur noch wahl) baut beide Bloecke; im vollen
+        // Bericht entscheidet die Blatt-Registry (Qualitaet Reporting ist dort ab Werk aus).
+        const blattAn = k => (!nur && !wahl) || rcBlattAktiv(wahl, k);
         const PCT = '0.0%';
         const crF = (z,n) => (z == null || !(n > 0)) ? '' : +(z/n).toFixed(4);
         const bd = { style:'thin', color:{ rgb:'FFD9D9D9' } };
@@ -17210,7 +19594,7 @@
         const liga = agg.liga;
         const scF = agg.trendScope || {};
         const stdFix   = !!(scF.std   && scF.std   !== 'ALL');
-        const stackFix = !!(scF.stack && scF.stack !== 'ALL');
+        const stackFix = !!(scF.stack && scF.stack !== 'ALL' && !rcIstProjektFilter(scF.stack));
         const teamFix  = !!(scF.team  && scF.team  !== 'ALL');
 
         const stacksVon = code => ((agg && agg.stacks) || [])
@@ -17294,10 +19678,10 @@
                 zeilen: stds.map(s => zeileEinheit(stdFullName(s.code), s, liga.byStd[s.code] || 0)) });
             stds.forEach(s => {
                 if (!stackFix) bl.push({ titel: 'STANDORT - ' + stdFullName(s.code).toUpperCase(),
-                    zeilen: stacksVon(s.code).map(o => zeileEinheit(o.stack || '—', o, o.ligaCalls || 0)) });
+                    zeilen: stacksVon(s.code).map(o => zeileEinheit(rcStackName(o.stack), o, o.ligaCalls || 0)) });
                 stacksVon(s.code).forEach(o => {
                     if (stackFix && (o.stack || '') !== scF.stack) return;
-                    bl.push({ titel: 'STACK - ' + (o.stack || '—').toUpperCase() + '  (' + stdFullName(s.code).toUpperCase() + ')',
+                    bl.push({ titel: 'STACK - ' + rcStackName(o.stack).toUpperCase() + '  (' + stdFullName(s.code).toUpperCase() + ')',
                         zeilen: teamsVon(s.code, o.stack).map(t => zeileEinheit(t.name, t, liga.byTeam[t.name] || 0)) });
                     if (stackFix || teamFix) {
                         teamsVon(s.code, o.stack).forEach(t => {
@@ -17317,7 +19701,7 @@
         // DSL/FIB ist im Datenmodell EIN Feld (fibDsl) — ehrlicher als zwei
         // Spalten, die dieselbe Zahl raten. PTV enthaelt sonstBnt (wie in den
         // Liga-Blaettern, sonst gehen die Detailspalten nicht auf die Summe auf).
-        if (nur !== 'qualitaet' && rcBlattAktiv(wahl, 'reportingV')) {
+        if (nur !== 'qualitaet' && blattAn('reportingV')) {
             // ZWEI Quoten-Spalten (06.08. nachts, Nutzer-Vergleich mit dem
             // ESL-Original): ANSPR. % rechnet wie das ESL selbst — Ansprachen
             // geteilt durch die ESL-KONTAKTE (Team 83 im Testzeitraum: 466/1239
@@ -17353,16 +19737,16 @@
         }
 
         // ---------- QUALITAET ----------
-        // Reine Liga-Sicht: Calls, AHT (gewichtet), CS/FQ/DDS/FTF/AQ gepoolt
+        // Reine Liga-Sicht: Calls, AHT (gewichtet), CS/FQ/DDS/FTF gepoolt
         // (nie gemittelt), TNPS als Punktwert, Detraktoren als Anzahl.
-        if (nur !== 'vertrieb' && rcBlattAktiv(wahl, 'reportingQ')) {
-            const QH = ['', 'CALLS','AHT','CS %','TNPS','FQ %','DDS %','FTF %','AQ %','DETR.'];
+        if (nur !== 'vertrieb' && blattAn('reportingQ')) {
+            const QH = ['', 'CALLS','AHT','CS %','TNPS','FQ %','DDS %','FTF %','DETR.'];
             const qZeile = (label, o, lc) => [ label, lc > 0 ? lc : '',
-                ahtV(o), qv(o,'cs'), tnv(o), qv(o,'fq'), qv(o,'dds'), qv(o,'ftf'), qv(o,'aq'), leer(o.detr) ];
+                ahtV(o), qv(o,'cs'), tnv(o), qv(o,'fq'), qv(o,'dds'), qv(o,'ftf'), leer(o.detr) ];
             const qZeileAg = (label, a, lc) => [ label, lc > 0 ? lc : '',
-                ahtAg(a), qAg(a,'cs'), tnAg(a), qAg(a,'fq'), qAg(a,'dds'), qAg(a,'ftf'), qAg(a,'aq'), leer(a.detr) ];
-            var qPct = [3, 5, 6, 7, 8];
-            var qW = w(26,8,8,8,8,8,8,8,8,7);
+                ahtAg(a), qAg(a,'cs'), tnAg(a), qAg(a,'fq'), qAg(a,'dds'), qAg(a,'ftf'), leer(a.detr) ];
+            var qPct = [3, 5, 6, 7];
+            var qW = w(26,8,8,8,8,8,8,8,7);
             var qSieb = rcKennzahlSieb(RC_KENNZAHLEN_Q, wahl && wahl.kq, QH, qPct, qW);
             if (qSieb) blattAusBloecken((namen && namen.q) || 'Qualitaet Reporting', qSieb.header,
                 bloeckeBauen(qSieb.zeile(qZeile), qSieb.zeile(qZeileAg)), qSieb.pct, qSieb.widths, '820000');
@@ -17456,7 +19840,7 @@
         // ihn ueber rcAggTrendScope).
         const scF = agg.trendScope || {};
         const stdFix   = !!(scF.std   && scF.std   !== 'ALL');
-        const stackFix = !!(scF.stack && scF.stack !== 'ALL');
+        const stackFix = !!(scF.stack && scF.stack !== 'ALL' && !rcIstProjektFilter(scF.stack));
         const teamFix  = !!(scF.team  && scF.team  !== 'ALL');
 
         // ==================================================================
@@ -17589,7 +19973,7 @@
                 stackRows.filter(o => (o.calls || 0) > 0 || (o.ligaCalls || 0) > 0)
                     .sort((a,b) => (b.total||0) - (a.total||0)).map(o => {
                     const lc = o.ligaCalls || 0;
-                    return [ stdFullName(o.standort), o.stack, o.kip||0, o.mob||0, o.fibDsl||0, o.env||0, o.bnt||0, o.vvl||0, o.bcr||0, o.nonBcr||0, o.pitches||0,
+                    return [ stdFullName(o.standort), rcStackName(o.stack), o.kip||0, o.mob||0, o.fibDsl||0, o.env||0, o.bnt||0, o.vvl||0, o.bcr||0, o.nonBcr||0, o.pitches||0,
                       lc > 0 ? lc : '', o.calls||0, lc > 0 ? crF(o.bnt||0, lc) : '', lc > 0 ? crF(o.vvl||0, lc) : '', o.total||0 ]; }),
                 [13,14], w(16,14,7,7,9,7,9,7,8,8,9,9,11,12,12,8));
         })();
@@ -17631,6 +20015,31 @@
                     pctAvg(d.liga.csS, d.liga.csN), pctAvg(d.liga.tnS, d.liga.tnN) ]),
                 [6,7,8,9], w(17,12,11,8,8,10,13,13,9,9));
         })();
+
+        // Blatt OHNE STACK (05.10.) — die eigene Gruppe der Agenten ohne
+        // Stack-Zuordnung (weder Mitarbeiter-Excel noch Anker). Unter einem
+        // Stack-Filter stehen sie in KEINER Summe dieser Mappe; ohne das Blatt
+        // waeren sie dort schlicht verschwunden (28.09.: 67 Agenten). Nur wenn
+        // heute im Bereich liegt — das Verzeichnis entsteht beim Parsen des
+        // heutigen Datenstroms und wird nicht archiviert.
+        (function(){
+            if (!rcBlattAktiv(wahl, 'ohneStack')) return;
+            const heute = rcTodayKey();
+            if ((scF.from && scF.from > heute) || (scF.to && scF.to < heute)) return;
+            const liste = rcOhneStackListe({ std: scF.std || 'ALL', team: scF.team || 'ALL', stack: scF.stack || 'ALL' })
+                .slice().sort((a, b) => (b.stueck - a.stueck) || (b.kontakte - a.kontakte));
+            if (!liste.length) return;
+            const projName = k => (rcProjEintrag(k) || {}).name || '';
+            const zeilen = liste.map(l => [ projName(l.projekt), stdFullName(l.standort), l.imMapping ? l.team : (l.teamRoh || l.team),
+                rcLueckeName(l), l.vo, l.kontakte, l.ansprachen, l.stueck, rcLueckeGrund(l) ]);
+            zeilen.push([ stackFix
+                ? 'Diese ' + liste.length + ' Agent(en) zählen in den Summen dieser Mappe (Filter ' + scF.stack + ') NICHT mit — ihr Stack ist unbekannt. Abhilfe: in der Mitarbeiter-Excel nachtragen.'
+                : 'Diese ' + liste.length + ' Agent(en) sind in den Summen dieser Mappe enthalten, stehen aber unter keinem einzelnen Stack. Abhilfe: in der Mitarbeiter-Excel nachtragen.',
+                '', '', '', '', '', '', '', '' ]);
+            flatSheet('Ohne Stack', 'FFEB9700',
+                ['Projekt','Standort','Team','Agent','VO-Nummer / CCS-ID','ESL-Kontakte','Ansprachen','Stück (heute)','Grund'],
+                zeilen, [], w(10,16,26,26,18,13,12,13,62));
+        })();
     }
 
     // Scope fuer rcAggAusRows/rcBuildAggSheets: aktive Dashboard-Filter, bzw. der
@@ -17662,7 +20071,7 @@
             try { rcBuildProdukteSheet(XL, wb, !!XL.__styled, data); } catch(e){ rcLog.warn("Produkte-Blatt: " + e.message); }
             rcBuildAnalyseSheets(XL, wb, !!XL.__styled, data);
             const g = (id, sk) => (scope && scope[sk] != null) ? (scope[sk] !== 'ALL' ? scope[sk] : null) : (() => { const el = document.getElementById(id); return (el && el.value !== 'ALL') ? el.value : null; })();
-            const parts = [g('rcStandortFilter','std'), g('rcStackFilter','stack'), g('rcTeamFilter','team') ? 'Team' + g('rcTeamFilter','team') : null].filter(Boolean);
+            const parts = [g('rcStandortFilter','std'), rcStackFilterText(g('rcStackFilter','stack')), g('rcTeamFilter','team') ? 'Team' + g('rcTeamFilter','team') : null].filter(Boolean);
             const fn = 'regiocom_Stand_' + (data.today ? 'heute' : dayKey) + (parts.length ? '_' + parts.join('_').replace(/[^A-Za-z0-9_-]+/g, '') : '') + '.xlsx';
             rcXlsxSpeichern(XL, wb, fn, data.today ? 'AKTUELLER_STAND' : ('STAND_' + data.label.replace(/\./g, '-')).slice(0, 31));
             rcLog.log('Stand-Export ' + data.label + ' (' + data.rows.length + ' Agenten): ' + fn);
@@ -17766,8 +20175,11 @@
             const sm = (window.rcWcaMapping || {}).stackMap || {};
             const stacks = [...new Set(Object.values(sm).filter(Boolean))].sort();
             const vor = fltVor('rcStackFilter');
-            return '<option value="ALL">Alle Stacks</option>' +
-                   stacks.map(s => '<option value="' + s + '"' + (s === vor ? ' selected' : '') + '>' + s + '</option>').join('');
+            // "<Projekt> gesamt" ('P:<projekt>', 05.10.) wie in der Kopfleiste — ohne
+            // die Option liesse sich ein so gefilterter Stand hier nicht vorwaehlen.
+            const projekte = window.rcAlleProjekteModus ? rcProjRahmenListe().map(p => 'P:' + p.key) : [];
+            const opt = s => '<option value="' + s + '"' + (s === vor ? ' selected' : '') + '>' + rcStackFilterText(s) + '</option>';
+            return '<option value="ALL">Alle Stacks</option>' + projekte.map(opt).join('') + stacks.map(opt).join('');
         })();
         // Team-Auswahl (ergaenzt 09.08.). Der Dialog kannte nur Standort und Stack,
         // scopeAus() setzte team hart auf 'ALL' — die Reporting-Mappe liess sich
@@ -17802,6 +20214,23 @@
             '<div style="color:#9C9C9C; font-size:11.5px; margin-bottom:14px;">' +
                 'EINE Mappe, voller Umfang. Die Historie reicht ' + tage.length + ' Tag(e) zurueck; fehlt ein Tag, ihn zuerst ueber ' +
                 '<b>Werkzeuge &rarr; Zeitraum &rarr; Daten laden</b> holen.</div>' +
+
+            // Alle-Projekte-Betrieb (28.09., Nutzer: "wenn ich Excel-Reporting haben
+            // will, dann soll er erst mal Buttons machen: Mobile Update, Kabel Update
+            // ... und danach muss das Reporting 100 % richtig sein"). Nur das aktive
+            // Projekt laeuft live mit — die anderen haben den Stand ihres letzten Abrufs.
+            (window.rcAlleProjekteModus ?
+            '<div class="rc-card" style="padding:12px; margin-bottom:10px;">' +
+                '<div style="font-weight:600; color:#F5F5F5; margin-bottom:4px;">Projekte aktualisieren</div>' +
+                '<div style="color:#9C9C9C; font-size:11px; margin-bottom:8px;">Nur das aktive Projekt laeuft live mit. Der Bericht holt vor dem Bau selbst, was sein Filter braucht (ohne Stack-Filter alle drei) &mdash; die Knoepfe hier holen einzeln nach.</div>' +
+                '<div id="rcExProjListe"></div>' +
+                '<div style="display:flex; gap:8px; margin-top:8px; flex-wrap:wrap;">' +
+                    '<button class="rc-btn" data-rc-exproj="kabel">Kabel aktualisieren</button>' +
+                    '<button class="rc-btn" data-rc-exproj="mobile">Mobile aktualisieren</button>' +
+                    '<button class="rc-btn" data-rc-exproj="um">UM aktualisieren</button>' +
+                    '<button class="rc-btn rc-btn-blue" data-rc-exproj="alle">Alle drei nacheinander</button>' +
+                '</div>' +
+            '</div>' : '') +
 
             '<div class="rc-card" style="padding:12px; margin-bottom:10px;">' +
                 '<div style="font-weight:600; color:#F5F5F5; margin-bottom:8px;">Zeitbezug</div>' +
@@ -17857,8 +20286,8 @@
                 const gruppe = (titel, knopfId, inhalt) => '<details style="margin-top:6px;"><summary style="cursor:pointer; color:#F5F5F5; font-size:12px; font-weight:600;">' + titel + ' <button type="button" class="rc-btn" data-alle="' + knopfId + '" style="font-size:10px; padding:1px 7px; margin-left:6px;">alle an/aus</button></summary><div style="padding:6px 2px 2px;" data-gruppe="' + knopfId + '">' + inhalt + '</div></details>';
                 let h = '<div class="rc-card" style="padding:12px; margin-top:10px;">' +
                     '<div style="font-weight:600; color:#F5F5F5; margin-bottom:4px;">Inhalt</div>' +
-                    '<div style="color:#9C9C9C; font-size:11px; margin-bottom:4px;">Was in die Mappe kommt. Die Auswahl wird je Projekt gemerkt. Alles an = die gewohnte volle Mappe.</div>';
-                h += gruppe('Blaetter', 'B', RC_BLAETTER.map(b => cb('rcExB_' + b[0], b[1], !(W.blaetter && W.blaetter[b[0]] === false))).join(''));
+                    '<div style="color:#9C9C9C; font-size:11px; margin-bottom:4px;">Was in die Mappe kommt. Die Auswahl wird je Projekt gemerkt. Ab Werk sind nur die acht Standard-Blätter an; weitere Blätter lassen sich hier zuschalten.</div>';
+                h += gruppe('Blaetter', 'B', RC_BLAETTER.map(b => cb('rcExB_' + b[0], b[1], rcBlattAktiv(W, b[0]))).join(''));
                 h += gruppe('Kennzahlen Vertrieb (Reporting-Blatt)', 'KV', RC_KENNZAHLEN_V.map(k => cb('rcExKV_' + k.key, k.label, !(W.kv && W.kv[k.key] === false))).join(''));
                 h += gruppe('Kennzahlen Qualitaet (Reporting-Blatt)', 'KQ',
                     RC_KENNZAHLEN_Q.map(k => cb('rcExKQ_' + k.key, k.label, !(W.kq && W.kq[k.key] === false))).join('') +
@@ -17878,12 +20307,48 @@
             team:  (document.getElementById('rcExWahlTeam')  || {}).value || 'ALL'
         });
         const an = (id, fn) => { const b = document.getElementById(id); if (b) b.addEventListener('click', fn); };
-        // Inhalt-Auswahl einsammeln + je Projekt merken. Gespeichert wird nur
-        // das ABGEWAEHLTE (false) — neue Kennzahlen/Blaetter sind damit
-        // automatisch an, statt unsichtbar auszufallen.
+        // Stand je Projekt: Farbe = Ampel (gruen frisch, amber aelter als 15 Min,
+        // rot keine Daten / zuletzt fremde Daten verworfen), * = aktives Projekt.
+        const projListe = () => {
+            const el = document.getElementById('rcExProjListe'); if (!el) return;
+            const esc = t => String(t == null ? '' : t).replace(/&/g, '&amp;').replace(/</g, '&lt;');
+            el.innerHTML = rcProjRahmenListe().map(p => {
+                const d = (window.rcProjektDaten || {})[p.key], st = (window.rcRahmen || {})[p.key] || {};
+                const min = d ? Math.floor((Date.now() - d.zeit) / 60000) : null;
+                const farbe = (!d || st.falschSeit) ? RC_AMPEL_ROT : (min >= 15 ? RC_AMPEL_WARN : RC_AMPEL_OK);
+                const uhr = d ? pad2(new Date(d.zeit).getHours()) + ':' + pad2(new Date(d.zeit).getMinutes()) : '';
+                const txt = d ? 'Stand ' + uhr + ' (vor ' + min + ' Min)' + (d.pruefung === 'ok' ? ', Agenten geprueft' : d.pruefung === 'unklar' ? ', nicht pruefbar' : d.pruefung === 'leer' ? ', noch keine Datensaetze heute' : '') : 'keine Daten';
+                return '<div style="display:flex; gap:10px; font-size:12px; color:#C9C9C9; padding:2px 0;">' +
+                    '<span style="min-width:64px; font-weight:700; color:' + farbe + ';">' + p.name + (p.key === window.rcAktivProjekt ? ' *' : '') + '</span>' +
+                    '<span>' + txt + (st.grund ? ' &mdash; ' + esc(st.grund) : '') + '</span></div>';
+            }).join('') + '<div style="font-size:10.5px; color:#8A8A8A; margin-top:2px;">* aktiv (laeuft live mit)</div>';
+        };
+        document.querySelectorAll('[data-rc-exproj]').forEach(b => b.addEventListener('click', async () => {
+            const key = b.getAttribute('data-rc-exproj'), alle = document.querySelectorAll('[data-rc-exproj]');
+            alle.forEach(x => { x.disabled = true; });
+            try {
+                if (key === 'alle') {
+                    const erg = await window.rcProjekteAlleAktualisieren(t => sagen(t));
+                    const fehl = Object.keys(erg).filter(k => !erg[k] || !erg[k].ok);
+                    sagen(fehl.length ? 'Nicht geholt: ' + fehl.map(k => rcProjEintrag(k).name + ' (' + ((erg[k] && erg[k].grund) || 'unbekannt') + ')').join(', ')
+                                      : 'Alle drei Projekte aktualisiert.', fehl.length > 0);
+                } else {
+                    const nm = rcProjEintrag(key).name;
+                    sagen('Hole ' + nm + ' ...');
+                    const r = await window.rcProjektAktualisieren(key);
+                    sagen(r && r.ok ? nm + ' aktualisiert (' + (r.zeilen || 0) + ' Zeilen, ' + (r.text || '') + ').'
+                                    : nm + ' nicht geholt: ' + ((r && r.grund) || 'unbekannt'), !(r && r.ok));
+                }
+            } catch(e){ sagen('Fehlgeschlagen: ' + (e && e.message ? e.message : e), true); }
+            finally { alle.forEach(x => { x.disabled = false; }); projListe(); }
+        }));
+        projListe();
+        // Inhalt-Auswahl einsammeln + je Projekt merken. Gespeichert wird nur,
+        // was vom Werkszustand ABWEICHT (Blaetter: true/false, Kennzahlen: nur false) —
+        // neue Kennzahlen sind damit automatisch an, neue Blaetter folgen ihrem Werkszustand.
         const wahlAus = () => {
             const aus = { blaetter:{}, kv:{}, kq:{} };
-            RC_BLAETTER.forEach(b => { const el = document.getElementById('rcExB_' + b[0]); if (el && !el.checked) aus.blaetter[b[0]] = false; });
+            RC_BLAETTER.forEach(b => { const el = document.getElementById('rcExB_' + b[0]); if (el && el.checked !== (b[2] !== false)) aus.blaetter[b[0]] = el.checked; });
             RC_KENNZAHLEN_V.forEach(k => { const el = document.getElementById('rcExKV_' + k.key); if (el && !el.checked) aus.kv[k.key] = false; });
             RC_KENNZAHLEN_Q.forEach(k => { const el = document.getElementById('rcExKQ_' + k.key); if (el && !el.checked) aus.kq[k.key] = false; });
             try { localStorage.setItem(rcKey('rcExportWahl_v1'), JSON.stringify(aus)); } catch(e){}
@@ -17917,25 +20382,62 @@
             prodHinweis();
         }));
 
+        // ERST AKTUALISIEREN, DANN BAUEN (05.10.). Liegt heute im Bereich, holt der
+        // Dialog vor dem Bau selbst, was der Filter braucht (rcFrischHolen) — vorher
+        // stand im heutigen Teil der Mappe der Stand des letzten Abrufs, fuer die
+        // nicht aktiven Projekte also alte oder gar keine Daten. Scheitert das
+        // Auffrischen, wird trotzdem gebaut; der Grund bleibt in der Statuszeile
+        // stehen (auch hinter dem spaeteren "Fertig"), statt verschluckt zu werden.
+        const frischDann = async (b, bauen) => {
+            const knoepfe = ['rcExWahlGo', 'rcExWahlRep'].map(id => document.getElementById(id)).filter(Boolean);
+            let hinweis = '', vorab = '';
+            // Datendienst (27.10.): liegen Vortage im Bereich, holt sie vorher der Dienst
+            // (ESL + Ligaliste je Projekt des Zuschnitts). FRIST, keine Sperre: scheitert
+            // es, wird trotzdem gebaut — mit dem Grund in der Statuszeile.
+            if (rcDienstModus() && b.von < heute) {
+                knoepfe.forEach(k => { k.disabled = true; });
+                sagen('Der Datendienst holt die Vortage ...');
+                try {
+                    const v = await rcDienstBereich(b.von, b.bis < gestern ? b.bis : gestern, rcProjekteFuerScope(scopeAus()));
+                    if (!v || !v.ok) vorab = 'Vortage nicht vollstaendig (' + ((v && v.text) || 'kein Ergebnis') + ')';
+                } catch(e){ vorab = 'Vortage nicht geholt (' + (e && e.message ? e.message : e) + ')'; }
+                finally { knoepfe.forEach(k => { k.disabled = false; }); }
+            }
+            if (b.von <= heute && b.bis >= heute) {
+                knoepfe.forEach(k => { k.disabled = true; });
+                sagen('Aktualisiere die Daten vor dem Export ...');
+                try {
+                    const f = await rcFrischHolen(scopeAus(), t => sagen(t));
+                    if (f && !f.ok) hinweis = 'nicht alles frisch (' + f.fehler.join('; ') + ')';
+                } catch(e){ hinweis = 'Auffrischen fehlgeschlagen (' + (e && e.message ? e.message : e) + ')'; }
+                finally { knoepfe.forEach(k => { k.disabled = false; }); projListe(); }
+            }
+            hinweis = [vorab, hinweis].filter(Boolean).join('; ');
+            const sagenMit = hinweis ? ((t, schlecht) => sagen(t + ' — ACHTUNG: ' + hinweis, true)) : sagen;
+            try { bauen(sagenMit); }
+            catch(e){ sagen('Fehlgeschlagen: ' + (e && e.message ? e.message : e), true); }
+        };
         an('rcExWahlGo', () => {
             const b = bereich();
             if (!b.von || !b.bis || b.von > b.bis) { sagen('Bitte einen gueltigen Zeitraum waehlen (von <= bis).', true); return; }
-            sagen('Baue Bericht ' + deutsch(b.von) + (b.von === b.bis ? '' : ' bis ' + deutsch(b.bis)) + ' ...');
-            // sagen wird hereingereicht: erst wenn die Datei wirklich geschrieben
-            // ist, steht hier "Fertig" (vorher meldete der Dialog das unbedingt).
-            try { window.rcExportStandZeitraum(b.von, b.bis, scopeAus(), true, sagen, wahlAus()); }
-            catch(e){ sagen('Fehlgeschlagen: ' + (e && e.message ? e.message : e), true); }
+            frischDann(b, sag => {
+                sag('Baue Bericht ' + deutsch(b.von) + (b.von === b.bis ? '' : ' bis ' + deutsch(b.bis)) + ' ...');
+                // sag wird hereingereicht: erst wenn die Datei wirklich geschrieben
+                // ist, steht hier "Fertig" (vorher meldete der Dialog das unbedingt).
+                window.rcExportStandZeitraum(b.von, b.bis, scopeAus(), true, sag, wahlAus());
+            });
         });
         an('rcExWahlRep', () => {
             const b = bereich();
             if (!b.von || !b.bis || b.von > b.bis) { sagen('Bitte einen gueltigen Zeitraum waehlen (von <= bis).', true); return; }
-            sagen('Baue Reporting-Mappe ' + deutsch(b.von) + (b.von === b.bis ? '' : ' bis ' + deutsch(b.bis)) + ' ...');
-            // sagen wird als Rueckmeldekanal hereingereicht: der Bau laeuft
-            // asynchron weiter, ein Fehlschlag danach landet damit in derselben
-            // Statuszeile statt in einem alert(), das die Fernsteuerung blockiert.
-            try { const okR = window.rcExportReporting(b.von, b.bis, scopeAus(), sagen);
-                  if (okR) sagen('Reporting-Mappe wird gebaut — sie landet gleich im Download-Ordner.'); }
-            catch(e){ sagen('Fehlgeschlagen: ' + (e && e.message ? e.message : e), true); }
+            frischDann(b, sag => {
+                sag('Baue Reporting-Mappe ' + deutsch(b.von) + (b.von === b.bis ? '' : ' bis ' + deutsch(b.bis)) + ' ...');
+                // sag wird als Rueckmeldekanal hereingereicht: der Bau laeuft
+                // asynchron weiter, ein Fehlschlag danach landet damit in derselben
+                // Statuszeile statt in einem alert(), das die Fernsteuerung blockiert.
+                const okR = window.rcExportReporting(b.von, b.bis, scopeAus(), sag);
+                if (okR) sag('Reporting-Mappe wird gebaut — sie landet gleich im Download-Ordner.');
+            });
         });
         an('rcExWahlRepAlle', () => {
             const b = bereich();
@@ -17997,7 +20499,7 @@
             const standDaten = rcStandRows(null);
             rcBuildStandSheets(XL, wb, styled, standDaten);
             rcBuildSalesSheet(XL, wb, styled, standDaten);
-            try { rcBuildProdukteSheet(XL, wb, styled, standDaten); } catch(e){ rcLog.warn("Produkte-Blatt: " + e.message); }
+            if (rcBlattAktiv(null, 'produkte')) { try { rcBuildProdukteSheet(XL, wb, styled, standDaten); } catch(e){ rcLog.warn("Produkte-Blatt: " + e.message); } }
             rcBuildAnalyseSheets(XL, wb, styled, standDaten);
 
             // Struktur / Liga Standorte / Liga Teams / Standorte / Stacks / Teams /
@@ -18233,10 +20735,10 @@
         const fStack = (document.getElementById('rcStackFilter')||{}).value || 'ALL';
         const fTeam  = (document.getElementById('rcTeamFilter')||{}).value || 'ALL';
         const mp = window.rcWcaMapping || {};
-        const ccsMapK = mp.ccsMap || {}, stackMapK = mp.stackMap || {};
+        const ccsMapK = mp.ccsMap || {};
         Object.values(st.agentStats || {}).forEach(a => {
             if (fCode && a.standort !== fCode) return;
-            if (fStack !== 'ALL' && (a.stack || stackMapK[a.team] || '') !== fStack) return;
+            if (fStack !== 'ALL' && !rcStackFilterPasst(a.team, fStack, a.projekt)) return;
             if (fTeam !== 'ALL' && (a.team || '') !== fTeam) return;
             const sales = (a.bnt||0) + (a.vvl||0);
             const ansp = a.ansprachen || 0;
@@ -18272,10 +20774,9 @@
             if (fCode && code !== fCode) return;
             const meta = ccsMapK[k.ccsId] || {};
             const team = ((meta.team || k.team || '') + '').trim();
-            const stack = stackMapK[team] || meta.stack || '';
-            // Ohne Mapping-Zuordnung (kein Team/Stack bekannt) NICHT unter einem
-            // aktiven Stack-/Team-Filter zeigen — wir wissen nicht, ob sie dazugehoeren.
-            if (fStack !== 'ALL' && stack !== fStack) return;
+            // Ohne Zuordnung (weder Mapping noch Anker) NICHT unter einem aktiven
+            // Stack-/Team-Filter zeigen — wir wissen nicht, ob sie dazugehoeren.
+            if (fStack !== 'ALL' && !rcStackFilterPasst(team, fStack, rcProjektVonAgent(k.ccsId))) return;
             if (fTeam  !== 'ALL' && team  !== fTeam)  return;
             const calls = k.callCount || 0;
             if (calls < 10) return;
@@ -18931,7 +21432,7 @@
                 `<span class="rc-mq-alarm">&#9650; ESL-TRACKING: <b>${x.name}</b> (${x.std}) — nur ${x.kont} von ${x.calls} Calls im ESL — bitte JEDEN Call eintragen</span>`));
         }
 
-        // 2c) Vertriebs-Blocker aus der Liga-Analyse (WQ, ACW, Aufleger, Potenzial)
+        // 2c) Vertriebs-Blocker aus der Liga-Analyse (WQ, ACW, Potenzial)
         if (window.rcBuildInsights) {
             window.rcBuildInsights().slice(0, 5).forEach(x => items.push(
                 `<span class="rc-mq-alarm">&#9650; ${x.cat}: ${x.txt}</span>`));
@@ -19076,6 +21577,742 @@
         } catch(e){ rcLog.error('Excel-Verarbeitung fehlgeschlagen:', e); }
     }
 
+    // ============================================================
+    //  ALLE DREI PROJEKTE — EIN PROJEKT NACH WAHL (28.09.)
+    // ============================================================
+    //  Ersetzt die Rotation vom 27.09. (Kabel-Seite + zwei Rahmen, reihum alle
+    //  60 s). Live-Befund 27.09. abends (Flugschreiber, zwei Logbuch-Dateien):
+    //  das ESL fuehrt EIN aktuelles Projekt je Anmeldung — das zuletzt im Menue
+    //  gewaehlte. Eine Seite behaelt ihre Liste nur, bis sie neu gebaut wird; neu
+    //  gebaut wird sie von einem ECHTEN Klick auf "Liste aktualisieren" (Historie,
+    //  Zeitraum-Dialog) und vom 5-Minuten-Auto-Refresh des Portals — und zwar mit
+    //  dem aktuellen Projekt der ANMELDUNG. Gemessen: Kabel lieferte nach zwei
+    //  Neustarts jeweils korrekt 1433 Zeilen, bis 23:24 "Zeitraum laden" lief — ab
+    //  23:25:19 exakt die 68 UM-Datensaetze (der UM-Rahmen war zuletzt per Menue
+    //  geoeffnet worden); nach dem Auto-Refresh des Mobile-Rahmens (23:25:22)
+    //  lieferte ab 23:25:39 auch Mobile die UM-Datensaetze. VKD_Tech stand auf 0.
+    //  Die Steckbrief-Messung vom Morgen ("seitengebunden") lief nur 10 s, ohne
+    //  Klick und ohne Auto-Refresh. Dieselbe Verwechslung steckt in den
+    //  Referenzexporten vom 09.08. ("Kabel.xlsx" traegt UM-Agenten, "Mobile.xlsx"
+    //  Kabel-Agenten — am Mapping gemessen).
+    //  Bauart (Nutzer 28.09.: "Er soll nur diesen Stack automatisch updaten, bei
+    //  dem ich auch stehen bleibe ... wenn ich einen anderen Stack klicke, dass
+    //  er auch ESL umwandelt und Daten liefert"):
+    //   - EIN aktives Projekt (rcAktivProjekt, gemerkt). Nur das holt der 20-s-Takt.
+    //   - EIN Arbeitsrahmen. Fuer ein anderes Projekt faehrt er wie ein Mensch
+    //     ueber das Menue dorthin — damit steht auch die Anmeldung auf diesem
+    //     Projekt, und jeder Neuaufbau bleibt dort. Nie zwei Projekte nebeneinander.
+    //   - Jede Lieferung wird GEPRUEFT: die Agenten muessen ueber das Mapping zum
+    //     Projekt gehoeren (VKD_*/OneC_* = Kabel, MF_* = Mobile, VUM_* = UM).
+    //     Fremde Daten werden verworfen und gemeldet, nicht angezeigt.
+    //   - Die anderen Projekte behalten ihren letzten Stand; neu geholt werden sie
+    //     beim Umschalten (Kopfleiste, Stack-Filter) oder per Knopf im Export-Dialog.
+    //  Die Kabel-Hauptseite exportiert in diesem Betrieb NICHT mehr selbst. Nur
+    //  Historie/Zeitraum laufen ueber sie — rcFetchRangeViaUI stellt vorher die
+    //  Anmeldung auf Kabel und prueft das Ergebnis.
+    //  Nur auf der Kabel-Seite des echten Portals; eine Mobile-/UM-Seite (eigener
+    //  Starter) bleibt Einzelprojekt. Abschalten: rcAlleProjekte(false).
+    function rcAlleProjekteAn(){
+        if (rcDienstModus()) return true;                                 // Datendienst: alle drei, ohne Portal
+        if (window.rcProjektKuerzel) return false;                        // Mobile-/UM-Seite
+        if (location.pathname.indexOf('/Agents/') === -1) return false;   // Pruefseiten, Offline-Harness
+        try { return localStorage.getItem('rcAlleProjekteAus') !== '1'; } catch(e){ return true; }
+    }
+    // Einmal je Einspielen festgelegt: ein Umschalten zur Laufzeit wuerde den Takt
+    // mitten im Betrieb umstellen.
+    window.rcAlleProjekteModus = rcAlleProjekteAn();
+    window.rcAlleProjekte = function(an){
+        try {
+            if (an === false) localStorage.setItem('rcAlleProjekteAus', '1');
+            else if (an === true) localStorage.removeItem('rcAlleProjekteAus');
+        } catch(e){}
+        return 'Alle Projekte in einem Dashboard: jetzt ' + (window.rcAlleProjekteModus ? 'AN' : 'AUS') +
+            (an === undefined ? '' : ', eingestellt ' + (rcAlleProjekteAn() ? 'AN' : 'AUS') + ' — wirkt nach dem Neuladen (F5).');
+    };
+    function rcProjRahmenListe(){
+        return [
+            { key:'kabel',  menue:'Vodafone Kabel',  praefix:'',   name:'Kabel'  },
+            { key:'mobile', menue:'Vodafone Mobile', praefix:'M-', name:'Mobile' },
+            { key:'um',     menue:'Vodafone UM',     praefix:'U-', name:'UM'     }
+        ];
+    }
+    function rcProjEintrag(key){
+        const l = rcProjRahmenListe();
+        for (let i = 0; i < l.length; i++) if (l[i].key === key) return l[i];
+        return null;
+    }
+    // Stack -> Projekt, am Mapping gegen die Exporte gemessen (28.09.): VKD_Tech und
+    // OneC_Tech stehen in den Kabel-Daten, MF_* in Mobile, VUM_* in UM.
+    function rcProjektVonStack(stack){
+        // Der Filterwert 'P:<projekt>' ("Kabel gesamt", 05.10.) nennt sein Projekt selbst.
+        if (String(stack || '').slice(0, 2) === 'P:') {
+            const k = String(stack).slice(2);
+            return (k === 'kabel' || k === 'mobile' || k === 'um') ? k : '';
+        }
+        const s = String(stack || '').toUpperCase();
+        if (/^(VKD|ONEC)/.test(s)) return 'kabel';
+        if (/^MF/.test(s)) return 'mobile';
+        if (/^VUM/.test(s)) return 'um';
+        return '';
+    }
+    window.rcProjektVonStack = rcProjektVonStack;
+    function rcProjektVonVo(vo, map){
+        const m = vo && map && ((map.voMap && map.voMap[vo]) || (map.ccsMap && map.ccsMap[vo]));
+        return rcProjektVonStack(m && m.team && map.stackMap ? map.stackMap[m.team] : '');
+    }
+
+    // Frisch je Einspielen. Die Generation laesst Laeufe einer Alt-Fassung (vor
+    // einem Re-Inject) aussteigen, statt in fremde Rahmen zu klicken.
+    window.rcProjektDaten = {};
+    window.rcRahmen = {};
+    window.rcRahmenGen = (window.rcRahmenGen || 0) + 1;
+    window.rcProjektAbrufLaeuft = null;   // { key, anlass, seit } — EIN ESL-Abruf zur Zeit
+    window.rcSitzungProjekt = '';         // worauf die Anmeldung steht; offen, bis der Rahmen einmal hinfuhr
+    window.rcAktivProjekt = (function(){
+        let v = null;
+        try { v = localStorage.getItem('rcAktivProjekt_v1'); } catch(e){}
+        return rcProjEintrag(v) ? v : 'kabel';
+    })();
+    document.querySelectorAll('iframe[data-rc-projekt]').forEach(function(f){ f.remove(); });
+
+    function rcRahmenHeute(){ const d = new Date(); return d.getFullYear()+'-'+pad2(d.getMonth()+1)+'-'+pad2(d.getDate()); }
+    function rcRahmenNorm(s){ return (s || '').replace(/\s+/g, ' ').trim().toLowerCase(); }
+    function rcRahmenText(d, sel, txt){
+        const t = rcRahmenNorm(txt), l = d ? d.querySelectorAll(sel) : [];
+        for (let i = 0; i < l.length; i++) {
+            const e = l[i], et = rcRahmenNorm(e.innerText || e.textContent || e.value || '');
+            let sichtbar = false;
+            try { sichtbar = !!(e.offsetParent || e.offsetWidth || e.offsetHeight); } catch(x){}
+            if (et && sichtbar && et.indexOf(t) !== -1) return e;
+        }
+        return null;
+    }
+    function rcRahmenStatistik(d){
+        const s = d ? d.querySelectorAll('select') : [];
+        for (let i = 0; i < s.length; i++)
+            for (let o = 0; o < s[i].options.length; o++)
+                if (rcRahmenNorm(s[i].options[o].textContent).indexOf('export projektergebnisse') !== -1) return s[i];
+        return null;
+    }
+    function rcRahmenAnsichtSteht(d){
+        const l = d ? d.querySelectorAll('.ui-selectonemenu-label') : [];
+        for (let i = 0; i < l.length; i++) if (rcRahmenNorm(l[i].textContent).indexOf('export projektergebnisse') !== -1) return true;
+        // Das Label fuellt erst das PrimeFaces-Skript — im Rahmen stand es leer
+        // ("Statistik (LEER)", 28.09. gemessen), obwohl der SERVER die Ansicht
+        // gewaehlt hatte. Ein Klick auf dieselbe Option loest dann KEINEN Wechsel
+        // aus. Zeuge ist die vom Server markierte Option (selected-Attribut); die
+        // beschreibt dieser Code nie selbst (anders als der Notnagel vom 22.08.).
+        const s = rcRahmenStatistik(d);
+        for (let o = 0; s && o < s.options.length; o++) {
+            const op = s.options[o];
+            if (op.defaultSelected && op.value && rcRahmenNorm(op.textContent).indexOf('export projektergebnisse') !== -1) return true;
+        }
+        return false;
+    }
+    // Welches Projekt zeigt eine ESL-Seite? Am Dateinamen (dekodiert — UM liegt
+    // unter "secure%20"): sis_vodafone.xhtml = Kabel, _mobile = Mobile, _um = UM.
+    function rcProjektVonPfad(pfad){
+        let s = String(pfad || '');
+        try { s = decodeURIComponent(s); } catch(e){}
+        const datei = s.split('/').pop().toLowerCase();
+        if (datei.indexOf('sis_vodafone') !== 0) return '';
+        return datei.indexOf('_mobile') !== -1 ? 'mobile' : datei.indexOf('_um') !== -1 ? 'um' : 'kabel';
+    }
+    // Export-Knopf in einer Knopfliste (Seite oder Such-Antwort) — EIN Sucher fuer
+    // Rahmen- und Einzelprojekt-Abruf. Echte Knoepfe: title "Liste exportieren",
+    // Symbol fa-file-excel-o.
+    function rcExportKnopfFinden(liste){
+        for (let i = 0; liste && i < liste.length; i++) {
+            const b = liste[i], t = ((b.title || '') + ' ' + (b.innerText || b.textContent || b.value || '')).toLowerCase();
+            if (t.indexOf('excel') !== -1 || t.indexOf('export') !== -1 || (b.innerHTML || '').toLowerCase().indexOf('excel') !== -1) return b;
+        }
+        return null;
+    }
+    // Die Such-Antwort (partial-response) lesen (28.09.): ohne Datensaetze rendert
+    // das ESL den Export-Knopf GAR NICHT ("Statistik liefert kein Ergebnis" —
+    // morgens gemessen). PrimeFaces schickt das Formular mit der Antwort neu; nur
+    // dort steht, ob es JETZT einen Export-Knopf gibt. Das DOM der Seite zeigt den
+    // Stand vom Seitenaufbau — morgens also fuer immer "kein Knopf".
+    function rcSuchAntwort(txt, W){
+        const s = String(txt || '');
+        const r = { leer: /Statistik liefert kein Ergebnis/i.test(s), formNeu: false, knopf: null };
+        // Teil-Antwort: das neu gerenderte filterForm. Voller Submit (Historie,
+        // rcFetchRangeBuffer mit fullMode): die ganze Seite — gesucht wird nur
+        // im filterForm.
+        const m = s.match(/<update id="filterForm"><!\[CDATA\[([\s\S]*?)\]\]><\/update>/);
+        const html = m ? m[1] : (/<form[^>]*\bid="filterForm"/.test(s) ? s : null);
+        if (html) {
+            try {
+                const P = (W && W.DOMParser) || DOMParser;
+                const doc = new P().parseFromString(html, 'text/html');
+                const root = doc.getElementById('filterForm') || doc;
+                const k = rcExportKnopfFinden(root.querySelectorAll('button[type="submit"], input[type="submit"]'));
+                r.formNeu = true;
+                r.knopf = k ? (k.id || k.name || null) : null;
+            } catch(e){}
+        }
+        return r;
+    }
+    // Eine Teil-Antwort (Ajax) nennt den viewExpiredDialog nur, wenn die Ansicht
+    // wirklich abgelaufen ist. Eine GANZE Seite traegt ihn immer (versteckt) —
+    // dort zaehlt nur die Ausnahme selbst (28.09.: jeder Export ohne Knopf lieferte
+    // die Seite und galt als "Ansicht abgelaufen").
+    function rcViewAbgelaufen(txt){
+        const s = String(txt || '');
+        return /ViewExpiredException/.test(s) || (/<partial-response/.test(s) && /viewExpiredDialog/.test(s));
+    }
+    // Ist eine HTML-Antwort die Anmeldeseite? Ein Passwortfeld allein beweist nichts
+    // (jede ESL-Seite traegt eins: "Passwort aendern") — nur ohne Hauptmenue.
+    function rcAnmeldeSeite(txt){
+        const s = String(txt || '');
+        return /j_username|id="loginForm"|name="username"|angemeldet\s+bleiben|>\s*Anmelden\s*</i.test(s) ||
+               (/type=["']?password/i.test(s) && !/frmMainMenu/.test(s));
+    }
+    // Zeilen von HEUTE im zuletzt verarbeiteten Datenstrom (ungefiltert). Grundlage
+    // fuer "ein Tag kann nur wachsen" im Einzelprojekt-Betrieb.
+    function rcStromHeuteZeilen(){
+        const s = window.rcLetzterDatenstrom;
+        if (!s || !s.length) return 0;
+        const h = (s[0] || []).map(function(x){ return (x == null ? '' : String(x)).toLowerCase().trim(); });
+        const iDat = h.indexOf('datum'), heute = rcRahmenHeute();
+        if (iDat === -1) return 0;
+        let n = 0;
+        for (let r = 1; r < s.length; r++) if (s[r] && rcRowDayKey(s[r], { datum: iDat }) === heute) n++;
+        return n;
+    }
+
+    // Den Arbeitsrahmen ueber das Menue auf ein Projekt fahren und bis zur
+    // Export-Ansicht fuehren. Klickwege wie der Autopilot (Menue-Eintrag nach
+    // exaktem Text, Reiter "Projektergebnisse", Ansicht per PrimeFaces-Klickweg) —
+    // am Portal gemessen 27.09. Der Menue-Klick stellt die ANMELDUNG um; deshalb
+    // gibt es genau EINEN Rahmen: jeder Aufbau raeumt die anderen ab.
+    async function rcRahmenAufbau(p){
+        const st = window.rcRahmen[p.key] || (window.rcRahmen[p.key] = { seit: Date.now() });
+        if (st.laeuft) return;
+        const gen = window.rcRahmenGen;
+        st.laeuft = true; st.bereit = false; st.versuch = Date.now(); st.anmeldung = false;
+        document.querySelectorAll('iframe[data-rc-projekt]').forEach(function(x){ x.remove(); });
+        Object.keys(window.rcRahmen).forEach(function(k){ const o = window.rcRahmen[k]; if (o && k !== p.key) { o.bereit = false; o.f = null; } });
+        const f = document.createElement('iframe');
+        f.setAttribute('data-rc-projekt', p.key);
+        // Ohne allow-top-navigation/-popups/-modals: der Rahmen kann das Dashboard
+        // nicht wegnavigieren und keinen blockierenden Dialog oeffnen.
+        f.setAttribute('sandbox', 'allow-scripts allow-same-origin allow-forms');
+        f.setAttribute('aria-hidden', 'true');
+        f.tabIndex = -1;
+        // Gelayoutet statt display:none — sonst findet die Sichtbarkeitspruefung
+        // der Klickwege nichts. Unsichtbar und nicht anklickbar.
+        f.style.cssText = 'position:fixed;right:0;bottom:0;width:1400px;height:900px;opacity:0;pointer-events:none;z-index:-1;border:0';
+        f.src = '/Agents/secure/main.xhtml';
+        document.body.appendChild(f);
+        st.f = f; st.tag = rcRahmenHeute();
+        const doc = function(){ try { return f.contentDocument; } catch(e){ return null; } };
+        const warte = async function(fn, ms){
+            const ende = Date.now() + ms;
+            while (Date.now() < ende) {
+                if (gen !== window.rcRahmenGen || !f.isConnected) return null;
+                let v = null;
+                try { v = fn(); } catch(e){}
+                if (v) return v;
+                await new Promise(function(r){ setTimeout(r, 300); });
+            }
+            return null;
+        };
+        try {
+            let d = await warte(function(){ const x = doc(); return x && x.readyState === 'complete' && (x.getElementById('frmMainMenu') || rcPasswortSichtbar(x)) ? x : null; }, 40000);
+            if (!d) throw new Error('ESL-Startseite laedt nicht');
+            if (!d.getElementById('frmMainMenu')) { st.anmeldung = true; throw new Error('Anmeldemaske statt ESL-Startseite'); }
+            // main.xhtml leitet auf die Seite des Projekts, auf dem die ANMELDUNG
+            // steht (28.09. gemessen). Ist das schon das Ziel, bewirkt der Menue-Klick
+            // NICHTS (Ajax ok, keine Umleitung) — das Warten auf eine neue Seite lief
+            // bis 28.09. jedes Mal 25 s ins Leere ("Projektseite laedt nicht", 122
+            // Neuaufbauten in einer Nacht). Dann also nicht klicken.
+            if (rcProjektVonPfad(d.location.pathname) !== p.key) {
+                const link = Array.from(d.querySelectorAll('a.ui-menuitem-link')).find(function(a){ return rcRahmenNorm(a.textContent) === rcRahmenNorm(p.menue); });
+                if (!link) throw new Error('Menueeintrag "' + p.menue + '" fehlt');
+                const alt = d;
+                window.rcSitzungProjekt = '';        // ab dem Klick ist offen, worauf die Anmeldung steht
+                link.click();
+                d = await warte(function(){ const x = doc(); return x && x !== alt && x.readyState === 'complete' && /\/Agents\//.test(x.location.pathname) ? x : null; }, 25000);
+                if (!d) throw new Error('Projektseite laedt nicht');
+            }
+            // Gegenprobe: die Seite muss jetzt zum Ziel gehoeren (sonst z. B. Umleitung
+            // auf die Anmeldung oder ein anderes Projekt).
+            const istJetzt = rcProjektVonPfad(d.location.pathname);
+            if (istJetzt !== p.key) throw new Error('ESL zeigt ' + ((rcProjEintrag(istJetzt) || {}).name || d.location.pathname) + ' statt ' + p.name);
+            if (!rcRahmenStatistik(doc())) {
+                const tab = await warte(function(){ const x = doc(); return x && (x.getElementById('sis_form_01:CTS_tabProjektQueries') ||
+                    rcRahmenText(x, 'span.ui-menuitem-text, a.ui-tabs-anchor, a, .ui-tabs-anchor', 'projektergebnisse')); }, 20000);
+                if (!tab) throw new Error('Reiter "Projektergebnisse" fehlt');
+                (tab.closest('a') || tab).click();
+                if (!await warte(function(){ return rcRahmenStatistik(doc()); }, 25000)) throw new Error('Statistik-Auswahl fehlt');
+            }
+            if (!rcRahmenAnsichtSteht(doc())) {
+                const s = rcRahmenStatistik(doc()), box = s && s.closest('.ui-selectonemenu'), trig = box && box.querySelector('.ui-selectonemenu-trigger');
+                if (trig) {
+                    trig.click();
+                    const li = await warte(function(){ return rcRahmenText(doc(), 'li.ui-selectonemenu-item, li[role=option]', 'export projektergebnisse'); }, 8000);
+                    if (li) li.click();
+                }
+                if (!await warte(function(){ return rcRahmenAnsichtSteht(doc()); }, 10000)) throw new Error('Ansicht "Export Projektergebnisse" laesst sich nicht waehlen');
+            }
+            if (!await warte(function(){ const x = doc(); return x && x.getElementById('filterForm'); }, 15000)) throw new Error('filterForm fehlt');
+            if (gen !== window.rcRahmenGen) return;
+            st.bereit = true; st.grund = '';
+            window.rcSitzungProjekt = p.key;
+            rcLog.log('Alle Projekte: ESL steht jetzt auf ' + p.name + '.');
+        } catch(e){
+            st.grund = e.message;
+            rcLog.warn('Alle Projekte: Umstellen auf ' + p.name + ' gescheitert — ' + e.message + '.');
+        } finally { st.laeuft = false; }
+    }
+
+    // Ein Export aus dem Arbeitsrahmen. DASSELBE Protokoll wie holeExcelVomServer
+    // (Such-Postback, frischer ViewState in alle Formulare, Export-POST) — wer
+    // dort Such-/Exportknopf aendert, zieht es hier nach. Der Such-Postback baut
+    // die Liste NICHT neu (27.09. gemessen: er liess die Seite bei ihrem Projekt,
+    // waehrend echte Klicks und der Auto-Refresh sie umstellten); der Export
+    // fragt die Liste der Seite frisch ab.
+    async function rcRahmenExport(f){
+        const W = f.contentWindow, d = f.contentDocument, form = d && d.getElementById('filterForm');
+        if (!form) return { art:'kein-form' };
+        const buttons = Array.from(form.querySelectorAll('button[type="submit"], input[type="submit"]'));
+        const searchBtn = buttons.find(function(b){ return /suchen|aktualisieren|filtern|anzeigen/.test((b.innerText||b.value||'').toLowerCase()); });
+        let such = null;
+        if (searchBtn && (searchBtn.id || searchBtn.name)) {
+            const sid = searchBtn.id || searchBtn.name, sd = new W.FormData(form);
+            sd.append(sid, sid);
+            sd.append('javax.faces.partial.ajax','true');
+            sd.append('javax.faces.source', sid);
+            sd.append('javax.faces.partial.execute','filterForm data');
+            sd.append('javax.faces.partial.render','filterForm data');
+            const rs = await W.fetch(form.action || d.location.href, { method:'POST', body:sd,
+                headers:{ 'Faces-Request':'partial/ajax', 'X-Requested-With':'XMLHttpRequest' } });
+            const txt = await rs.text();
+            if (rcViewAbgelaufen(txt)) return { art:'abgelaufen' };
+            const vs = txt.match(/<update id="[^"]*javax\.faces\.ViewState[^"]*"><!\[CDATA\[(.*?)\]\]><\/update>/) ||
+                       txt.match(/name="javax\.faces\.ViewState".*?value="([^"]+)"/);
+            if (vs && vs[1]) d.querySelectorAll('input[name="javax.faces.ViewState"]').forEach(function(inp){ inp.value = vs[1]; });
+            such = rcSuchAntwort(txt, W);
+        }
+        // Export-Knopf aus der frischen Such-Antwort, sonst vom Seitenaufbau. KEIN
+        // geratener Ersatz mehr: ein Export ohne echten Knopf lieferte nur die Seite.
+        const exportBtn = such && such.formNeu ? null : rcExportKnopfFinden(buttons);
+        const btnId = such && such.formNeu ? such.knopf : (exportBtn ? (exportBtn.id || exportBtn.name) : null);
+        if (!btnId) {
+            // Ohne Datensaetze gibt es keinen Export-Knopf (morgens, Wochenende): gueltig leer.
+            const leer = (such && such.leer) || /Statistik liefert kein Ergebnis/i.test(((d.getElementById('data') || {}).textContent) || '');
+            return { art: leer ? 'leer' : 'kein-export' };
+        }
+        const fd = new W.FormData(form);
+        fd.append(btnId, btnId);
+        const r = await W.fetch(form.action || d.location.href, { method:'POST', body:fd });
+        if (!r.ok) return { art:'http', status:r.status };
+        const buf = await r.arrayBuffer(), b = new Uint8Array(buf, 0, Math.min(2, buf.byteLength));
+        // xlsx ist ein ZIP ("PK"). Alles andere ist eine HTML-Seite, egal welcher Content-Type.
+        if (!(b[0] === 0x50 && b[1] === 0x4b)) {
+            let txt = '';
+            try { txt = new TextDecoder().decode(new Uint8Array(buf, 0, Math.min(buf.byteLength, 60000))); } catch(e){}
+            if (rcViewAbgelaufen(txt)) return { art:'abgelaufen' };
+            // Ein Passwortfeld allein ist kein Beleg: jede ESL-Seite traegt ein
+            // verborgenes (27.09. gemessen) — rcAnmeldeSeite verlangt dazu, dass das
+            // Hauptmenue fehlt.
+            if (rcAnmeldeSeite(txt)) return { art:'anmeldung' };
+            return { art:'html' };
+        }
+        return { art:'excel', buf: buf };
+    }
+
+    // Gehoert eine Lieferung zum Projekt? Drei Zustaende (Fallstrick 11): ok /
+    // falsch / unklar. Grundlage ist das Mapping (Agent -> Team -> Stack ->
+    // Projekt), NICHT der Spaltensatz — der folgt der Seite, nicht den Daten
+    // (27.09.: Kabel-Spalten mit UM-Datensaetzen). alleTage: auch Vortage zaehlen
+    // (Bereichs-Export), sonst nur heute.
+    function rcProjektPruefen(key, data, alleTage){
+        const map = window.rcWcaMapping || {};
+        const n = { kabel:0, mobile:0, um:0 };
+        let zugeordnet = 0, zeilen = 0;
+        const h = ((data && data[0]) || []).map(function(x){ return (x == null ? '' : String(x)).toLowerCase().trim(); });
+        const iVo = h.indexOf('vo_nummer'), iDat = h.indexOf('datum');
+        const heute = rcRahmenHeute();
+        for (let r = 1; data && r < data.length; r++) {
+            const z = data[r];
+            if (!z) continue;
+            if (!alleTage && iDat !== -1 && rcRowDayKey(z, { datum: iDat }) !== heute) continue;
+            zeilen++;
+            const p = rcProjektVonVo(iVo === -1 ? '' : String(z[iVo] == null ? '' : z[iVo]).trim(), map);
+            if (p) { n[p]++; zugeordnet++; }
+        }
+        const pr = { urteil:'unklar', zeilen: zeilen, zugeordnet: zugeordnet, anteile: n, text:'' };
+        const name = function(k){ return (rcProjEintrag(k) || {}).name || k; };
+        const pct = function(x){ return Math.round(100 * x) + ' %'; };
+        if (zugeordnet < 10) { pr.text = 'nicht pruefbar (' + zugeordnet + ' von ' + zeilen + ' Zeilen ueber das Mapping zuordenbar)'; return pr; }
+        let top = key;
+        Object.keys(n).forEach(function(k){ if (n[k] > n[top]) top = k; });
+        const eigen = n[key] / zugeordnet, fremd = n[top] / zugeordnet;
+        if (top !== key && fremd >= 0.6 && eigen < 0.3) {
+            pr.urteil = 'falsch';
+            pr.text = 'Daten gehoeren zu ' + name(top) + ' (' + pct(fremd) + ' der zuordenbaren Zeilen, ' + name(key) + ' nur ' + pct(eigen) + ')';
+        } else if (eigen >= 0.5) {
+            pr.urteil = 'ok'; pr.text = pct(eigen) + ' ' + name(key);
+        } else {
+            pr.text = 'gemischt (' + name(key) + ' ' + pct(eigen) + ')';
+        }
+        return pr;
+    }
+    window.rcProjektPruefen = rcProjektPruefen;
+    function rcProjektIds(data){
+        const s = new Set();
+        const h = ((data && data[0]) || []).map(function(x){ return (x == null ? '' : String(x)).toLowerCase().trim(); });
+        const iId = h.indexOf('id'), iDat = h.indexOf('datum'), heute = rcRahmenHeute();
+        if (iId === -1) return s;
+        for (let r = 1; r < data.length; r++) {
+            const z = data[r];
+            if (!z || (iDat !== -1 && rcRowDayKey(z, { datum: iDat }) !== heute)) continue;
+            if (z[iId] != null && z[iId] !== '') s.add(String(z[iId]));
+        }
+        return s;
+    }
+    // Liefern zwei Projekte dieselben Datensaetze, stimmt eins nicht (27.09.: 0 %
+    // Ueberschneidung, solange alles stimmte, 100 %, sobald eine Seite fremde Daten
+    // lieferte). Liefert den Schluessel des anderen Projekts oder null.
+    function rcProjektGleichMit(key, data){
+        const a = rcProjektIds(data);
+        if (a.size < 5) return null;
+        const PD = window.rcProjektDaten || {};
+        let treffer = null;
+        rcProjRahmenListe().forEach(function(q){
+            if (q.key === key || treffer) return;
+            const e = PD[q.key];
+            if (!e || !e.data) return;
+            const b = rcProjektIds(e.data);
+            if (b.size < 5) return;
+            let n = 0;
+            a.forEach(function(id){ if (b.has(id)) n++; });
+            if (n / Math.min(a.size, b.size) >= 0.5) treffer = q.key;
+        });
+        return treffer;
+    }
+
+    // EIN Abruf eines Projekts: bei Bedarf umstellen, exportieren, pruefen,
+    // uebernehmen. Anlaesse: 'takt' (20-s-Takt), 'haupt' (Start, Jetzt,
+    // Nachholen — alles, was holeExcelVomServer ruft), 'knopf' (Export-Dialog),
+    // 'historie' (vor einem Bereichs-Export auf der Kabel-Seite).
+    async function rcProjektAbruf(key, anlass){
+        const p = rcProjEintrag(key);
+        if (!p) return { ok:false, grund:'unbekanntes Projekt "' + key + '"' };
+        // Datendienst (27.10.): kein Rahmen, kein Portal. Den Takt fuehrt der Dienst
+        // selbst; alles andere (Start, Jetzt, Knopf, Auffrischen) wird bestellt.
+        if (rcDienstModus()) return anlass === 'takt' ? { ok:true, grund:'Datendienst' } : rcDienstAbruf(key);
+        if (window.rcHarvestBusy && anlass !== 'historie') return { ok:false, grund:'Historie/Zeitraum laeuft gerade' };
+        // EIN Abruf zur Zeit — zwei gleichzeitige stellten die Anmeldung
+        // gegeneinander um. Der Takt verzichtet, alles andere wartet. Eine Sperre
+        // aelter als 3 Min gilt als verwaist (ein fetch ohne Antwort).
+        const frei = function(){ const l = window.rcProjektAbrufLaeuft; return !l || Date.now() - l.seit > 180000; };
+        if (!frei()) {
+            if (anlass === 'takt') return { ok:false, grund:'belegt' };
+            const bis = Date.now() + 60000;
+            while (!frei() && Date.now() < bis) await new Promise(function(r){ setTimeout(r, 250); });
+            if (!frei()) return { ok:false, grund:'ein anderer ESL-Abruf haengt' };
+        }
+        const st = window.rcRahmen[key] || (window.rcRahmen[key] = { seit: Date.now() });
+        const steht = st.bereit && st.f && st.f.isConnected && st.tag === rcRahmenHeute() && window.rcSitzungProjekt === key;
+        // Scheitert das Umstellen wiederholt, nicht alle 20 s neu hinfahren.
+        if (!steht && anlass === 'takt' && (st.fehler || 0) >= 3 && Date.now() - (st.versuch || 0) < 60000)
+            return { ok:false, grund: (st.grund || 'Umstellen gescheitert') + ' (neuer Versuch in 1 Min)' };
+        const gen = window.rcRahmenGen;
+        const sperre = { key: key, anlass: anlass, seit: Date.now() };
+        window.rcProjektAbrufLaeuft = sperre;
+        try { rcProjektKnoepfe(); } catch(e){}
+        try {
+            if (!steht) {
+                await rcRahmenAufbau(p);
+                if (gen !== window.rcRahmenGen) return { ok:false, grund:'neu eingespielt' };
+                if (st.anmeldung) { rcSessionLost('Anmeldemaske im Arbeitsrahmen (' + p.name + ')'); return { ok:false, grund:'ESL-Sitzung abgemeldet' }; }
+                if (!st.bereit) return rcProjektFehlschlag(key, st.grund || 'Umstellen gescheitert');
+            }
+            let e;
+            try { e = await rcRahmenExport(st.f); } catch(err){ e = { art:'fehler', grund: err && err.message }; }
+            if (gen !== window.rcRahmenGen) return { ok:false, grund:'neu eingespielt' };
+            return rcProjektLieferung(key, e);
+        } finally {
+            if (window.rcProjektAbrufLaeuft === sperre) window.rcProjektAbrufLaeuft = null;
+            try { rcProjektKnoepfe(); } catch(e){}
+        }
+    }
+    window.rcProjektAbruf = rcProjektAbruf;
+    // Eine Lieferung uebernehmen: lesen, pruefen (Mapping, fremde Daten, "ein Tag
+    // kann nur wachsen"), in rcProjektDaten ablegen, Live-Ansicht neu rechnen.
+    // Aus rcProjektAbruf herausgezogen (27.10.), damit der Portal-Weg UND der
+    // Empfang des Datendienstes dieselbe Pruefung durchlaufen — eine zweite
+    // Fassung waere Fallstrick 8. e = {art, buf?, status?, grund?, zeit?};
+    // zeit = Lieferzeit (Dienst), sonst jetzt.
+    function rcProjektLieferung(key, e){
+        const p = rcProjEintrag(key);
+        if (!p) return { ok:false, grund:'unbekanntes Projekt "' + key + '"' };
+        const st = window.rcRahmen[key] || (window.rcRahmen[key] = { seit: Date.now() });
+        if (e.art === 'anmeldung') { rcSessionLost('Export im Arbeitsrahmen lieferte die Anmeldeseite (' + p.name + ')'); return { ok:false, grund:'ESL-Sitzung abgemeldet' }; }
+        if (e.art === 'excel') {
+            let data = null;
+            try {
+                const wb = XLSX.read(new Uint8Array(e.buf), { type:'array' });
+                const ws = wb.Sheets[wb.SheetNames[0]];
+                data = ws ? XLSX.utils.sheet_to_json(ws, { header:1 }) : null;
+            } catch(err){ return rcProjektFehlschlag(key, 'Export unlesbar: ' + (err && err.message)); }
+            if (!data || !data.length) return rcProjektFehlschlag(key, 'Export ohne Tabellenblatt');
+            const pr = rcProjektPruefen(key, data);
+            const gleich = pr.urteil === 'ok' ? null : rcProjektGleichMit(key, data);
+            if (pr.urteil === 'falsch' || gleich) {
+                st.bereit = false;                  // naechster Abruf faehrt ueber das Menue neu hin
+                st.falschSeit = st.falschSeit || Date.now();
+                return rcProjektFehlschlag(key, 'ESL lieferte fremde Daten — ' +
+                    (pr.urteil === 'falsch' ? pr.text : 'dieselben Datensaetze wie ' + rcProjEintrag(gleich).name) + ' — verworfen');
+            }
+            // Eine GEPRUEFTE Lieferung, die ein anderes Projekt mit denselben
+            // Datensaetzen haelt, entlarvt dessen Stand: verwerfen statt anzeigen.
+            if (pr.urteil === 'ok') {
+                const q = rcProjektGleichMit(key, data);
+                if (q) {
+                    delete window.rcProjektDaten[q];
+                    const sq = window.rcRahmen[q] || (window.rcRahmen[q] = { seit: Date.now() });
+                    sq.grund = 'Stand verworfen: dieselben Datensaetze wie das gepruefte ' + p.name;
+                    rcLog.warn('Alle Projekte: ' + rcProjEintrag(q).name + '-Stand verworfen — dieselben Datensaetze wie das gepruefte ' + p.name + '.');
+                }
+            }
+            const alt = window.rcProjektDaten[key];
+            window.rcProjektDaten[key] = { data: data, zeit: e.zeit || Date.now(), pruefung: pr.urteil, pruefText: pr.text };
+            if (st.fehler || st.falschSeit) rcLog.log('Alle Projekte: ' + p.name + ' liefert wieder (' + pr.text + ').');
+            st.fehler = 0; st.grund = ''; st.falschSeit = 0;
+            if (key === window.rcAktivProjekt) rcEslErfolg(e.zeit);
+            // Erste oder lange nicht geholte Lieferung wie einen Erststart
+            // behandeln: ihre Abschluesse sind dem Dashboard neu, aber nicht neu
+            // GESCHEHEN — sonst liefen sie alle auf einmal durch Laufband und Radar.
+            rcVerarbeiteAlle(!alt || Date.now() - alt.zeit > 120000);
+            return { ok:true, zeilen: data.length - 1, pruefung: pr.urteil, text: pr.text };
+        }
+        if (e.art === 'leer') {
+            // Noch keine Datensaetze heute (28.09. gemessen: vor Schichtbeginn meldet
+            // das ESL "Statistik liefert kein Ergebnis"). Gueltig leer. Aber ein Tag
+            // kann nur wachsen: hatte das Projekt heute schon Datensaetze, ist "leer"
+            // verdaechtig (Anmeldung umgestellt?) — Stand bleibt, neu hinfahren.
+            const vorher = window.rcProjektDaten[key];
+            const nVorher = vorher && vorher.data ? rcProjektIds(vorher.data).size : 0;
+            if (nVorher > 0) {
+                st.bereit = false;
+                return rcProjektFehlschlag(key, 'ESL meldet ploetzlich keine Datensaetze (vorher ' + nVorher + ') — Stand bleibt');
+            }
+            window.rcProjektDaten[key] = { data: [[]], zeit: e.zeit || Date.now(), pruefung: 'leer', pruefText: 'noch keine Datensaetze heute' };
+            if (st.fehler || st.falschSeit) rcLog.log('Alle Projekte: ' + p.name + ' antwortet wieder (noch keine Datensaetze heute).');
+            st.fehler = 0; st.grund = ''; st.falschSeit = 0;
+            if (key === window.rcAktivProjekt) rcEslErfolg(e.zeit);
+            rcVerarbeiteAlle(!vorher || Date.now() - vorher.zeit > 120000);
+            return { ok:true, zeilen:0, pruefung:'leer', text:'noch keine Datensaetze heute' };
+        }
+        if (e.art === 'abgelaufen') st.bereit = false;
+        return rcProjektFehlschlag(key, e.art === 'http' ? 'HTTP ' + e.status
+            : e.art === 'abgelaufen' ? 'Ansicht abgelaufen'
+            : e.art === 'html' ? 'Export liefert HTML statt Excel'
+            : e.art === 'kein-form' ? 'kein Datenformular im Rahmen'
+            : e.art === 'kein-export' ? 'kein Export-Knopf (Seite nicht bereit)'
+            : (e.grund || e.art));
+    }
+    function rcProjektFehlschlag(key, grund){
+        const p = rcProjEintrag(key), st = window.rcRahmen[key] || (window.rcRahmen[key] = { seit: Date.now() });
+        st.fehler = (st.fehler || 0) + 1; st.grund = grund;
+        if (st.fehler >= 2) st.bereit = false;             // naechster Abruf faehrt neu hin
+        if (st.fehler === 1 || st.fehler % 10 === 0)
+            rcLog.warn('Alle Projekte: ' + p.name + ' — ' + grund + (st.fehler > 1 ? ' (' + st.fehler + '. Mal in Folge)' : '') + '.');
+        if (key === window.rcAktivProjekt) rcEslFehlschlag(grund + ' (' + p.name + ')');
+        return { ok:false, grund: grund };
+    }
+
+    // Die drei Exporte haben VERSCHIEDENE Spaltensaetze (gemessen 09.08.): Kabel
+    // "produktgrupe", Mobile "produktgruppe" + osf_id, UM ohne Gruppenspalte, dafuer
+    // Winback/Bundesland/Postleitzahl. Zusammengefuehrt wird auf die KABEL-
+    // Kopfzeile, Spalte fuer Spalte nach NAMEN — nach Position gelesen stuende bei
+    // UM das produktmerkmal in der Gruppenspalte. Fehlt ein Kabel-Stand (aktiv ist
+    // ein anderes Projekt), gilt der bekannte Kabel-Spaltensatz. Eine fehlende
+    // Gruppe bleibt leer; rcProduktGruppe leitet sie je Zeile aus dem Produktnamen ab.
+    // Die IDs von Mobile/UM bekommen ein Projekt-Praefix: die Ansprache-Zaehlung
+    // entdoppelt je Kontakt-ID, eine gleiche ID in zwei Projekten wuerde sonst still
+    // verschluckt. Es zaehlt nur HEUTE (nach Mitternacht kann ein alter Stand noch
+    // den Vortag tragen). frisch: Lieferung wie einen Erststart behandeln.
+    function rcVerarbeiteAlle(frisch){
+        const PD = window.rcProjektDaten || {};
+        const k = PD.kabel;
+        const kopf = (k && k.data && k.data[0] && k.data[0].length) ? k.data[0].slice()
+            : ['datum','standort','team','vo_nummer','kunde','produktgrupe','produktmerkmal','produkt','ergebnis','anzahl','sis_angesprochen','sis_nicht_moeglich_grund','id'];
+        const norm = function(x){ return (x == null ? '' : String(x)).toLowerCase().trim(); };
+        const h = kopf.map(norm);
+        const iId = h.indexOf('id');
+        const istGruppe = function(x){ return x === 'produktgrupe' || x === 'produktgruppe'; };
+        const heute = rcRahmenHeute();
+        // Jede Zeile traegt ihr PROJEKT mit (05.10., Spalte rc_projekt am Ende).
+        // Beim Abruf steht es fest — jede Lieferung gehoert zu Kabel, Mobile oder
+        // UM —, wurde hier aber bis dahin weggeworfen. Danach liess sich ein Agent
+        // nur noch ueber die Mitarbeiter-Excel einem Projekt zuordnen; wer dort
+        // fehlte, verschwand unter jedem Stack-Filter.
+        const out = [kopf.concat(['rc_projekt'])];
+        let quellen = 0;
+        rcProjRahmenListe().forEach(function(p){
+            const e = PD[p.key];
+            if (!e || !e.data || !e.data.length) return;
+            quellen++;
+            const hq = e.data[0].map(norm);
+            const zu = h.map(function(name){ return istGruppe(name) ? hq.findIndex(istGruppe) : hq.indexOf(name); });
+            const iDat = hq.indexOf('datum');
+            for (let r = 1; r < e.data.length; r++) {
+                const q = e.data[r];
+                if (!q) continue;
+                if (iDat !== -1 && rcRowDayKey(q, { datum: iDat }) !== heute) continue;
+                const z = zu.map(function(j){ return j === -1 ? '' : q[j]; });
+                if (p.praefix && iId !== -1 && z[iId] != null && z[iId] !== '') z[iId] = p.praefix + z[iId];
+                z.push(p.key);
+                out.push(z);
+            }
+        });
+        if (!quellen) return;
+        if (frisch) window.rcIsInitialized = false;
+        window.processDataStream(out);
+    }
+    window.rcVerarbeiteAlle = rcVerarbeiteAlle;   // Pruefseite test_alle_projekte.html + Konsole
+
+    // Live-Takt. Einzelprojekt: wie bisher alle 20 s die eigene Seite.
+    // Alle Projekte: alle 20 s NUR das aktive Projekt (Nutzer 28.09.).
+    function rcLiveTick(){
+        if (rcDienstModus()) return;                  // Datendienst: der Empfang speist ein, kein eigener Abruf
+        if (!window.rcAlleProjekteModus) return holeExcelVomServer();
+        return rcProjektAbruf(window.rcAktivProjekt, 'takt');
+    }
+    function rcAlleProjekteStart(){
+        if (!window.rcAlleProjekteModus) return;
+        window.rcProjektStartZeit = Date.now();
+        rcLog.log('Alle Projekte in einem Dashboard: aktiv ist ' + rcProjEintrag(window.rcAktivProjekt).name +
+            ' (alle 20 s). Die anderen holt ein Klick auf Kabel/Mobile/UM in der Kopfleiste, ein Stack-Filter oder der Export-Dialog. Abschalten: rcAlleProjekte(false).');
+        rcProjektKnoepfe();
+    }
+    // Aktives Projekt wechseln: ab jetzt holt der Takt nur noch dieses. Sofort
+    // umstellen und mit der Ligaliste zusammen neu holen (wie "Jetzt").
+    window.rcProjektWechseln = function(key, anlass){
+        if (!window.rcAlleProjekteModus) return false;
+        const p = rcProjEintrag(key);
+        if (!p) return false;
+        const alt = window.rcAktivProjekt;
+        window.rcAktivProjekt = key;
+        try { localStorage.setItem('rcAktivProjekt_v1', key); } catch(e){}
+        if (alt !== key) {
+            try { window.rcLogEreignis('Alle Projekte: aktives Projekt ' + ((rcProjEintrag(alt) || {}).name || alt) + ' -> ' + p.name + (anlass ? ' (' + anlass + ')' : '') + '.'); } catch(e){}
+            window.rcEslFehlserie = 0; window.rcEslFehlgrund = '';     // die Serie gehoerte zum alten Projekt
+            // Ein Stack-Filter eines anderen Projekts wuerde das neue gleich wieder verdecken.
+            const sf = document.getElementById('rcStackFilter');
+            const sfP = sf && sf.value !== 'ALL' ? rcProjektVonStack(sf.value) : '';
+            if (sfP && sfP !== key) {
+                sf.value = 'ALL';
+                const ts = document.getElementById('rcTeamFilter'); if (ts) { ts.value = 'ALL'; ts.dataset.sig = ''; }
+                if (window.rcLetzterDatenstrom) window.processDataStream(window.rcLetzterDatenstrom);
+                if (window.rcMarkFilters) window.rcMarkFilters();
+            }
+        }
+        rcProjektKnoepfe();
+        // Datendienst (Ruling R6): den Wechsel IMMER sofort melden, ohne zu warten.
+        // "Jetzt" wird abgewiesen, solange eine Runde oder ein Zeitraum laeuft — dann
+        // bliebe der Takt des Dienstes still auf dem alten Projekt stehen.
+        if (rcDienstModus()) rcDienstAnfrage('/api/projekt', { projekt: key }, 10000).then(function(r){
+            if (!r || !r.ok) rcLog.warn('Datendienst: Projektwechsel auf ' + p.name + ' nicht bestaetigt (' + ((r && r.grund) || 'kein Ergebnis') + ').');
+        }, function(){});
+        if (window.rcJetztAktualisieren) window.rcJetztAktualisieren();
+        return true;
+    };
+    // Ein Projekt einmal neu holen, OHNE es zum aktiven zu machen (Export-Dialog).
+    // Der naechste Takt faehrt danach von selbst zum aktiven zurueck.
+    window.rcProjektAktualisieren = function(key){ return rcProjektAbruf(key, 'knopf'); };
+    // Alle drei nacheinander — das aktive zuletzt, damit der Rahmen dort stehen bleibt.
+    window.rcProjekteAlleAktualisieren = async function(melden){
+        const sag = melden || function(){};
+        const folge = rcProjRahmenListe().map(function(p){ return p.key; })
+            .sort(function(a, b){ return (a === window.rcAktivProjekt) - (b === window.rcAktivProjekt); });
+        const erg = {};
+        for (let i = 0; i < folge.length; i++) {
+            const p = rcProjEintrag(folge[i]);
+            sag('Hole ' + p.name + ' (' + (i + 1) + ' von ' + folge.length + ') ...');
+            erg[folge[i]] = await rcProjektAbruf(folge[i], 'knopf');
+        }
+        return erg;
+    };
+    // Kopfleiste: aktiv = Rot, Amber-Unterkante = Stand fehlt, ist aelter als
+    // 15 Min oder wurde zuletzt als fremd verworfen. Tooltip: Stand + Pruefung.
+    function rcProjektKnoepfe(){
+        const box = document.getElementById('rcProjWahl');
+        if (!box) return;
+        if (!window.rcAlleProjekteModus) { box.style.display = 'none'; return; }
+        box.style.display = '';
+        const lauf = window.rcProjektAbrufLaeuft;
+        box.querySelectorAll('[data-rc-proj]').forEach(function(b){
+            const key = b.getAttribute('data-rc-proj'), p = rcProjEintrag(key);
+            if (!p) return;
+            const d = (window.rcProjektDaten || {})[key], st = (window.rcRahmen || {})[key] || {};
+            const aktiv = key === window.rcAktivProjekt;
+            const min = d ? Math.floor((Date.now() - d.zeit) / 60000) : null;
+            b.classList.toggle('on', aktiv);
+            b.classList.toggle('lauf', !!(lauf && lauf.key === key));
+            b.classList.toggle('alt', min === null || min >= 15 || !!st.falschSeit);
+            const uhr = d ? (function(t){ return pad2(t.getHours()) + ':' + pad2(t.getMinutes()); })(new Date(d.zeit)) : '';
+            b.title = p.name + ': ' + (d ? 'Stand ' + uhr + ' (vor ' + min + ' Min)' +
+                    (d.pruefung === 'ok' ? ', Agenten geprueft' : d.pruefung === 'unklar' ? ', nicht pruefbar' : d.pruefung === 'leer' ? ', noch keine Datensaetze heute' : '') : 'noch keine Daten') +
+                (st.grund ? ' — ' + st.grund : '') +
+                (aktiv ? '. AKTIV: wird alle 20 s aktualisiert — Klick holt sofort neu.' : '. Klick: ESL auf ' + p.name + ' umstellen und Daten holen.');
+        });
+    }
+    document.querySelectorAll('#rcProjWahl [data-rc-proj]').forEach(function(b){
+        b.addEventListener('click', function(){
+            const key = b.getAttribute('data-rc-proj');
+            if (key === window.rcAktivProjekt) { if (window.rcJetztAktualisieren) window.rcJetztAktualisieren(); }
+            else window.rcProjektWechseln(key, 'Kopfleiste');
+        });
+    });
+    rcProjektKnoepfe();
+    // Quellen-Streifen: nur das AKTIVE Projekt — die anderen stehen gewollt, bis sie
+    // jemand holt (Nutzer 28.09.). Fremde Daten stehen sofort drin: sie werden
+    // verworfen, und das muss auf dem Wandmonitor stehen, nicht nur im Log.
+    function rcAlleProjekteLage(){
+        if (!window.rcAlleProjekteModus) return [];
+        const key = window.rcAktivProjekt, p = rcProjEintrag(key);
+        if (!p) return [];
+        const st = window.rcRahmen[key] || {}, dat = window.rcProjektDaten[key];
+        if (st.falschSeit) return [p.name + ': ' + (st.grund || 'ESL lieferte fremde Daten')];
+        const min = Math.floor((Date.now() - (dat ? dat.zeit : (window.rcProjektStartZeit || Date.now()))) / 60000);
+        if (min < RC_ESL_TOT_MIN) return [];
+        return [p.name + (dat ? ': Zahlen stehen seit ' + min + ' Minuten still' : ': noch keine Zahlen (seit ' + min + ' Minuten)') +
+                (st.grund ? ' — ' + st.grund : '')];
+    }
+
+    // Historie gegen Vertauschung pruefen (28.09.): ein Tag, dessen Agenten
+    // ueberwiegend zu einem ANDEREN Projekt gehoeren, wurde vertauscht geholt
+    // (27.09.: die Monats-Historie der Kabel-Seite kam sehr wahrscheinlich mit
+    // UM-Daten, weil die Anmeldung auf UM stand). Nur Vortage — heute ist live.
+    // Liefert die Liste der verdaechtigen Tage.
+    function rcHistorieFremdeTage(hist, eigen){
+        const map = window.rcWcaMapping || {};
+        const heute = rcRahmenHeute(), out = [];
+        Object.keys(hist || {}).forEach(function(tag){
+            const t = hist[tag];
+            if (tag >= heute || !t || !t.byAgent) return;
+            const n = { kabel:0, mobile:0, um:0 };
+            let zu = 0;
+            Object.keys(t.byAgent).forEach(function(vo){ const p = rcProjektVonVo(vo, map); if (p) { n[p]++; zu++; } });
+            if (zu < 10) return;
+            let top = eigen;
+            Object.keys(n).forEach(function(k){ if (n[k] > n[top]) top = k; });
+            if (top !== eigen && n[top] / zu >= 0.6 && n[eigen] / zu < 0.3) out.push(tag);
+        });
+        return out.sort();
+    }
+    window.rcHistorieFremdeTage = rcHistorieFremdeTage;
+    function rcEigenesProjektKey(){
+        const k = window.rcProjektKuerzel;
+        return k === 'mob' ? 'mobile' : k === 'um' ? 'um' : 'kabel';
+    }
+
     // Aufeinanderfolgende Fehlschlaege des ESL-Abrufs. Ein einzelner ist normal
     // (PrimeFaces re-rendert, Seite kurz nicht bereit); eine Serie ist ein
     // Ausfall und muss auf den Wandmonitor. Der Quellen-Waechter liest beides.
@@ -19093,10 +22330,11 @@
         if (window.rcEslFehlserie >= 2) { try { rcExportAnsichtSicherstellen(); } catch(e){} }
         try { rcQuellenWatchTick(); } catch(e){}
     }
-    function rcEslErfolg(){
+    // zeit: Lieferzeit (Datendienst) — sonst jetzt.
+    function rcEslErfolg(zeit){
         if (window.rcEslFehlserie) rcLog.log('ESL-Abruf laeuft wieder (nach ' + window.rcEslFehlserie + ' Fehlversuchen).');
         window.rcEslFehlserie = 0; window.rcEslFehlgrund = '';
-        window.rcEslLastOk = Date.now();
+        window.rcEslLastOk = zeit || Date.now();
     }
     // EIN Sucher fuer den "Liste aktualisieren"-Knopf des Portals. Vorher hatten
     // rcPortalAufHeute und rcFetchRangeViaUIIntern zwei verschiedene, und nur der
@@ -19105,6 +22343,24 @@
     // submit), sie sind icon-only (innerText leer, der Text steht im title), und
     // manche tragen ihre Bedeutung nur im Icon-Markup (refresh).
     // Funktionsdeklaration, weil rcFetchRangeViaUIIntern sie weit unterhalb nutzt.
+    // Steht eine SICHTBARE Anmeldemaske im Dokument? Jede ESL-Seite traegt ein
+    // verborgenes Passwortfeld (27.09. gemessen: "Anmeldemaske JA" auf allen drei
+    // Seiten, waehrend sie Excel lieferten) — das Vorhandensein allein beweist nichts.
+    function rcPasswortSichtbar(d){
+        let l = null;
+        try { l = d && d.querySelectorAll('input[type="password"]'); } catch(e){ return false; }
+        for (let i = 0; l && i < l.length; i++) {
+            try {
+                const el = l[i], W = el.ownerDocument && el.ownerDocument.defaultView;
+                if (!(el.offsetWidth || el.offsetHeight)) continue;
+                if (W && W.getComputedStyle(el).visibility === 'hidden') continue;
+                return true;
+            } catch(e){}
+        }
+        return false;
+    }
+    window.rcPasswortSichtbar = rcPasswortSichtbar;
+
     function rcFilterKnopf(form){
         if (!form) return null;
         return Array.from(form.querySelectorAll('button, input[type="submit"]'))
@@ -19132,8 +22388,13 @@
         var jetzt = Date.now();
         if (jetzt - (rcExportAnsichtSicherstellen._zuletzt || 0) < 5 * 60 * 1000) return false;
         var form = document.getElementById('filterForm'); if (!form) return false;
-        // Anmeldemaske ist Sache von rcSessionLost, nicht dieser Wache.
-        if (document.querySelector('input[type="password"]')) return false;
+        // Anmeldemaske ist Sache von rcSessionLost, nicht dieser Wache. NUR eine
+        // sichtbare zaehlt — bis 28.09. stand hier jedes Passwortfeld, und weil
+        // jede ESL-Seite ein verborgenes traegt, griff die Wache nie.
+        if (rcPasswortSichtbar(document)) return false;
+        // Alle-Projekte-Betrieb: exportiert wird im Arbeitsrahmen, der seine Ansicht
+        // beim Hinfahren selbst waehlt — die Kabel-Seite hier anzufassen hilft nicht.
+        if (window.rcAlleProjekteModus) return false;
         var ZIEL = 'export projektergebnisse';
         var lc = function(s){ return (s || '').replace(/\s+/g,' ').trim().toLowerCase(); };
         // Das Statistik-select ist das mit einer Option des Zieltexts.
@@ -19199,6 +22460,10 @@
     // Opfer, der Minuten vorher aus einem ganz anderen Anlass lief — und das
     // Dashboard stuende bis zum naechsten Ausloeser auf dem Vortag.
     async function rcPortalAufHeute(erzwingen){
+        // Alle-Projekte-Betrieb (28.09.): die Kabel-Seite liefert keine Live-Zahlen
+        // mehr, und ein echter Klick hier baute ihre Liste mit dem Projekt der
+        // Anmeldung neu. Der Arbeitsrahmen steht nach Mitternacht von selbst neu auf.
+        if (window.rcAlleProjekteModus) return false;
         const jetzt = Date.now();
         if (!erzwingen && jetzt - rcTagFixZuletzt < 5 * 60 * 1000) return false;
         rcTagFixZuletzt = jetzt;
@@ -19223,7 +22488,13 @@
     }
     window.rcPortalAufHeute = rcPortalAufHeute;
 
+    // Dasselbe Abrufprotokoll steht in rcRahmenExport (Mobile/UM-Rahmen, 27.09.) —
+    // Aenderungen an Such-/Exportknopf dort nachziehen.
     async function holeExcelVomServer(){
+        // Alle-Projekte-Betrieb (28.09.): die Kabel-Seite exportiert nicht mehr
+        // selbst — jeder Abruf (Takt, Start, Jetzt, Nachholen, Sitzungs-Retry)
+        // geht an das AKTIVE Projekt ueber den Arbeitsrahmen.
+        if (window.rcAlleProjekteModus) return rcProjektAbruf(window.rcAktivProjekt, 'haupt');
         if (window.rcHarvestBusy) return; // Historien-Harvester laeuft — keine konkurrierenden POSTs
         rcLog.log('--- Aktualisierungszyklus (20s) ---');
         try {
@@ -19252,6 +22523,7 @@
 
             // 1. Suche/Filter ausloesen, um Backend-DataModel zu erneuern
             const searchBtn = buttons.find(b => /suchen|aktualisieren|filtern|anzeigen/.test((b.innerText||b.value||'').toLowerCase()));
+            let such = null;
             if (searchBtn) {
                 const sid = searchBtn.id || searchBtn.name;
                 if (sid) {
@@ -19267,10 +22539,11 @@
                         const txt = await resp.text();
                         // Server-seitige ViewExpiredException schon hier abfangen — sie kommt
                         // als partial-response mit viewExpiredDialog/ViewExpiredException-eval.
-                        if (/ViewExpiredException|viewExpiredDialog/.test(txt)) {
+                        if (rcViewAbgelaufen(txt)) {
                             rcSessionLost('ViewExpiredException in Such-Antwort');
                             return;
                         }
+                        such = rcSuchAntwort(txt);
                         const vs = txt.match(/<update id="[^"]*javax\.faces\.ViewState[^"]*"><!\[CDATA\[(.*?)\]\]><\/update>/) ||
                                    txt.match(/name="javax\.faces\.ViewState".*?value="([^"]+)"/);
                         // WICHTIG gegen ViewExpired: das frische Token in ALLE Formulare schreiben
@@ -19285,11 +22558,28 @@
                 }
             }
 
-            // 2. Excel-Export ausloesen (mit aktualisiertem ViewState)
+            // 2. Excel-Export ausloesen (mit aktualisiertem ViewState). Knopf aus der
+            // frischen Such-Antwort (rcSuchAntwort), sonst vom Seitenaufbau — KEIN
+            // geratener Ersatz: ohne Datensaetze rendert das ESL gar keinen Export-Knopf
+            // (28.09. gemessen), ein Export mit Ersatz-Id lieferte die Seite zurueck, und
+            // die galt als Abmeldung (Seiten-Neuladen jeden Morgen vor dem ersten Datensatz).
             const formData = new FormData(form);
-            const exportBtn = buttons.find(b => { const t=(b.innerText||b.value||'').toLowerCase(); return t.includes('excel')||t.includes('export')||(b.innerHTML||'').toLowerCase().includes('excel'); });
-            const btnId = exportBtn ? (exportBtn.id || exportBtn.name) : 'filterForm:j_idt517';
-            if (btnId) formData.append(btnId, btnId);
+            const exportBtn = such && such.formNeu ? null : rcExportKnopfFinden(buttons);
+            const btnId = such && such.formNeu ? such.knopf : (exportBtn ? (exportBtn.id || exportBtn.name) : null);
+            if (!btnId) {
+                const leer = (such && such.leer) || /Statistik liefert kein Ergebnis/i.test(((document.getElementById('data') || {}).textContent) || '');
+                const s = document.getElementById('rcFetchStatus');
+                // Ein Tag kann nur wachsen: "leer", nachdem heute schon Zeilen kamen, ist ein Fehler.
+                if (leer && rcStromHeuteZeilen() === 0) {
+                    if (s) s.textContent = 'noch keine Datensaetze heute';
+                    rcEslErfolg();
+                } else {
+                    if (s) s.textContent = 'Export nicht bereit — neuer Versuch in 20s';
+                    rcEslFehlschlag(leer ? 'ESL meldet ploetzlich keine Datensaetze' : 'kein Export-Knopf auf der Seite');
+                }
+                return;
+            }
+            formData.append(btnId, btnId);
 
             const response = await fetch(form.action || window.location.href, { method:'POST', body:formData });
             if (response.ok) {
@@ -19309,7 +22599,9 @@
                 if (ct.includes('text/html') || urlHint) {
                     let body = '';
                     try { body = await response.text(); } catch(e){}
-                    const echterLogout = urlHint || /ViewExpiredException|viewExpiredDialog|j_username|id="loginForm"|name="username"|type="password"|angemeldet\s+bleiben|>\s*Anmelden\s*</i.test(body);
+                    // viewExpiredDialog und Passwortfeld stehen versteckt in JEDER ESL-Seite
+                    // (28.09. gemessen) — die Helfer werten nur echte Merkmale.
+                    const echterLogout = urlHint || rcViewAbgelaufen(body) || rcAnmeldeSeite(body);
                     if (echterLogout) {
                         rcSessionLost('Export lieferte HTML/Login statt Excel');
                     } else {
@@ -19345,6 +22637,7 @@
     //  verdrahtet ('intraday'), das liveOk-Gate kann das Paket also nicht
     //  verwerfen, selbst wenn im Portal "Aktueller Monat" eingestellt ist.
     const LIVE_NOW_TIMEOUT = 45000;   // ein einzelner Intraday-Request, kein Durchklick
+    const JETZT_ESL_FRIST  = 90000;   // Umstellen + Export dauern 1-3 s; 90 s heisst: haengt
     async function rcJetztAktualisieren(melden){
         const sag = melden || function(t){ if (window.rcToast) rcToast(t, 5000); rcLog.log(t); };
         if (window.rcJetztBusy) { sag('Es laeuft bereits eine Aktualisierung.'); return null; }
@@ -19359,31 +22652,56 @@
         if (btn) { btn.disabled = true; btn.classList.add('rc-btn-on'); }
         const t0 = Date.now();
         try {
+            // Datendienst (27.10.): ESL und Ligaliste holt der Dienst in EINER Runde —
+            // kein Kommando an ein Ligalisten-Fenster, kein Abruf aus dem Portal.
+            const dienst = rcDienstModus() ? rcDienstRunde() : null;
             // ---- Ligaliste: Sofort-Kommando ueber denselben Weg wie RC_HARVEST_RANGE ----
             let ligaSent = false;
             const cmd = { type:'RC_LIVE_NOW' };
-            try { if (window.rcKpiWin && !window.rcKpiWin.closed) { window.rcKpiWin.postMessage(cmd, '*'); ligaSent = true; } } catch(e){}
-            try { rcKpiChannel.postMessage(cmd); } catch(e){}
+            if (!dienst) {
+                try { if (window.rcKpiWin && !window.rcKpiWin.closed) { window.rcKpiWin.postMessage(cmd, '*'); ligaSent = true; } } catch(e){}
+                try { rcKpiChannel.postMessage(cmd); } catch(e){}
+            }
 
+            // Der Zeitgeber gehoert zu GENAU DIESEM Lauf (05.10.). Vorher lief er
+            // nach einer Antwort einfach weiter und pruefte nur "steht ein
+            // Antwort-Handle?". Kam binnen 45 s ein ZWEITER Lauf (Projektwechsel,
+            // Auffrischen vor dem Export), raeumte der alte Zeitgeber DESSEN
+            // Handle ab: die Antwort der Ligaliste lief ins Leere, der eigene
+            // Zeitgeber des zweiten Laufs fand keinen Handle mehr und loeste auch
+            // nicht auf — der Knopf hing fuer immer (Logbuch 05.10.: "Jetzt-Knopf
+            // LAEUFT" von 17:12 bis zum Neuladen 19:19, jeder Export wartete 50 s).
             const ligaP = ligaSent ? new Promise(res => {
-                window.rcLiveNowDone = d => { window.rcLiveNowDone = null; res(d || {}); };
-                setTimeout(() => {
-                    if (!window.rcLiveNowDone) return;      // schon beantwortet
-                    window.rcLiveNowDone = null;
+                let frist = null;
+                const meiner = d => {
+                    if (window.rcLiveNowDone === meiner) window.rcLiveNowDone = null;
+                    if (frist) { clearTimeout(frist); frist = null; }
+                    res(d || {});
+                };
+                window.rcLiveNowDone = meiner;
+                frist = setTimeout(() => {
+                    frist = null;
+                    if (window.rcLiveNowDone === meiner) window.rcLiveNowDone = null;
                     res({ ok:false, error:'Ligaliste hat in ' + (LIVE_NOW_TIMEOUT/1000) + ' s nicht geantwortet' });
                 }, LIVE_NOW_TIMEOUT);
             }) : Promise.resolve({ ok:false, error:'Ligalisten-Fenster nicht verbunden — im Werkzeug-Menue auf "KPI-Quelle" klicken' });
 
             // ---- ESL: derselbe Live-Abruf wie im 20-s-Takt, kein zweiter Weg ----
-            const eslP = holeExcelVomServer()
-                .then(() => ({ ok:true }))
-                .catch(e => ({ ok:false, error:String(e && e.message || e) }));
+            // Mit Frist: der ESL-Abruf wartet intern ohne Zeitgrenze auf das
+            // Portal. Bleibt er haengen, darf der Knopf nicht mit haengen.
+            const eslP = dienst ? null : Promise.race([
+                holeExcelVomServer()
+                    .then(r => (r && r.ok === false) ? { ok:false, error: r.grund } : { ok:true })
+                    .catch(e => ({ ok:false, error:String(e && e.message || e) })),
+                new Promise(res => setTimeout(() => res({ ok:false, error:'ESL hat in ' + (JETZT_ESL_FRIST/1000) + ' s nicht geantwortet' }), JETZT_ESL_FRIST))
+            ]);
+            const eslName = window.rcAlleProjekteModus ? 'ESL ' + ((rcProjEintrag(window.rcAktivProjekt) || {}).name || '') : 'ESL';
 
-            const [liga, esl] = await Promise.all([ligaP, eslP]);
+            const [liga, esl] = dienst ? await dienst.then(r => [r.liga, r.esl]) : await Promise.all([ligaP, eslP]);
             const s = Math.round((Date.now() - t0) / 1000);
             const txt = 'Aktualisiert nach ' + s + ' s — Ligaliste: ' +
                 (liga.ok ? (liga.agenten || 0) + ' Agenten' : (liga.error || 'kein Ergebnis')) +
-                ' · ESL: ' + (esl.ok ? 'neu geladen' : (esl.error || 'kein Ergebnis'));
+                ' · ' + eslName + ': ' + (esl.ok ? 'neu geladen' : (esl.error || 'kein Ergebnis'));
             sag(txt);
             return { liga, esl, sekunden:s };
         } finally {
@@ -19392,6 +22710,126 @@
         }
     }
     window.rcJetztAktualisieren = rcJetztAktualisieren;
+
+    // ============================================================
+    //  ERST AKTUALISIEREN, DANN AUSGEBEN (05.10.)
+    // ============================================================
+    //  Nutzer 05.10.: "Dieser automatische E-Mail-Versand. Da muss das ja auch
+    //  alles in Stacks erst mal sich aktualisieren und danach Daten exportieren."
+    //  Im Alle-Projekte-Betrieb laeuft nur das AKTIVE Projekt im 20-s-Takt mit;
+    //  die anderen tragen den Stand ihres letzten Abrufs, nach einem Neuladen gar
+    //  keinen. Ein Export oder Report ueber mehrere Projekte enthielt damit alte
+    //  oder keine Daten, solange niemand vorher "Alle drei nacheinander" klickte
+    //  (rcProjekteAlleAktualisieren hatte genau EINEN Aufrufer, den Dialog-Knopf).
+    //  Jetzt holt jede Ausgabe selbst, was ihr Zuschnitt braucht: Export-Dialog,
+    //  Report/Stundenmail (rcFrischStart aus ESL_Start.cmd), Luecken-Liste.
+    //    Welche Projekte: Stack-Filter -> das Projekt dieses Stacks; 'P:<projekt>'
+    //    -> dieses; ohne Stack-Filter alle drei.
+    //    Reihenfolge: erst die nicht aktiven, zuletzt das aktive zusammen mit der
+    //    Ligaliste ueber den erprobten "Jetzt"-Weg — der Rahmen bleibt danach auf
+    //    dem aktiven Projekt stehen, und es gibt keinen zweiten Abrufweg.
+    //    Ein Stand juenger als RC_FRISCH_MAX_MS gilt als frisch (drei Mail-Kreise
+    //    hintereinander holen nicht dreimal).
+    //  Das ist eine FRIST, keine Sperre (Fallstrick 13): scheitert ein Abruf,
+    //  wird trotzdem ausgegeben — mit dem Grund im Ergebnis, im Dialog und im Log.
+    const RC_FRISCH_MAX_MS = 45000;
+    function rcProjekteFuerScope(scope){
+        const st = scope && scope.stack;
+        const p = (st && st !== 'ALL') ? rcProjektVonStack(st) : '';
+        const keys = p ? [p] : rcProjRahmenListe().map(function(q){ return q.key; });
+        return keys.sort(function(a, b){ return (a === window.rcAktivProjekt) - (b === window.rcAktivProjekt); });
+    }
+    async function rcFrischLaufen(scope, sag, maxAlter){
+        const t0 = Date.now();
+        const erg = { ok:true, projekte:{}, liga:null, fehler:[], sekunden:0, text:'' };
+        const jung = function(t){ return !!t && Date.now() - t < maxAlter; };
+        const multi = !!window.rcAlleProjekteModus, aktiv = window.rcAktivProjekt;
+        const keys = multi ? rcProjekteFuerScope(scope) : [];
+        const merke = function(key, name, r){
+            erg.projekte[key] = r || { ok:false, grund:'kein Ergebnis' };
+            if (!erg.projekte[key].ok) erg.fehler.push(name + ': ' + (erg.projekte[key].grund || 'kein Ergebnis'));
+        };
+        // 1) die NICHT aktiven Projekte des Zuschnitts
+        for (let i = 0; i < keys.length; i++) {
+            const key = keys[i];
+            if (key === aktiv) continue;
+            const p = rcProjEintrag(key), d = (window.rcProjektDaten || {})[key];
+            if (d && jung(d.zeit)) { erg.projekte[key] = { ok:true, frisch:true }; continue; }
+            sag('Hole ' + p.name + ' ...');
+            let r;
+            try { r = await rcProjektAbruf(key, 'knopf'); } catch(e){ r = { ok:false, grund:String(e && e.message || e) }; }
+            merke(key, p.name, r);
+        }
+        // 2) das aktive Projekt (Einzelprojekt: die eigene Seite) und die Ligaliste
+        const eslKey = multi ? aktiv : 'esl';
+        const eslName = multi ? ((rcProjEintrag(aktiv) || {}).name || aktiv) : 'ESL';
+        const eslGefragt = multi ? keys.indexOf(aktiv) !== -1 : true;
+        const eslStand = function(){ return multi ? (((window.rcProjektDaten || {})[aktiv] || {}).zeit || 0) : (window.rcEslLastOk || 0); };
+        // Die Ligaliste gilt auch dann als versorgt, wenn sie eben erst GEFRAGT wurde:
+        // antwortet sie nicht, wartete sonst jeder der drei Mail-Kreise erneut 45 s.
+        const ligaStand = function(){ return Math.max(window.rcKpiLastUpdate ? window.rcKpiLastUpdate.getTime() : 0, window.rcFrischLigaVersuch || 0); };
+        const noetig = function(){ return (eslGefragt && !jung(eslStand())) || !jung(ligaStand()); };
+        if (noetig()) {
+            sag('Hole ' + (eslGefragt ? eslName + ' und ' : '') + 'Ligaliste ...');
+            // Laeuft gerade ein "Jetzt" (Knopf, Herzschlag), auf dessen Ende warten.
+            const bis = Date.now() + LIVE_NOW_TIMEOUT + 5000;
+            while (window.rcJetztBusy && Date.now() < bis) await new Promise(function(r){ setTimeout(r, 250); });
+            let j = null;
+            if (noetig()) {
+                window.rcFrischLigaVersuch = Date.now();
+                try { j = await rcJetztAktualisieren(function(){}); } catch(e){ j = null; }
+            }
+            if (j) {
+                erg.liga = j.liga || null;
+                // Der STAND entscheidet, nicht die Rueckmeldung: im Einzelprojekt liefert
+                // holeExcelVomServer keinen Status, "Jetzt" meldet dort auch dann
+                // "neu geladen", wenn der Abruf leer ausging.
+                if (eslGefragt) merke(eslKey, eslName, (j.esl && j.esl.ok && jung(eslStand())) ? { ok:true }
+                    : { ok:false, grund:(j.esl && j.esl.error) || window.rcEslFehlgrund || 'kein frischer Stand' });
+            } else if (eslGefragt) {
+                // "Jetzt" lief nicht (Historie/Zeitraum belegt die Seite) oder ein anderer
+                // Lauf hat inzwischen geholt: der Stand entscheidet, nicht der Aufruf.
+                merke(eslKey, eslName, jung(eslStand()) ? { ok:true, frisch:true }
+                    : { ok:false, grund: (window.rcHarvestBusy || window.rcRangeBusy) ? 'Historien-/Zeitraum-Abruf läuft' : 'nicht geholt' });
+            }
+        } else if (eslGefragt) erg.projekte[eslKey] = { ok:true, frisch:true };
+        erg.ok = erg.fehler.length === 0;
+        erg.sekunden = Math.round((Date.now() - t0) / 1000);
+        const teile = Object.keys(erg.projekte).map(function(k){
+            const r = erg.projekte[k], n = k === 'esl' ? 'ESL' : ((rcProjEintrag(k) || {}).name || k);
+            return n + ': ' + (r.frisch ? 'frisch' : r.ok ? (r.zeilen != null ? r.zeilen + ' Zeilen' : 'neu geladen') : (r.grund || 'nicht geholt'));
+        });
+        if (erg.liga) teile.push('Ligaliste: ' + (erg.liga.ok ? (erg.liga.agenten || 0) + ' Agenten' : (erg.liga.error || 'kein Ergebnis')));
+        erg.text = (erg.ok ? 'Aktualisiert' : 'NUR TEILWEISE aktualisiert') + ' nach ' + erg.sekunden + ' s — ' + teile.join(' · ');
+        if (!erg.ok) rcLog.warn('Auffrischen vor der Ausgabe: ' + erg.text);
+        return erg;
+    }
+    // Ein zweiter Aufruf waehrend eines laufenden wartet dessen Ende ab und prueft
+    // dann nur noch die Frische — zwei Laeufe stellten die Anmeldung gegeneinander um.
+    async function rcFrischHolen(scope, melden, opts){
+        const sag = melden || function(){};
+        const maxAlter = (opts && opts.maxAlterMs != null) ? opts.maxAlterMs : RC_FRISCH_MAX_MS;
+        if (window.rcFrischLauf) { try { await window.rcFrischLauf; } catch(e){} }
+        const lauf = rcFrischLaufen(scope || { std:'ALL', stack:'ALL', team:'ALL' }, sag, maxAlter);
+        window.rcFrischLauf = lauf;
+        try { return await lauf; }
+        finally { if (window.rcFrischLauf === lauf) window.rcFrischLauf = null; }
+    }
+    window.rcFrischHolen = rcFrischHolen;
+    // Fernsteuerung (ESL_Start.cmd vor der Stundenmail): anstossen und den Zustand
+    // abfragen — Runtime.evaluate wartet nicht auf ein Promise.
+    window.rcFrischStart = function(scope){
+        const st = { laeuft:true, ok:false, text:'', zeit:Date.now() };
+        window.rcFrischLetzter = st;
+        rcFrischHolen(scope, function(t){ st.text = t; }).then(
+            function(e){ st.laeuft = false; st.ok = !!(e && e.ok); st.text = (e && e.text) || st.text; },
+            function(err){ st.laeuft = false; st.ok = false; st.text = 'Auffrischen fehlgeschlagen: ' + (err && err.message ? err.message : err); });
+        return 'gestartet';
+    };
+    window.rcFrischStand = function(){
+        const s = window.rcFrischLetzter;
+        return s ? ((s.laeuft ? 'laeuft:' : (s.ok ? 'fertig:ok:' : 'fertig:teil:')) + (s.text || '')) : 'kein-stand';
+    };
 
     // Wie alt sind die Liga-Zahlen? EINE Rechnung, mehrere Ausgabeorte —
     // bisher stand das nur an der CS-Kachel der Qualitaets-Seite, und genau die
@@ -19418,6 +22856,7 @@
     // ============================================================
     const RC_HIST_DAYS = 7;
     function rcLoadEslHistory(){
+        if (rcDienstModus()) return rcHistorieVereint('rcEslHistory');
         try { return JSON.parse(localStorage.getItem(rcKey('rcEslHistory')) || '{}'); } catch(e){ return {}; }
     }
     // Wie viele Tage die PRODUKTAUFSCHLUESSELUNG behalten (die Summen bleiben
@@ -19444,6 +22883,70 @@
             });
             return weg;
         } catch(e){ return 0; }
+    }
+
+    // ========================================================================
+    //  HISTORIE JE PROJEKT (Datendienst, 27.10.)
+    //  Im Dienst-Betrieb zeigt EIN Dashboard alle drei Projekte. Die Vortage
+    //  liegen trotzdem je Projekt getrennt im Speicher ('rcEslHistory' /
+    //  '_mob' / '_um', ebenso 'rcLigaHistDash...') — ein Projekt darf das andere
+    //  nie ueberschreiben. Angezeigt wird die VEREINIGUNG (je Tag alle drei
+    //  zusammengezaehlt). Ohne Marke bleibt es bei EINEM Schluessel ueber rcKey.
+    //  Funktionsdeklarationen: das Laden der Liga-Historie ruft sie beim Aufbau.
+    // ========================================================================
+    function rcProjSfx(p){ return p === 'mobile' ? '_mob' : p === 'um' ? '_um' : ''; }
+    function rcHistSchluessel(basis){
+        return rcDienstModus() ? [basis, basis + '_mob', basis + '_um'] : [rcKey(basis)];
+    }
+    // Zahlenfelder von s auf o addieren (byStd-Eintraege, Liga-tot, pg/pgB).
+    function rcZahlenAddieren(o, s){
+        Object.keys(s || {}).forEach(function(f){ if (typeof s[f] === 'number') o[f] = (o[f] || 0) + s[f]; });
+        return o;
+    }
+    // Zwei ESL-Tagesaggregate DESSELBEN Tages (zwei Projekte) zu einem. Die
+    // Eingaben bleiben unveraendert — sie sind der Speicher der Projekte.
+    function rcEslTagVereinen(a, b){
+        const out = Object.assign({}, a, { byStd:{}, byAgent:{} });
+        ['rows','kontakte','ansp','bcr','nonBcr','bnt','vvl'].forEach(function(f){ out[f] = (a[f] || 0) + (b[f] || 0); });
+        [a, b].forEach(function(x){
+            Object.keys(x.byStd || {}).forEach(function(c){ rcZahlenAddieren(out.byStd[c] || (out.byStd[c] = {}), x.byStd[c]); });
+            Object.keys(x.byAgent || {}).forEach(function(vo){
+                const s = x.byAgent[vo], o = out.byAgent[vo] || (out.byAgent[vo] = {});
+                Object.keys(s || {}).forEach(function(f){
+                    const v = s[f];
+                    if (typeof v === 'number') o[f] = (o[f] || 0) + v;
+                    else if ((f === 'pg' || f === 'pgB') && v) rcZahlenAddieren(o[f] || (o[f] = {}), v);
+                    else if (o[f] == null || o[f] === '') o[f] = v;          // ccs/nm: der erste gesetzte
+                });
+            });
+        });
+        return out;
+    }
+    // Zwei Liga-Tagesschnappschuesse zu einem. Ein Agent in zwei Projekten zaehlt
+    // einmal — mit dem Eintrag, der die meisten Calls hat.
+    function rcLigaTagVereinen(a, b){
+        const out = Object.assign({}, a, { byStd:{}, byAgent:{}, tot: rcZahlenAddieren(rcZahlenAddieren({}, a.tot), b.tot) });
+        if (b.nurCalls) out.nurCalls = true;
+        [a, b].forEach(function(x){
+            Object.keys(x.byStd || {}).forEach(function(c){ rcZahlenAddieren(out.byStd[c] || (out.byStd[c] = {}), x.byStd[c]); });
+            Object.keys(x.byAgent || {}).forEach(function(id){
+                const s = x.byAgent[id], o = out.byAgent[id];
+                if (!o || ((s && s.c) || 0) > (o.c || 0)) out.byAgent[id] = s;
+            });
+        });
+        return out;
+    }
+    // Historie aus ALLEN Schluesseln von rcHistSchluessel, je Tag vereint.
+    // Ohne Marke ist das genau der eine rcKey-Schluessel, unveraendert.
+    function rcHistorieVereint(basis){
+        const vereinen = basis === 'rcLigaHistDash' ? rcLigaTagVereinen : rcEslTagVereinen;
+        const out = {};
+        rcHistSchluessel(basis).forEach(function(k){
+            let h = {};
+            try { h = JSON.parse(localStorage.getItem(k) || '{}') || {}; } catch(e){}
+            Object.keys(h).forEach(function(t){ if (h[t]) out[t] = out[t] ? vereinen(out[t], h[t]) : h[t]; });
+        });
+        return out;
     }
 
     // Kompakte Tages-Aggregation eines Export-Buffers (ohne UI/Feiern/State).
@@ -19502,7 +23005,8 @@
             const gruppe = rcProduktGruppe(ix.prod !== -1 ? r[ix.prod] : '', prodName);
             if (agE && gruppe) {
                 (agE.pg || (agE.pg = {}))[gruppe] = (agE.pg[gruppe] || 0) + anz;
-                if (bcrRel) (agE.pgB || (agE.pgB = {}))[gruppe] = (agE.pgB[gruppe] || 0) + anz;
+                if (!agE.pgB) agE.pgB = {};    // leer = "nichts BCR-relevant", wie im Live-Parser
+                if (bcrRel) agE.pgB[gruppe] = (agE.pgB[gruppe] || 0) + anz;
             }
             const { cat, isBnt, isVvl } = classify(gruppe);
             if (cat) {
@@ -19542,28 +23046,53 @@
         const voMap = (window.rcWcaMapping && window.rcWcaMapping.voMap) || {};
         const ccsMap = (window.rcWcaMapping && window.rcWcaMapping.ccsMap) || {};
         if (!Object.keys(voMap).length && !Object.keys(ccsMap).length) return 0;
-        const hist = window.rcEslHistory || rcLoadEslHistory() || {};
         let fixed = 0, tage = 0;
-        Object.keys(hist).forEach(dk => {
-            const ba = hist[dk] && hist[dk].byAgent; if (!ba) return;
-            let t = 0;
-            Object.keys(ba).forEach(vo => {
-                const m = voMap[vo];
-                if (m) {
-                    if (!ba[vo].ccs && m.ccsId) { ba[vo].ccs = String(m.ccsId); t++; }
-                    if (!ba[vo].nm && m.name) ba[vo].nm = m.name;
-                } else if (ccsMap[vo]) {   // vo IST bereits die CCS-ID
-                    if (!ba[vo].ccs) { ba[vo].ccs = String(vo); t++; }
-                    if (!ba[vo].nm && ccsMap[vo].name) ba[vo].nm = ccsMap[vo].name;
-                }
+        // Agenten eines Historien-Objekts nachruesten (gemeinsam fuer beide Zweige).
+        const flicke = hist => {
+            Object.keys(hist).forEach(dk => {
+                const ba = hist[dk] && hist[dk].byAgent; if (!ba) return;
+                let t = 0;
+                Object.keys(ba).forEach(vo => {
+                    const m = voMap[vo];
+                    if (m) {
+                        if (!ba[vo].ccs && m.ccsId) { ba[vo].ccs = String(m.ccsId); t++; }
+                        if (!ba[vo].nm && m.name) ba[vo].nm = m.name;
+                    } else if (ccsMap[vo]) {   // vo IST bereits die CCS-ID
+                        if (!ba[vo].ccs) { ba[vo].ccs = String(vo); t++; }
+                        if (!ba[vo].nm && ccsMap[vo].name) ba[vo].nm = ccsMap[vo].name;
+                    }
+                });
+                if (t) { fixed += t; tage++; }
             });
-            if (t) { fixed += t; tage++; }
-        });
-        if (fixed) {
-            try { localStorage.setItem(rcKey('rcEslHistory'), JSON.stringify(hist)); } catch(e){ window.rcHistorieSpeicherFehler('Harvester', e); }
-            window.rcEslHistory = hist;
-            rcLog.log('ESL-Historie nachgeruestet: ' + fixed + ' Agenten an ' + tage + ' Tag(en) mit CCS-ID verknuepft — Vortags-Stand-Export zeigt jetzt Ansprache/BNT/VVL.');
+        };
+        if (rcDienstModus()) {
+            // Datendienst (27.10.): je Projekt-Schluessel einzeln — die vereinte
+            // Anzeige-Historie darf nie in einen Projekt-Schluessel.
+            rcHistSchluessel('rcEslHistory').forEach(hk => {
+                let hist = {};
+                try { hist = JSON.parse(localStorage.getItem(hk) || '{}') || {}; } catch(e){ return; }
+                const vorher = fixed;
+                flicke(hist);
+                if (fixed === vorher) return;
+                try { localStorage.setItem(hk, JSON.stringify(hist)); } catch(e){ window.rcHistorieSpeicherFehler('Harvester', e); }
+            });
+            if (fixed) {
+                // Heute steht im Dienst-Betrieb nur im Speicher der Seite — nicht verlieren.
+                const tKey = rcTodayKey(), heute = window.rcEslHistory && window.rcEslHistory[tKey];
+                window.rcEslHistory = rcLoadEslHistory();
+                if (heute && !window.rcEslHistory[tKey]) window.rcEslHistory[tKey] = heute;
+            }
+        } else {
+            // Ohne Dienst wie bisher: den Speicher der SEITE reparieren und schreiben —
+            // er kann dem localStorage voraus sein (Harvester/Zeitraum bei vollem Speicher).
+            const hist = window.rcEslHistory || rcLoadEslHistory() || {};
+            flicke(hist);
+            if (fixed) {
+                try { localStorage.setItem(rcKey('rcEslHistory'), JSON.stringify(hist)); } catch(e){ window.rcHistorieSpeicherFehler('Harvester', e); }
+                window.rcEslHistory = hist;
+            }
         }
+        if (fixed) rcLog.log('ESL-Historie nachgeruestet: ' + fixed + ' Agenten an ' + tage + ' Tag(en) mit CCS-ID verknuepft — Vortags-Stand-Export zeigt jetzt Ansprache/BNT/VVL.');
         return fixed;
     };
     function rcReadSheet(arrayBuffer){
@@ -19640,6 +23169,7 @@
     // (ein Export ueber mehrere Tage, spaeter per Datumsspalte getrennt).
     // fullMode=true: Suche als VOLLER Formular-Submit statt Partial-AJAX.
     async function rcFetchRangeBuffer(fromStr, toStr, fullMode){
+        if (rcDienstModus()) return null;             // Datendienst: Zeitraeume holt rcDienstBereich
         const form = document.getElementById('filterForm'); if (!form) return null;
         // Datumsfelder robust finden: Datepicker-Klasse, PrimeFaces-Kalender oder
         // Inputs, deren Wert wie ein Datum aussieht. OHNE gefundene Felder wird
@@ -19656,6 +23186,7 @@
         const searchBtn = buttons.find(b => /suchen|aktualisieren|filtern|anzeigen|liste aktualisieren/.test((b.innerText||b.value||b.title||'').toLowerCase()));
         // 1) Suche mit Datum-Override -> Backend-DataModel auf den Zeitraum stellen
         const sid = searchBtn ? (searchBtn.id || searchBtn.name) : null;
+        let such = null;
         if (sid) {
             const sd = new FormData(form);
             sd.set(n0, fromStr); sd.set(n1, toStr);
@@ -19677,16 +23208,96 @@
             const vs = txt.match(/<update id="[^"]*javax\.faces\.ViewState[^"]*"><!\[CDATA\[(.*?)\]\]><\/update>/) ||
                        txt.match(/name="javax\.faces\.ViewState".*?value="([^"]+)"/);
             if (vs && vs[1]) { const old = form.querySelector('input[name="javax.faces.ViewState"]'); if (old) old.value = vs[1]; }
+            such = rcSuchAntwort(txt);
         }
-        // 2) Export mit Datum-Override
+        // 2) Export mit Datum-Override. Knopf aus der frischen Antwort, sonst vom
+        // Seitenaufbau (28.09.: morgens ohne Datensaetze rendert die Seite KEINEN).
+        // Kein geratener Ersatz mehr — 'j_idt640' ist nur auf Kabel der Export-Knopf,
+        // auf Mobile/UM lieferte er die Seite statt Excel.
+        const exportBtn = such && such.formNeu ? null : rcExportKnopfFinden(buttons);
+        const btnId = such && such.formNeu ? such.knopf : (exportBtn ? (exportBtn.id || exportBtn.name) : null);
+        if (!btnId) {
+            rcLog.warn('Historie: kein Export-Knopf fuer ' + fromStr + ' – ' + toStr + (such && such.leer ? ' (Statistik liefert kein Ergebnis)' : '') + '.');
+            return null;
+        }
         const fd = new FormData(form);
         fd.set(n0, fromStr); fd.set(n1, toStr);
-        const exportBtn = buttons.find(b => { const t=(b.innerText||b.value||b.title||'').toLowerCase(); return t.includes('excel')||t.includes('export')||(b.innerHTML||'').toLowerCase().includes('excel'); });
-        const btnId = exportBtn ? (exportBtn.id || exportBtn.name) : 'filterForm:j_idt640';
         fd.append(btnId, btnId);
         const response = await fetch(form.action || window.location.href, { method:'POST', body:fd });
         if (!response.ok) return null;
-        return await response.arrayBuffer();
+        return rcBereichPruefen(await response.arrayBuffer(), fromStr, toStr);
+    }
+    // Gehoeren die Zeilen eines Bereichs-Exports zum Projekt dieser Seite? Sonst
+    // landeten fremde Zahlen in der Historie (und die Selbstheilung loeschte sie
+    // beim naechsten Lauf wieder — ein Kreislauf ohne Ende). Gilt fuer den UI-Weg
+    // UND die fetch-Rueckfaelle: bis 28.09. liefen die Rueckfaelle ungeprueft —
+    // und zwar genau dann, wenn der UI-Weg nichts brachte, weil sich die Anmeldung
+    // nicht auf Kabel stellen liess.
+    // projekt (Datendienst, 27.10.): gegen DIESES Projekt pruefen statt gegen das
+    // der Seite — die Dienst-Seite traegt alle drei.
+    function rcBereichPruefen(buf, fromStr, toStr, projekt){
+        if (!buf) return buf;
+        // Eine Seite statt Excel (falscher Knopf, abgelaufene Ansicht) ist kein
+        // Ergebnis. Bis 28.09. warf erst das Einlesen ("could not find <table>") —
+        // und die Ausnahme riss den ganzen Monatslauf samt Rueckfall-Wegen mit.
+        const pk = new Uint8Array(buf, 0, Math.min(2, buf.byteLength || 0));
+        if (!(pk[0] === 0x50 && pk[1] === 0x4b)) {
+            rcLog.warn('Bereichs-Export ' + fromStr + ' – ' + toStr + ': das ESL lieferte eine Seite statt Excel — verworfen.');
+            return null;
+        }
+        try {
+            const sh = rcReadSheet(buf);
+            const pr = sh && sh.data ? rcProjektPruefen(projekt || rcEigenesProjektKey(), sh.data, true) : null;
+            if (pr && pr.urteil === 'falsch') {
+                rcLog.warn('Bereichs-Export ' + fromStr + ' – ' + toStr + ' VERWORFEN — ' + pr.text + '. Die Historie bleibt unveraendert.');
+                return null;
+            }
+        } catch(e){}
+        return buf;
+    }
+    // Datendienst (27.10.): die Vortage EINES Projekts (ESL-Bereichs-Export + Liga-
+    // Tage vom Dienst) in dessen eigene Historie legen. Heute bleibt aussen vor —
+    // der laufende Tag steht nur im Speicher der Seite. Ersetzungsregel wie
+    // rcRangeLoad (ein Tag kann nur wachsen), 40 Tage. Danach zeigt das Dashboard
+    // wieder die Vereinigung aller drei Projekte.
+    function rcDienstHistorieAblegen(projekt, buf, ligaTage, von, bis){
+        const tKey = rcTodayKey();
+        const esl = { ok:false, tage:0, grund:'' }, liga = { ok:false, tage:0 };
+        if (!buf) esl.grund = 'keine ESL-Datei';
+        else {
+            try {
+                const b = rcBereichPruefen(buf, von, bis, projekt);
+                if (!b) esl.grund = 'Bereichs-Export verworfen (Seite statt Excel oder fremdes Projekt)';
+                else {
+                    const perDay = rcAggregateMultiDayBuffer(b) || {};
+                    const key = 'rcEslHistory' + rcProjSfx(projekt);
+                    let hist = {};
+                    try { hist = JSON.parse(localStorage.getItem(key) || '{}') || {}; } catch(e){}
+                    Object.keys(perDay).forEach(function(k){
+                        if (k < von || k > bis || k >= tKey) return;
+                        if (!hist[k] || (hist[k].kontakte || 0) <= (perDay[k].kontakte || 0)) { hist[k] = perDay[k]; esl.tage++; }
+                    });
+                    Object.keys(hist).sort().slice(0, -40).forEach(function(k){ delete hist[k]; });
+                    rcKappeProdHistorie(hist);
+                    try { localStorage.setItem(key, JSON.stringify(hist)); esl.ok = true; }
+                    catch(e){ esl.grund = 'Speicher voll'; esl.tage = 0; window.rcHistorieSpeicherFehler('Dienst-Vortage ESL ' + projekt, e); }
+                }
+            } catch(e){ esl.grund = 'ESL-Datei nicht lesbar: ' + (e && e.message ? e.message : e); }
+        }
+        if (ligaTage && typeof ligaTage === 'object') {
+            const key = 'rcLigaHistDash' + rcProjSfx(projekt);
+            let cur = {};
+            try { cur = JSON.parse(localStorage.getItem(key) || '{}') || {}; } catch(e){}
+            Object.keys(ligaTage).forEach(function(t){ if (t < tKey && ligaTage[t]) { cur[t] = ligaTage[t]; liga.tage++; } });
+            Object.keys(cur).sort().slice(0, -40).forEach(function(k){ delete cur[k]; });
+            try { localStorage.setItem(key, JSON.stringify(cur)); liga.ok = true; }
+            catch(e){ liga.tage = 0; window.rcHistorieSpeicherFehler('Dienst-Vortage Ligaliste ' + projekt, e); }
+        }
+        const heute = window.rcEslHistory && window.rcEslHistory[tKey];
+        window.rcEslHistory = rcHistorieVereint('rcEslHistory');
+        if (heute) window.rcEslHistory[tKey] = heute;
+        window.rcLigaHistory = rcHistorieVereint('rcLigaHistDash');
+        return { esl: esl, liga: liga };
     }
     // Rueckwaerts-kompatibel: EIN Tag
     async function rcFetchDayBuffer(dateStr, fullMode){ return rcFetchRangeBuffer(dateStr, dateStr, fullMode); }
@@ -19696,7 +23307,20 @@
     // das Servermodell), exportiert danach per fetch und stellt den Ur-Zustand
     // wieder her. So respektiert der Export den Datumsbereich zuverlaessig.
     async function rcFetchRangeViaUI(fromStr, toStr){
+        if (rcDienstModus()) return null;             // Datendienst: Zeitraeume holt rcDienstBereich
         const form = document.getElementById('filterForm'); if (!form) return null;
+        // Alle-Projekte-Betrieb (28.09.): ein ECHTER Klick baut die Liste mit dem
+        // Projekt der ANMELDUNG neu — und die kann auf Mobile/UM stehen (27.09.
+        // gemessen: nach Monats-Historie und "Zeitraum laden" lieferte die Kabel-
+        // Seite UM-Daten). Deshalb erst die Anmeldung auf Kabel stellen und das
+        // Ergebnis danach pruefen.
+        if (window.rcAlleProjekteModus) {
+            const vorab = await rcProjektAbruf('kabel', 'historie');
+            if (!vorab || !vorab.ok) {
+                rcLog.warn('Alle Projekte: Bereichs-Export uebersprungen — ESL laesst sich nicht auf Kabel stellen (' + ((vorab && vorab.grund) || 'unbekannt') + ').');
+                return null;
+            }
+        }
         // Den eigenen 20-Sekunden-Live-Poll aussperren (Korrektur 04.08.).
         // Diese Funktion verstellt die Datumsfelder des Portals und klickt
         // "Liste aktualisieren" — der Server steht danach fuer einige Sekunden
@@ -19710,8 +23334,9 @@
         // Wege gilt: Zeitraum-Dialog, rcEslDebugRange und kuenftige Aufrufer.
         const warBesetzt = window.rcHarvestBusy;
         window.rcHarvestBusy = true;
+        let buf = null;
         try {
-            return await rcFetchRangeViaUIIntern(fromStr, toStr);
+            buf = await rcFetchRangeViaUIIntern(fromStr, toStr);
         } finally {
             // Nur zuruecknehmen, wenn WIR sie gesetzt haben: der 4-Stunden-
             // Harvester setzt sie selbst und raeumt sie in seinem eigenen
@@ -19719,6 +23344,7 @@
             // Lauf mitten drin frei.
             if (!warBesetzt) window.rcHarvestBusy = false;
         }
+        return rcBereichPruefen(buf, fromStr, toStr);
     }
     async function rcFetchRangeViaUIIntern(fromStr, toStr){
         const form = document.getElementById('filterForm'); if (!form) return null;
@@ -19728,20 +23354,29 @@
         const setVal = (el, v) => { el.value = v; el.dispatchEvent(new Event('input', {bubbles:true})); el.dispatchEvent(new Event('change', {bubbles:true})); };
         setVal(vonI, fromStr); setVal(bisI, toStr);
         // echten "Liste aktualisieren"-Button klicken -> Server-Commit ueber PrimeFaces
-        const buttons = Array.from(form.querySelectorAll('button, input[type="submit"]'));
         const updBtn = rcFilterKnopf(form);
         if (updBtn) { try { updBtn.click(); } catch(e){} }
         await new Promise(r => setTimeout(r, 6000)); // auf PrimeFaces-Ajax + Neuaufbau warten
-        // Export per fetch — DOM hat jetzt Bereich + aktualisierten ViewState
+        // Export per fetch — aus dem FRISCHEN Formular: der Klick hat es neu
+        // gerendert (Fallstrick 16), und erst jetzt steht fest, ob es einen
+        // Export-Knopf gibt. Ohne Datensaetze heute rendert die Seite beim Aufbau
+        // keinen (28.09.) — die alte Knopfliste von VOR dem Klick fiel dann auf
+        // 'j_idt640' zurueck, und das ist nur auf Kabel der Export-Knopf.
         let buf = null;
         try {
-            const fd = new FormData(form);
-            fd.set(vonI.name, fromStr); fd.set(bisI.name, toStr);
-            const expBtn = buttons.find(b => { const t=(b.title||b.innerText||b.value||'').toLowerCase(); return t.includes('export')||t.includes('excel')||(b.innerHTML||'').toLowerCase().includes('excel'); });
-            const btnId = expBtn ? (expBtn.id || expBtn.name) : 'filterForm:j_idt640';
-            fd.append(btnId, btnId);
-            const resp = await fetch(form.action || window.location.href, { method:'POST', body:fd });
-            if (resp.ok) buf = await resp.arrayBuffer();
+            const formE = document.getElementById('filterForm') || form;
+            const expBtn = rcExportKnopfFinden(formE.querySelectorAll('button[type="submit"], input[type="submit"]'));
+            if (!expBtn) {
+                const leer = /Statistik liefert kein Ergebnis/i.test(((document.getElementById('data') || {}).textContent) || '');
+                rcLog.warn('Historie(UI): nach der Suche kein Export-Knopf — ' + (leer ? 'der Zeitraum hat keine Datensaetze' : 'Seite nicht bereit') + '.');
+            } else {
+                const fd = new FormData(formE);
+                fd.set(vonI.name, fromStr); fd.set(bisI.name, toStr);
+                const btnId = expBtn.id || expBtn.name;
+                fd.append(btnId, btnId);
+                const resp = await fetch(formE.action || window.location.href, { method:'POST', body:fd });
+                if (resp.ok) buf = await resp.arrayBuffer();
+            }
         } catch(e){ rcLog.warn('Historie(UI): Export-Fetch fehlgeschlagen:', e); }
         // KRITISCH: Zeitraum per ECHTEM Klick auf HEUTE zurueckstellen — sonst bleibt
         // das SERVER-Modell auf dem Bereich stehen und jeder folgende Live-Poll
@@ -19794,6 +23429,7 @@
     };
 
     async function rcHarvestEslHistory(){
+        if (rcDienstModus()) return;                  // Datendienst: Vortage holt der Dienst selbst
         if (window.rcHarvestBusy) return;
         if (!document.getElementById('filterForm') || !window.XLSX) return;
         const todayKey = (d => d.getFullYear()+'-'+pad2(d.getMonth()+1)+'-'+pad2(d.getDate()))(new Date());
@@ -19821,6 +23457,21 @@
                 try { localStorage.removeItem(rcKey('rcEslHistCheck')); localStorage.setItem(rcKey('rcEslHistory'), JSON.stringify(hist)); } catch(e){ window.rcHistorieSpeicherFehler('Historie-Reparatur', e); }
                 rcLog.warn('Historie: ' + bad.length + ' identische Vortage verworfen (alter Harvest-Fehler) — lade korrekt nach.');
             }
+        })();
+
+        // Vertauschte Tage (28.09.): gehoeren die Agenten eines Vortags ueberwiegend
+        // zu einem ANDEREN Projekt, wurde er mit der falschen Anmeldung geholt.
+        // Verwerfen und den Monatslauf neu anstossen — sonst stuenden Wochen- und
+        // Monatsberichte dauerhaft auf fremden Zahlen.
+        (function(){
+            const fremd = rcHistorieFremdeTage(hist, rcEigenesProjektKey());
+            if (!fremd.length) return;
+            fremd.forEach(k => delete hist[k]);
+            try {
+                localStorage.removeItem(rcKey('rcEslHistCheck')); localStorage.removeItem(rcKey('rcEslMonatsHarvest'));
+                localStorage.setItem(rcKey('rcEslHistory'), JSON.stringify(hist));
+            } catch(e){ window.rcHistorieSpeicherFehler('Historie-Reparatur', e); }
+            rcLog.warn('Historie: ' + fremd.length + ' Tag(e) mit Daten eines anderen ESL-Projekts verworfen (' + fremd.join(', ') + ') — werden neu geholt.');
         })();
 
         // EINMAL JE MONAT den ganzen laufenden Monat holen (Nutzer-Vorgabe 30.07.),
@@ -20398,7 +24049,7 @@
         scope = scope || {};
         const fStd = scope.std || 'ALL', fTeam = scope.team != null ? String(scope.team) : 'ALL', fStack = scope.stack || 'ALL';
         const mapping = window.rcWcaMapping || {};
-        const voMap = mapping.voMap || {}, ccsMap = mapping.ccsMap || {}, stackMap = mapping.stackMap || {};
+        const voMap = mapping.voMap || {}, ccsMap = mapping.ccsMap || {};
         const agentStats = (window.rcLetzteStats && window.rcLetzteStats.agentStats) || {};
         const tKey = rcTodayKey();
 
@@ -20410,17 +24061,20 @@
             return { name: (m && m.name) || (a && a.name) || (cm && cm.name) || vo,
                      team: ((m && m.team) || (a && a.team) || (cm && cm.team) || '').toString().trim(),
                      std:  normalizeStandort((m && m.standort) || (a && a.standort) || (cm && cm.standort) || ''),
-                     ccs:  ((m && m.ccsId) || (a && a.ccsId) || (cm ? vo : '')).toString() };
+                     ccs:  ((m && m.ccsId) || (a && a.ccsId) || (cm ? vo : '')).toString(),
+                     proj: (a && a.projekt) || rcProjektVonAgent(vo) };
         };
         const ccsMeta = id => {
             const m = ccsMap[id], k = window.rcKpiData ? window.rcKpiData[id] : null;
             return { name: (m && m.name) || (k && k.agentName) || ('CCS ' + id),
                      team: ((m && m.team) || (k && k.team) || '').toString().trim(),
-                     std:  normalizeStandort((m && m.standort) || (k && k.standort) || '') };
+                     std:  normalizeStandort((m && m.standort) || (k && k.standort) || ''),
+                     proj: rcProjektVonAgent(id) };
         };
+        // Stack ueber die EINE Regel (05.10.): Mapping, sonst Anker; 'P:<projekt>' = ganzes Projekt.
         const inScope = meta => (fStd === 'ALL' || meta.std === fStd)
             && (fTeam === 'ALL' || meta.team === fTeam)
-            && (fStack === 'ALL' || (meta.team && (stackMap[meta.team] || '') === fStack));
+            && (fStack === 'ALL' || rcStackFilterPasst(meta.team, fStack, meta.proj || ''));
 
         const eslHist = window.rcEslHistory || rcLoadEslHistory();
         const ligaHist = window.rcLigaHistory || {};
@@ -20490,7 +24144,7 @@
         const agents = Object.values(agg)
             .filter(g => ((g.k||0)+(g.a||0)+(g.bnt||0)+(g.vvl||0)+(g.calls||0)) > 0 || (g.csN||0) > 0 || (g.tnN||0) > 0)
             .sort((x,y) => (y.bnt - x.bnt) || (y.calls - x.calls));
-        const scopeLabel = [ fStd !== 'ALL' ? stdFullName(fStd) : '', fStack !== 'ALL' ? fStack : '', fTeam !== 'ALL' ? 'Team ' + fTeam : '' ]
+        const scopeLabel = [ fStd !== 'ALL' ? stdFullName(fStd) : '', fStack !== 'ALL' ? rcStackFilterText(fStack) : '', fTeam !== 'ALL' ? 'Team ' + fTeam : '' ]
             .filter(Boolean).join(' · ') || 'Alle Standorte';
         return { days, agents, scopeLabel };
     };
@@ -20580,6 +24234,7 @@
         const alle = kpi && kpi.alle;
         if (!alle) return '';
         // Was oben schon eine eigene Kachel hat, nicht doppelt zeigen.
+        // 'Auflegerquote' bleibt hier als AUSSCHLUSS: die Ligaliste liefert sie weiter mit, sie wird nicht angezeigt.
         const schon = ['ACD','ACW','AHT','ACHT','Auflegerquote','CS','TNPS',
             'CS Deep Detractor %','TNPS Antwortquote %','TNPS Deep Detractor %',
             'First-Time-Fix','Total-Fix','Final Fix 7',
@@ -20651,7 +24306,6 @@
                 kpiTile('ACD', fmtAht(kpi.acdSec), '#F5F5F5', 'Min') +
                 kpiTile('ACW', fmtAht(kpi.acwSec), '#F5F5F5', 'Min') +
                 kpiTile('ACHT', fmtAht(kpi.achtSec), '#F5F5F5', 'Min') +
-                kpiTile('Auflegerquote', fmtPct1(kpi.auflegerquote), zielColor(kpi.auflegerquote, RC_ZIELE.aq)) +
                 kpiTile('CS', fmtPct1(kpi.cs), zielColor(kpi.cs, RC_ZIELE.cs)) +
                 kpiTile('CS Deep Detr.', fmtPct1(kpi.csDds), kpi.csDds!=null&&kpi.csDds>RC_ZIELE.dds.max?'#E60000':'#F5F5F5') +
                 kpiTile('TNPS', fmtPct1(kpi.tnps), zielColor(kpi.tnps, RC_ZIELE.tnps)) +
@@ -21111,6 +24765,173 @@
         renderCmp();
     };
 
+    // ============================================================
+    //  OHNE STACK-ZUORDNUNG — sichtbar statt still verworfen (05.10.)
+    // ============================================================
+    // Steht bewusst HIER und nicht bei den Filtern: der Dialog benutzt rcAttr und
+    // stdFullName (beides const weiter oben) — davor laege der Text in ihrer
+    // temporalen Todeszone (tdz_pruefen.js). Die Funktionen sind Deklarationen
+    // und damit auch fuer den Parser und den Blatt-Bauer weiter oben sichtbar.
+    //  Wer weder ueber die Mitarbeiter-Excel noch ueber den Anker einen Stack
+    //  hat, zaehlt im Projekt und unter "Alle Stacks", aber unter keinem
+    //  einzelnen Stack-Filter (Nutzer-Entscheidung 05.10.: eigene Gruppe, nicht
+    //  in die Stack-Summe). Bis dahin fiel er dort lautlos heraus — gemessen am
+    //  28.09.: 97 von 457 Agenten. Die Kopfleiste nennt jetzt die Zahl, ein Klick
+    //  zeigt die Liste, und "Mapping-Luecken" schreibt sie als Excel fuer die
+    //  Pflege der Mitarbeiter-Excel.
+    //  Zuschnitt wie der Dashboard-Filter: Standort und Team gelten; bei einem
+    //  Stack-Filter zaehlt das PROJEKT dieses Stacks (die Agenten koennten zu
+    //  jedem Stack des Projekts gehoeren).
+    function rcOhneStackListe(scope){
+        const sc = scope || window.rcActiveScope();
+        // Ohne geladene Mitarbeiter-Excel hat NIEMAND einen Stack — das ist ein
+        // fehlendes Mapping (eigene Meldung am Stack-Filter), keine Zuordnungsluecke.
+        // Sonst stuende beim Start "457 ohne Stack" in der Kopfleiste.
+        const sm = (window.rcWcaMapping && window.rcWcaMapping.stackMap) || {};
+        if (!Object.keys(sm).length) return [];
+        const proj = (sc.stack && sc.stack !== 'ALL') ? rcProjektVonStack(sc.stack) : '';
+        return (window.rcOhneStack || []).filter(function(l){
+            if (sc.std && sc.std !== 'ALL' && l.standort !== sc.std) return false;
+            if (sc.team && sc.team !== 'ALL' && l.team !== sc.team) return false;
+            if (proj && l.projekt !== proj) return false;
+            return true;
+        });
+    }
+    window.rcOhneStackListe = rcOhneStackListe;
+    function rcOhneStackChip(){
+        const el = document.getElementById('rcOhneStackChip');
+        if (!el) return;
+        const sc = window.rcActiveScope();
+        const l = rcOhneStackListe(sc);
+        if (!l.length) { el.style.display = 'none'; return; }
+        const stk = l.reduce(function(s, x){ return s + (x.stueck || 0); }, 0);
+        const zaehltMit = sc.stack === 'ALL' || rcIstProjektFilter(sc.stack);
+        el.style.display = '';
+        // Der Zusatz steht in einem eigenen <span>: wird die Kopfleiste eng, bleibt nur die Zahl (.rc-eng1).
+        el.innerHTML = l.length + '<span> ohne Stack</span>';
+        el.title = l.length + ' Agent(en) ohne Stack-Zuordnung, ' + stk + ' Stück heute. ' + (zaehltMit
+            ? 'In dieser Ansicht zählen sie mit — unter einem einzelnen Stack-Filter nicht.'
+            : 'Sie gehören zum selben Projekt, zählen im Filter ' + sc.stack + ' aber NICHT mit: ihr Stack ist unbekannt.') +
+            ' Klick zeigt die Liste.';
+    }
+    function rcLueckeGrund(l){
+        if (l.imMapping) return 'Team „' + (l.team || '?') + '“ hat in der Mitarbeiter-Excel keinen Stack';
+        return l.stack ? 'fehlt in der Mitarbeiter-Excel — Stack über die Kollegen im ESL-Team'
+                       : 'fehlt in der Mitarbeiter-Excel — im ESL-Team kein eindeutiger Kollegen-Stack';
+    }
+    // Name fuer die Anzeige: ohne Mapping-Eintrag ist l.name die nackte Nummer —
+    // dann hilft die Ligaliste (vo_nummer ist in der Praxis die CCS-ID).
+    function rcLueckeName(l){
+        const k = (window.rcKpiData || {})[l.vo] || (l.ccs ? (window.rcKpiData || {})[l.ccs] : null);
+        return (!l.imMapping && k && k.agentName) ? k.agentName : (l.name || l.vo);
+    }
+    window.rcOpenOhneStack = function(){
+        const sc = window.rcActiveScope();
+        const l = rcOhneStackListe(sc).slice().sort(function(a, b){ return (b.stueck - a.stueck) || (b.kontakte - a.kontakte); });
+        const projName = k => (rcProjEintrag(k) || {}).name || '—';
+        const sum = f => l.reduce((s, x) => s + (x[f] || 0), 0);
+        const zeilen = l.length ? l.map(x => `<tr>
+            <td>${rcAttr(projName(x.projekt))}</td><td>${rcAttr(stdFullName(x.standort))}</td>
+            <td>${rcAttr(x.imMapping ? x.team : (x.teamRoh || x.team))}</td>
+            <td><b>${rcAttr(rcLueckeName(x))}</b>${rcLueckeName(x) === x.vo ? '' : ` <span class="rc-mono" style="color:#9A9A9A; font-size:10px; font-weight:400;">${rcAttr(x.vo)}</span>`}</td>
+            <td style="text-align:center;" class="rc-mono">${x.kontakte}</td><td style="text-align:center;" class="rc-mono">${x.ansprachen}</td>
+            <td style="text-align:center; font-weight:700;" class="rc-mono">${x.stueck}</td>
+            <td style="font-size:10.5px; color:#BDBDBD;">${rcAttr(rcLueckeGrund(x))}</td></tr>`).join('')
+            : '<tr><td colspan="8" style="text-align:center; color:#9C9C9C; padding:16px;">Im aktuellen Filter hat jeder Agent einen Stack.</td></tr>';
+        const zaehltMit = sc.stack === 'ALL' || rcIstProjektFilter(sc.stack);
+        rcShowDetail(`<div class="rc-detail-head"><div><h3>Ohne Stack-Zuordnung</h3>
+            <div class="rc-detail-sub">${rcAttr(rcKpiScopeTxt())} · <b style="color:#FFC14D;">${l.length}</b> Agent(en) · ${sum('kontakte')} Kontakte · ${sum('stueck')} Stück heute</div></div></div>
+            <div class="rc-detail-hint" style="margin-bottom:8px;">${zaehltMit
+                ? 'Diese Agenten zählen in dieser Ansicht mit. Unter einem einzelnen Stack-Filter erscheinen sie nicht, weil ihr Stack unbekannt ist.'
+                : 'Diese Agenten gehören zum selben Projekt wie der gewählte Stack, zählen in seinen Summen aber NICHT mit: ihr Stack ist unbekannt. Unter „' + rcAttr(rcStackFilterText('P:' + rcProjektVonStack(sc.stack)) || 'Alle Stacks') + '“ und „Alle Stacks“ sind sie enthalten.'}
+                Abhilfe: Agent bzw. Stack in der Mitarbeiter-Excel nachtragen und die Datei neu einlesen.</div>
+            <div style="margin-bottom:10px;"><button class="rc-btn rc-btn-blue" id="rcLueckenExcel">Mapping-Lücken als Excel</button>
+                <span id="rcLueckenStatus" style="margin-left:10px; color:#9C9C9C; font-size:11.5px;"></span></div>
+            <table class="rc-detail-table"><thead><tr><th>Projekt</th><th>Standort</th><th>Team</th><th>Agent</th>
+                <th style="text-align:center;">Kontakte</th><th style="text-align:center;">Anspr.</th><th style="text-align:center;">Stück</th><th>Grund</th></tr></thead><tbody>${zeilen}</tbody></table>`);
+        const b = document.getElementById('rcLueckenExcel');
+        if (b) b.addEventListener('click', function(){
+            const s = document.getElementById('rcLueckenStatus');
+            b.disabled = true;
+            window.rcMappingLuecken(function(t, schlecht){ if (s) { s.textContent = t; s.style.color = schlecht ? '#E60000' : '#9C9C9C'; } })
+                .then(function(){ b.disabled = false; }, function(){ b.disabled = false; });
+        });
+    };
+    document.getElementById('rcOhneStackChip').addEventListener('click', function(){ window.rcOpenOhneStack(); });
+
+    // "Mapping-Luecken" als Excel (05.10.) — die Arbeitsliste fuer die Pflege der
+    // Mitarbeiter-Excel: wer heute im ESL gebucht hat, dort aber fehlt, und
+    // welche Teams keinen Stack tragen. Immer ueber ALLE Standorte und Projekte
+    // (der Dashboard-Filter gilt hier nicht), deshalb vorher alles frisch holen.
+    window.rcMappingLuecken = async function(melden){
+        const sag = melden || function(t){ if (window.rcToast) rcToast(t, 6000); rcLog.log(t); };
+        try {
+            sag('Hole die Projekte frisch ...');
+            await rcFrischHolen({ std:'ALL', stack:'ALL', team:'ALL' }, sag);
+        } catch(e){ rcLog.warn('Mapping-Luecken: Auffrischen fehlgeschlagen (' + (e && e.message) + ') — es gilt der vorhandene Stand.'); }
+        if (!window.rcWcaMapping || !Object.keys(window.rcWcaMapping.stackMap || {}).length) {
+            sag('Keine Mitarbeiter-Excel geladen — erst das Mapping einlesen, dann zeigt die Liste, wer darin fehlt.', true);
+            return null;
+        }
+        const alle = window.rcZuordnungLuecken || [];
+        const ohneMap = alle.filter(function(l){ return !l.imMapping; });
+        const ohneStackTeam = alle.filter(function(l){ return l.imMapping && !l.stack; });
+        if (!alle.length) { sag('Keine Lücken: jeder Agent von heute steht in der Mitarbeiter-Excel und hat einen Stack.'); return null; }
+        const projName = function(k){ return (rcProjEintrag(k) || {}).name ? 'Vodafone ' + rcProjEintrag(k).name : ''; };
+        const sm = (window.rcWcaMapping && window.rcWcaMapping.stackMap) || {};
+        const moeglich = function(proj){
+            const l = [...new Set(Object.values(sm).filter(Boolean))].filter(function(s){ return rcProjektVonStack(s) === proj; }).sort();
+            return l.length ? l.join(' oder ') : '';
+        };
+        const liga = function(l){ return (window.rcKpiData || {})[l.vo] || (l.ccs ? (window.rcKpiData || {})[l.ccs] : null) || null; };
+        const ord = function(a, b){ return (a.projekt || '').localeCompare(b.projekt || '') || (a.standort || '').localeCompare(b.standort || '')
+            || (a.teamRoh || '').localeCompare(b.teamRoh || '') || (b.stueck - a.stueck); };
+        const tag = rcTodayKey(), datum = tag.slice(8) + '.' + tag.slice(5, 7) + '.' + tag.slice(0, 4);
+        const b1 = [['Agenten, die am ' + datum + ' im ESL gebucht haben, aber NICHT in der Mitarbeiter-Excel stehen (' + ohneMap.length + ')'],
+            ['Projekt', 'Standort (ESL)', 'ESL-Team (Rohname)', 'VO-Nummer / CCS-ID', 'Name laut Ligaliste', 'Liga-Team', 'Stack-Vorschlag', 'Grundlage des Vorschlags', 'ESL-Kontakte', 'Ansprachen', 'Stück']];
+        ohneMap.slice().sort(ord).forEach(function(l){ const k = liga(l);
+            b1.push([projName(l.projekt), stdFullName(l.standort), l.teamRoh || '', l.vo, k ? (k.agentName || '') : '', k ? ((k.team || '') + '') : '',
+                l.stack || '', l.stack ? 'eindeutig über die Kollegen im selben ESL-Team'
+                                       : 'kein eindeutiger Kollegen-Stack' + (moeglich(l.projekt) ? ' — ' + moeglich(l.projekt) : ''),
+                l.kontakte, l.ansprachen, l.stueck]); });
+        const teams = {};
+        ohneStackTeam.forEach(function(l){ const key = l.projekt + '|' + l.standort + '|' + l.team;
+            const t = teams[key] || (teams[key] = { projekt:l.projekt, standort:l.standort, team:l.team, agenten:0, kontakte:0, stueck:0 });
+            t.agenten++; t.kontakte += l.kontakte; t.stueck += l.stueck; });
+        const tl = Object.keys(teams).map(function(k){ return teams[k]; }).sort(function(a, b){ return (a.projekt || '').localeCompare(b.projekt || '') || (b.agenten - a.agenten); });
+        const b2 = [['Teams, die in der Mitarbeiter-Excel stehen, deren Spalte "stack" aber bei ALLEN Mitgliedern leer ist (' + tl.length + ')'],
+            ['Projekt (laut ESL-Export)', 'Standort', 'Team (Excel)', 'Agenten heute aktiv', 'ESL-Kontakte', 'Stück', 'Stack muss sein']];
+        tl.forEach(function(t){ b2.push([projName(t.projekt), stdFullName(t.standort), t.team, t.agenten, t.kontakte, t.stueck, moeglich(t.projekt)]); });
+        // Welche Projekte stecken drin? Fehlt eins, fehlen auch seine Luecken —
+        // das gehoert in die Datei, nicht nur ins Log.
+        const stand = window.rcAlleProjekteModus ? rcProjRahmenListe().map(function(p){ const d = (window.rcProjektDaten || {})[p.key];
+            return p.name + ': ' + (d && d.data && d.data.length > 1 ? 'Stand ' + pad2(new Date(d.zeit).getHours()) + ':' + pad2(new Date(d.zeit).getMinutes())
+                                                                   : 'KEINE Daten geladen'); }).join(' · ') : '';
+        if (stand) { b1.push([]); b1.push(['Enthaltene Projekte — ' + stand]); }
+        const fn = 'ESL_Mapping_Luecken_' + tag + '.xlsx';
+        return new Promise(function(fertig){
+            rcLoadStyledXlsx(function(XL){
+                try {
+                    const wb = XL.utils.book_new();
+                    const s1 = XL.utils.aoa_to_sheet(b1); s1['!cols'] = [18, 16, 30, 18, 26, 14, 14, 54, 12, 11, 8].map(function(w){ return { wch:w }; });
+                    const s2 = XL.utils.aoa_to_sheet(b2); s2['!cols'] = [24, 16, 30, 20, 12, 8, 28].map(function(w){ return { wch:w }; });
+                    XL.utils.book_append_sheet(wb, s1, 'Agenten ohne Mapping');
+                    XL.utils.book_append_sheet(wb, s2, 'Teams ohne Stack');
+                    const bytes = new Uint8Array(XL.write(wb, { bookType:'xlsx', type:'array' }));
+                    if (window.rcXlsxAbfangen) window.rcXlsxAbfangen(bytes, fn);
+                    else {
+                        const a = document.createElement('a');
+                        const url = URL.createObjectURL(new Blob([bytes], { type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
+                        a.href = url; a.download = fn; document.body.appendChild(a); a.click();
+                        setTimeout(function(){ document.body.removeChild(a); URL.revokeObjectURL(url); }, 1500);
+                    }
+                    sag('Fertig — ' + fn + ': ' + ohneMap.length + ' Agenten fehlen in der Mitarbeiter-Excel, ' + tl.length + ' Team(s) ohne Stack.');
+                    fertig({ datei: fn, agenten: ohneMap.length, teams: tl.length });
+                } catch(e){ sag('Mapping-Lücken: ' + (e && e.message ? e.message : e), true); fertig(null); }
+            });
+        });
+    };
+
     // ---------- KPI-KACHEL-DRILLDOWN: Klick auf eine Arena-Zahl -> WER dahinter steht ----------
     // Zeigt fuer BNT/KIP/MOB/VVL/Ansprachen/Ablehnungen/Kontakte/Offene die Agenten-Liste
     // (nur im aktuell gewaehlten Filter Standort/Team/Stack). Klick auf eine Zeile
@@ -21120,13 +24941,22 @@
         const ts=document.getElementById('rcTeamFilter');
         const ss=document.getElementById('rcStackFilter');
         const p=[];
-        if (ss && ss.value && ss.value!=='ALL') p.push(ss.value);
+        if (ss && ss.value && ss.value!=='ALL') p.push(rcStackFilterText(ss.value));
         if (fv && fv!=='ALL') p.push(stdFullName(fv));
         if (fv && fv!=='ALL' && ts && ts.value!=='ALL') p.push('Team '+ts.value);
         return p.length ? p.join(' · ') : 'Alle Standorte';
     }
     window.rcOpenKpiDetail = function(kind){
-        const sales = window.rcAllSales || [];
+        // rcAllSales ist UNGEFILTERT (die Kriegskarte braucht alle Standorte). Dieser
+        // Dialog steht aber unter dem aktiven Filter und sagt das auch in seiner
+        // Fusszeile — ohne den Zuschnitt zeigte der Klick auf "BNT 129" (Filter
+        // VKD_Tech) die 514 Abschluesse ALLER Standorte unter der Ueberschrift
+        // "VKD_Tech" (05.10. im Browser gemessen). Ablehnungen und die
+        // Agenten-Listen darunter kommen schon gefiltert aus dem Parser.
+        const scD = window.rcActiveScope();
+        const sales = (window.rcAllSales || []).filter(s => (scD.std === 'ALL' || s.standort === scD.std)
+            && (scD.team === 'ALL' || s.team === scD.team)
+            && (scD.stack === 'ALL' || rcStackFilterPasst(s.team, scD.stack, s.projekt)));
         const rejs  = window.rcAllRejections || [];
         const agentsArr = Object.values((window.rcLetzteStats||{}).agentStats || {});
         const scopeTxt = rcKpiScopeTxt();
@@ -21341,6 +25171,15 @@
             const t0 = Date.now();
             const dauer = () => Math.round((Date.now() - t0) / 1000) + ' s';
             try {
+                // Datendienst (27.10.): den Bereich holt der Dienst fuer alle drei Projekte
+                // (ESL-Bereichs-Export + Liga-Tage), der Empfang legt ihn in die Historie.
+                // Kein Kommando an die Ligaliste, kein Klick im Portal.
+                if (rcDienstModus()) {
+                    setStatus('Laeuft: der Datendienst holt ' + from + ' bis ' + to + ' fuer Kabel, Mobile und UM (ESL und Ligaliste) ...', false);
+                    const b = await rcDienstBereich(from, to, ['kabel','mobile','um']);
+                    setStatus('Fertig nach ' + dauer() + ' — ' + b.text, !b.ok);
+                    return;
+                }
                 // ---- 1) Ligaliste anstossen und auf ihre Antwort warten ----
                 let ligaSent = false;
                 const cmd = { type:'RC_HARVEST_RANGE', from, to };
@@ -21481,6 +25320,16 @@
 
     // Einmaliger, idempotenter "Session ist tot"-Handler: Banner + Poller stoppen.
     function rcSessionLost(reason){
+        // Datendienst (27.10.): die Anmeldung ist Sache des Dienstes. Kein Banner,
+        // kein Anhalten des Takts, kein Retry gegen das Portal — nur ins Logbuch,
+        // und ein Dauerzustand hoechstens alle 5 Min (sonst fuellt er den Ringpuffer).
+        if (rcDienstModus()) {
+            if (Date.now() - (rcSessionLost._dienst || 0) >= 300000) {
+                rcSessionLost._dienst = Date.now();
+                rcLog.warn('ESL meldet: ' + (reason || 'unbekannt') + ' — im Dienst-Betrieb meldet der Datendienst selbst neu an.');
+            }
+            return;
+        }
         if (!window.rcSessionState.alive) return;          // schon gemeldet
         window.rcSessionState.alive = false;
         window.rcSessionState.lostAt = rcNowStamp();
@@ -21568,44 +25417,59 @@
     function rcJq(){
         return window.jQuery || window.$ || (window.PrimeFaces && PrimeFaces.$) || null;
     }
+    // Setzt den Leerlauf-Zaehler EINES Fensters zurueck (Hauptseite oder Rahmen).
+    // Liefert true, wenn ein echter Timer-Reset gegriffen hat.
+    function rcLeerlaufZurueck(W){
+        var didReset = false, d = W.document;
+        // a) DIREKTER Reset des jQuery-idleTimer (das nutzt PF IdleMonitor intern).
+        //    Wird an document, document.body und window versucht (je nach PF-Version
+        //    ist das Plugin an eines davon gebunden).
+        var jq = W === window ? rcJq() : (W.jQuery || W.$ || (W.PrimeFaces && W.PrimeFaces.$) || null);
+        if (jq && typeof jq.fn === 'object' && jq.fn.idleTimer) {
+            [d, d.body, W].forEach(function(el){
+                try { jq(el).idleTimer('reset'); didReset = true; } catch(e){}
+            });
+        }
+        // b) PF-IdleMonitor-Widget ueber seine SIGNATUR erkennen (nicht ueber die id):
+        //    ein IdleMonitor hat cfg.timeout UND pause()+resume(). pause()+resume()
+        //    re-armt den idleTimer sauber (= Reset). Poll-Widgets haben start/stop
+        //    statt pause/resume und werden so nicht faelschlich getriggert.
+        var PF = W.PrimeFaces;
+        if (PF && PF.widgets) {
+            Object.keys(PF.widgets).forEach(function(k){
+                var w = PF.widgets[k];
+                if (!w || !w.cfg) return;
+                var isIdle = ('timeout' in w.cfg) && typeof w.pause === 'function' && typeof w.resume === 'function';
+                if (!isIdle) return;
+                try {
+                    if (typeof w.reset === 'function') { w.reset(); }
+                    else { w.pause(); w.resume(); }
+                    didReset = true;
+                } catch(e){}
+            });
+        }
+        // c) synthetische User-Aktivitaet als Zusatz (falls das Plugin doch an einem
+        //    anderen Element haengt und auf echte Events lauscht). keydown ohne key ->
+        //    loest keinen Escape-/Shortcut-Handler aus (no-op).
+        ['mousemove','mousedown','keydown'].forEach(function(type){
+            var ev;
+            try { ev = new W.Event(type, { bubbles:true }); }
+            catch(e){ ev = d.createEvent('Event'); ev.initEvent(type, true, true); }
+            try { d.dispatchEvent(ev); } catch(e){}
+        });
+        return didReset;
+    }
     function rcKeepAliveTick(){
+        if (rcDienstModus()) return;                  // Datendienst: kein Portal in dieser Seite
         if (!window.rcSessionState.alive) return;
-        var didReset = false;
         try {
-            // a) DIREKTER Reset des jQuery-idleTimer (das nutzt PF IdleMonitor intern).
-            //    Wird an document, document.body und window versucht (je nach PF-Version
-            //    ist das Plugin an eines davon gebunden).
-            var jq = rcJq();
-            if (jq && typeof jq.fn === 'object' && jq.fn.idleTimer) {
-                [document, document.body, window].forEach(function(el){
-                    try { jq(el).idleTimer('reset'); didReset = true; } catch(e){}
-                });
-            }
-            // b) PF-IdleMonitor-Widget ueber seine SIGNATUR erkennen (nicht ueber die id):
-            //    ein IdleMonitor hat cfg.timeout UND pause()+resume(). pause()+resume()
-            //    re-armt den idleTimer sauber (= Reset). Poll-Widgets haben start/stop
-            //    statt pause/resume und werden so nicht faelschlich getriggert.
-            if (window.PrimeFaces && PrimeFaces.widgets) {
-                Object.keys(PrimeFaces.widgets).forEach(function(k){
-                    var w = PrimeFaces.widgets[k];
-                    if (!w || !w.cfg) return;
-                    var isIdle = ('timeout' in w.cfg) && typeof w.pause === 'function' && typeof w.resume === 'function';
-                    if (!isIdle) return;
-                    try {
-                        if (typeof w.reset === 'function') { w.reset(); }
-                        else { w.pause(); w.resume(); }
-                        didReset = true;
-                    } catch(e){}
-                });
-            }
-            // c) synthetische User-Aktivitaet als Zusatz (falls das Plugin doch an einem
-            //    anderen Element haengt und auf echte Events lauscht). keydown ohne key ->
-            //    loest keinen Escape-/Shortcut-Handler aus (no-op).
-            ['mousemove','mousedown','keydown'].forEach(function(type){
-                var ev;
-                try { ev = new Event(type, { bubbles:true }); }
-                catch(e){ ev = document.createEvent('Event'); ev.initEvent(type, true, true); }
-                try { document.dispatchEvent(ev); } catch(e){}
+            var didReset = rcLeerlaufZurueck(window);
+            // Die unsichtbaren Projekt-Rahmen (Alle-Projekte-Betrieb, 27.09.) tragen
+            // JE EINEN EIGENEN IdleMonitor, und in ihnen bewegt sich nie eine Maus.
+            // Ohne Reset laeuft dort der 4-h-Zaehler durch, und der Rahmen springt
+            // auf die Login-Seite — dieselbe Lage wie oben, nur unsichtbar.
+            document.querySelectorAll('iframe[data-rc-projekt]').forEach(function(f){
+                try { if (f.contentWindow && f.contentWindow.document) rcLeerlaufZurueck(f.contentWindow); } catch(e){}
             });
             window.rcSessionState.lastAlive = rcNowStamp();
             window.rcSessionState.lastReset = didReset;   // Diagnose: hat ein echter Timer-Reset gegriffen?
@@ -21673,6 +25537,8 @@
                     (em != null ? ' (seit ' + em + ' Minuten)' : '') +
                     (window.rcEslFehlgrund ? ' — ' + window.rcEslFehlgrund : ''));
             }
+            // ---- Mobile/UM im Alle-Projekte-Betrieb (27.09.) ----
+            try { rcAlleProjekteLage().forEach(function(t){ lage.texte.push(t); }); } catch(e){}
             // ---- Takt (Fenster minimiert / Tab eingeschlafen) ----
             // Kein zweiter Streifen: es wird derselbe Quellen-Streifen benutzt,
             // der ohnehin ueber allen Seiten liegt.
@@ -21890,20 +25756,22 @@
         } catch(e){ return -1; }
     }
     // Historien-Tage aelter als N Tage entfernen. Gilt fuer alle Historien
-    // dieses Projekts (rcKey!), nicht fuer die der anderen zwei.
+    // dieses Projekts (rcKey!), nicht fuer die der anderen zwei — im Dienst-
+    // Betrieb fuer alle drei (rcHistSchluessel), die Seite traegt sie alle.
     function rcSpeicherHistorieKappen(tage){
         var weg = 0;
         var grenze = new Date(); grenze.setDate(grenze.getDate() - tage);
         var gKey = grenze.getFullYear() + '-' + pad2(grenze.getMonth() + 1) + '-' + pad2(grenze.getDate());
         ['rcEslHistory', 'rcLigaHistDash'].forEach(function(basis){
-            try {
-                var k = rcKey(basis);
-                var o = JSON.parse(localStorage.getItem(k) || '{}');
-                var vorher = Object.keys(o).length;
-                Object.keys(o).forEach(function(tag){ if (tag < gKey) delete o[tag]; });
-                var nachher = Object.keys(o).length;
-                if (nachher < vorher) { localStorage.setItem(k, JSON.stringify(o)); weg += (vorher - nachher); }
-            } catch(e){}
+            rcHistSchluessel(basis).forEach(function(k){
+                try {
+                    var o = JSON.parse(localStorage.getItem(k) || '{}');
+                    var vorher = Object.keys(o).length;
+                    Object.keys(o).forEach(function(tag){ if (tag < gKey) delete o[tag]; });
+                    var nachher = Object.keys(o).length;
+                    if (nachher < vorher) { localStorage.setItem(k, JSON.stringify(o)); weg += (vorher - nachher); }
+                } catch(e){}
+            });
         });
         return weg;
     }
@@ -21936,12 +25804,15 @@
         // rcKappeProdHistorie ist KEINE globale Aufraeumfunktion - sie bekommt
         // ein Historien-Objekt und kappt darin die pg/pgB-Felder der Tage
         // jenseits von RC_PROD_HIST_TAGE. Also: laden, kappen, zurueckschreiben.
-        try {
-            var hk = rcKey('rcEslHistory');
-            var h = JSON.parse(localStorage.getItem(hk) || '{}');
-            var wegP = rcKappeProdHistorie(h);
-            if (wegP) { localStorage.setItem(hk, JSON.stringify(h)); getan.push(wegP + ' Produktdetails alter Tage entfernt'); }
-        } catch(e){}
+        var wegP = 0;
+        rcHistSchluessel('rcEslHistory').forEach(function(hk){
+            try {
+                var h = JSON.parse(localStorage.getItem(hk) || '{}');
+                var n = rcKappeProdHistorie(h);
+                if (n) { localStorage.setItem(hk, JSON.stringify(h)); wegP += n; }
+            } catch(e){}
+        });
+        if (wegP) getan.push(wegP + ' Produktdetails alter Tage entfernt');
         if (rcSpeicherFrei()) return rcSpeicherFertig(getan, belegtVorher);
         // Stufe 2: alte Historien-Tage
         var n = rcSpeicherHistorieKappen(RC_SP_TAGE);
@@ -21949,6 +25820,7 @@
         if (rcSpeicherFrei()) return rcSpeicherFertig(getan, belegtVorher);
         // Stufe 3: Logbuch
         try { if (window.rcLogbuchLeeren) { window.rcLogbuchLeeren(); getan.push('Logbuch geleert'); } } catch(e){}
+        try { if (window.rcFluss && window.rcFluss.kappen) { var fk = window.rcFluss.kappen(); if (fk) getan.push(fk + ' aeltere Flugschreiber-Eintraege entfernt'); } } catch(e){}
         if (rcSpeicherFrei()) return rcSpeicherFertig(getan, belegtVorher);
         // Stufe 4: Code-Blobs, aber nur wenn der Starter sie ohnehin mitbringt
         var b = rcSpeicherBlobsWeg();
@@ -21999,6 +25871,7 @@
         return seitStart >= RC_WD_KALT_MIN ? seitStart : null;
     }
     function rcWdTick(){
+        if (rcDienstModus()) return;                  // Datendienst: kein Fenster, kein Neuladen — heilen ist Sache des Dienstes
         var jetzt = Date.now();
         ['liga', 'esl'].forEach(function(q){
             var z = RC_WD[q], leiter = RC_WD_STUFEN[q];
@@ -22127,6 +26000,7 @@
     }
 
     function rcSessionWatchTick(){
+        if (rcDienstModus()) return;                  // Datendienst: keine Portal-Dialoge in dieser Seite
         try {
             // "keine Antwort vom Server" -> nur wegklicken, KEIN Reload (haelt das Script am Leben)
             if (rcDlgVisible('ajaxTimeoutDialog')) {
@@ -22175,15 +26049,18 @@
     ]).then(() => {
         rcLog.log('Bibliotheken bereit. Starte Live-Crawl (20s)...');
         rcAutoMapping();          // Mitarbeiter-Excel ohne Datei-Dialog uebernehmen
-        window.rcLiveInterval = setInterval(holeExcelVomServer, 20000);
+        window.rcLiveInterval = setInterval(rcLiveTick, 20000);
+        if (rcDienstModus()) { rcDienstEmpfangStarten(); return; }   // Datendienst: Daten kommen vom Dienst
         holeExcelVomServer();
+        rcAlleProjekteStart();    // Mobile + UM in Rahmen (nur Kabel-Seite, 27.09.)
         // Tageshistorie: 20 s nach Start fehlende Vortage nachladen, danach alle 4 h pruefen
         setTimeout(rcHarvestEslHistory, 20000);
         window.rcHistInterval = setInterval(rcHarvestEslHistory, 4*3600*1000);
         rcAutoKpiQuelle();        // Ligaliste selbst oeffnen (Crawler braucht unseren opener)
     }).catch(err => {
         rcLog.error('Fehler beim Start:', err);
-        window.rcLiveInterval = setInterval(holeExcelVomServer, 20000);
+        window.rcLiveInterval = setInterval(rcLiveTick, 20000);
+        if (rcDienstModus()) { rcDienstEmpfangStarten(); return; }
         holeExcelVomServer();
     });
 
@@ -22691,6 +26568,8 @@
         // Quelle oeffnen — window.open aus dem Dashboard heraus, sonst ist
         // window.opener im Monitor null und der Rueckkanal fehlt (wie bei der Ligaliste).
         window.rcOpenQueueQuelle = function(){
+            // Datendienst: kein Monitor-Fenster aus dieser Seite.
+            if (rcDienstModus()) { if (window.rcToast) window.rcToast('Warteschleife im Dienst-Betrieb aus.', 5000); return false; }
             try { if(window.rcQueueWin && !window.rcQueueWin.closed){ window.rcQueueWin.focus(); return true; } } catch(e){}
             // Ueber die CCS-Startseite einsteigen (siehe RC_CCS_START oben): ein
             // Direktaufruf ohne stehende Sitzung endet in "keine Berechtigung".
@@ -24552,6 +28431,8 @@
         };
 
         // ---- Boot ----
+        // Datendienst (27.10.): diese Seite oeffnet kein Genesys-Fenster.
+        if(rcDienstModus()){ queueAbraeumen(); rcLog.log('[WS] Warteschleife im Dienst-Betrieb aus (kommt mit Vorhaben 4).'); return; }
         if(CFG.modulAus){
             queueAbraeumen();
             rcLog.log('[WS] Warteschleifen-Modul ist abgeschaltet (rcQueueAus(false) schaltet es wieder ein).');
@@ -24750,7 +28631,7 @@
             agenten.forEach(function(a){ ansp += nz(a.ansprachen); });
 
             // Liga-Calls und Qualitaet ueber die zentrale, filtertreue Aggregation
-            var liga = { calls:0, cs:null, tnps:null, aht:null, aq:null };
+            var liga = { calls:0, cs:null, tnps:null, aht:null };
             try {
                 if (window.rcLigaAgg) {
                     var la = window.rcLigaAgg();
@@ -24769,7 +28650,7 @@
                     var sc = window.rcActiveScope();
                     inScope = ks.filter(function(k){ return window.rcLigaInScope(k, sc); });
                 }
-                var csS=0,csN=0,tnS=0,tnN=0,ahS=0,ahN=0,aqS=0,aqN=0;
+                var csS=0,csN=0,tnS=0,tnN=0,ahS=0,ahN=0;
                 inScope.forEach(function(k){
                     var c = nz(k.callCount);
                     // Nach Calls GEWICHTET mitteln: ein Agent mit einem einzigen Call
@@ -24777,12 +28658,10 @@
                     if(k.cs != null && c){ csS += k.cs*c; csN += c; }
                     if(k.tnps != null && c){ tnS += k.tnps*c; tnN += c; }
                     if(k.ahtSec != null && c){ ahS += k.ahtSec*c; ahN += c; }
-                    if(k.auflegerquote != null && c){ aqS += k.auflegerquote*c; aqN += c; }
                 });
                 liga.cs = csN ? csS/csN : null;
                 liga.tnps = tnN ? tnS/tnN : null;
                 liga.aht = ahN ? ahS/ahN : null;
-                liga.aq = aqN ? aqS/aqN : null;
                 if(!liga.calls) inScope.forEach(function(k){ liga.calls += nz(k.callCount); });
             } catch(e){}
 
@@ -24815,13 +28694,12 @@
             // Kopfzeile, die den aktiven Filter nennt — ohne Filter zeigte sie
             // alle Standorte unter falscher Ueberschrift.
             var sc = window.rcActiveScope ? window.rcActiveScope() : null;
-            var stackVon = (window.rcWcaMapping && window.rcWcaMapping.stackMap) || {};
             var m = {};
             roh.forEach(function(s){
                 if(sc){
                     if(sc.std   !== 'ALL' && s.standort !== sc.std) return;
                     if(sc.team  !== 'ALL' && s.team     !== sc.team) return;
-                    if(sc.stack !== 'ALL' && stackVon[s.team] !== sc.stack) return;
+                    if(sc.stack !== 'ALL' && !rcStackFilterPasst(s.team, sc.stack, s.projekt)) return;
                 }
                 // s.produkt = konkreter Name, s.prod = Klasse (Rueckfall)
                 var name = (s.produkt || s.prod || '').toString().trim();
@@ -24942,14 +28820,13 @@
             ks.forEach(function(k){
                 var code = (window.rcLigaMeta ? rcLigaMeta(k).std : k.standort) || k.standort;
                 if(!code) return;
-                var e = per[code] || (per[code] = { code:code, calls:0, csS:0, csN:0, tnS:0, tnN:0, aqS:0, aqN:0, ahS:0, ahN:0 });
+                var e = per[code] || (per[code] = { code:code, calls:0, csS:0, csN:0, tnS:0, tnN:0, ahS:0, ahN:0 });
                 var c = nz(k.callCount);
                 e.calls += c;
                 // Nach Calls gewichtet — wie ueberall sonst auf dieser Seite.
                 if(c){
                     if(k.cs != null){ e.csS += k.cs*c; e.csN += c; }
                     if(k.tnps != null){ e.tnS += k.tnps*c; e.tnN += c; }
-                    if(k.auflegerquote != null){ e.aqS += k.auflegerquote*c; e.aqN += c; }
                     if(k.ahtSec != null){ e.ahS += k.ahtSec*c; e.ahN += c; }
                 }
             });
@@ -24957,13 +28834,11 @@
                 var w = {
                     cs:   e.csN ? e.csS/e.csN : null,
                     tnps: e.tnN ? e.tnS/e.tnN : null,
-                    aq:   e.aqN ? e.aqS/e.aqN : null,
                     aht:  e.ahN ? (e.ahS/e.ahN)/60 : null
                 };
                 var pruefungen = [
                     { v:w.cs,   ok:function(v){ return v >= RC_ZIELE.cs.min; },   t:'CS' },
                     { v:w.tnps, ok:function(v){ return v >= RC_ZIELE.tnps.min; }, t:'TNPS' },
-                    { v:w.aq,   ok:function(v){ return v >= RC_ZIELE.aq.min; },   t:'AQ' },
                     { v:w.aht,  ok:function(v){ return v <= RC_ZIELE.ahtMin.max; }, t:'AHT' }
                 ];
                 var bewertbar = 0, erreicht = 0, offen = [];
@@ -24981,7 +28856,7 @@
               });
 
             var sub = el('rcMZielSub');
-            if(sub) sub.textContent = liste.length ? ('4 Qualitaetsziele · ' + liste.length + ' Standorte') : '';
+            if(sub) sub.textContent = liste.length ? ('3 Qualitaetsziele · ' + liste.length + ' Standorte') : '';
             if(!liste.length){
                 h.innerHTML = '<div class="rc-m-leer">Noch keine Ligalisten-Daten im aktuellen Filter.</div>';
                 return;

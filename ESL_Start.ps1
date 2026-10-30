@@ -1,7 +1,7 @@
 ﻿# HINWEIS: Diese Datei wird aus dem PowerShell-Teil von ESL_Start.cmd erzeugt.
 # NICHT von Hand aendern — Aenderungen gehoeren in die .cmd (hinter #PSSTART),
 # danach "node ps1_erzeugen.js" ausfuehren.
-# Erzeugt am 21.8.2026, 21:23:13 aus ESL_Start.cmd.
+# Erzeugt am 11.10.2026, 00:27:17 aus ESL_Start.cmd.
 <#
 ================================================================================
  ESL Live-Arena - EIN-KLICK-START (PowerShell + Edge-Fernsteuerung)
@@ -133,7 +133,7 @@ Write-Host "  ----------------------" -ForegroundColor DarkGray
 # Standmarke. Ohne sie war nach jedem Update unklar, ob die neue Datei
 # ueberhaupt gestartet wurde - die Ausgabe sah bis zur Anmeldung identisch aus.
 # Beim Aendern dieser Datei MITZIEHEN.
-$StarterStand = '2026-08-21 NeuTab+Startblock'
+$StarterStand = '2026-10-05 Liga-verbunden'
 Write-Host "  Stand: $StarterStand" -ForegroundColor DarkGray
 
 # ---------- 1) Dateien einlesen ----------
@@ -724,7 +724,7 @@ function PaketFuer($marke, $url) {
 Gut ("Injektions-Paket: " + [math]::Round($Paket.Length / 1024) + " KB")
 if ($PaketMobile -or $PaketUm) {
     $auch = @(); if ($PaketMobile) { $auch += 'Mobile' }; if ($PaketUm) { $auch += 'UM' }
-    Gut ("Weitere Projekte versorgt: " + ($auch -join ' + ') + "  (Start ueber ESL_Start_Mobile_UM.cmd)")
+    Gut ("Weitere Projekte versorgt: " + ($auch -join ' + ') + "  (Start ueber ESL_Start_Mobile.cmd bzw. ESL_Start_UM.cmd)")
 }
 if (-not $MappingB64) {
     Warn "Mitarbeiter_IDS_Final_komplett.xlsx liegt nicht im Ordner -"
@@ -1673,6 +1673,8 @@ function WendeEinstellungenAn($ziele) {
 #  denselben Zuschnitt, obwohl gerade die Leitung oft einen anderen braucht.
 #
 #  Ablauf jetzt, je Kreis:
+#    0. (05.10.) Erst aktualisieren: FrischeAuf laesst das Dashboard holen, was
+#       der Zuschnitt braucht (rcFrischStart/rcFrischStand) - siehe dort.
 #    1. Empfaenger + Zuschnitt im Dashboard setzen (rcReport.setTo/setCc/setScope).
 #    2. NACHFRAGEN, wie viele Zeilen dieser Zuschnitt trifft. Sind es 0, wird
 #       dieser Kreis mit Begruendung uebersprungen - frueher entstand daraus ein
@@ -1792,6 +1794,59 @@ function PruefeWatchdogAlarm($ziele) {
     } catch { Warn ("  Alarm-Mail fehlgeschlagen: " + $_.Exception.Message) }
 }
 
+# ---------------------------------------------------------------------------
+#  ERST AKTUALISIEREN, DANN REPORT (05.10.)
+# ---------------------------------------------------------------------------
+#  Nutzer-Vorgabe: "Dieser automatische E-Mail-Versand. Da muss das ja auch
+#  alles in Stacks erst mal sich aktualisieren und danach Daten exportieren."
+#
+#  Im Alle-Projekte-Betrieb holt das Dashboard nur das AKTIVE Projekt im
+#  20-s-Takt. Kabel, Mobile und UM stehen sonst auf dem Stand ihres letzten
+#  Abrufs - nach einem Neuladen der Seite auf gar keinem. Die Stundenmail las
+#  genau diesen Stand: ein Zuschnitt auf MF_CARE traf 0 Zeilen (und fiel aus),
+#  solange niemand im Dashboard auf Mobile geklickt hatte, und "ohne Filter"
+#  enthielt nur das Projekt, das gerade lief.
+#
+#  Jetzt stoesst der Starter VOR dem Zuschnitt rcFrischStart an: das Dashboard
+#  holt, was der Zuschnitt braucht (Stack -> dessen Projekt, ohne Stack alle
+#  drei, dazu die Ligaliste) und meldet ueber rcFrischStand, wann es fertig ist.
+#  Erst danach wird die Zeilenzahl gemessen und der Report gebaut.
+#
+#  Das ist eine FRIST, keine Sperre: wird das Auffrischen nicht fertig oder
+#  scheitert ein Projekt, geht die Mail trotzdem raus - mit dem Stand, der da
+#  ist, und mit dem Grund in diesem Fenster. Eine Pflicht haette bei einer
+#  haengenden Quelle jede Mail des Tages verhindert.
+$MailFrischFristSek = 120
+function FrischeAuf($dash, $std, $stack, $team, $text) {
+    $js = 'try{ if(typeof window.rcFrischStart!=="function") return "alt";' +
+          ' return window.rcFrischStart({std:' + (AlsJsText $std) + ', stack:' + (AlsJsText $stack) + ', team:' + (AlsJsText $team) + '}); }' +
+          'catch(e){ return "fehler:"+e.message; }'
+    $a = AmDashboard $dash 305 $js 8000
+    if ("$a" -eq 'alt') { return 'alt' }      # aelteres Dashboard im Tab: kennt das Auffrischen noch nicht
+    if ("$a" -ne 'gestartet') {
+        Warn "  ${text}: Auffrischen liess sich nicht anstossen ($a) - es gilt der vorhandene Stand."
+        return 'fehler'
+    }
+    $frist = (Get-Date).AddSeconds($MailFrischFristSek)
+    $stand = ''
+    while ((Get-Date) -lt $frist) {
+        Start-Sleep -Seconds 2
+        $stand = AmDashboard $dash 306 'try{ return window.rcFrischStand(); }catch(e){ return "fehler:"+e.message; }' 8000
+        if ("$stand" -like 'fertig:*') { break }
+    }
+    if ("$stand" -like 'fertig:ok:*') {
+        Schritt ("  ${text}: " + "$stand".Substring(10))
+        return 'ok'
+    }
+    if ("$stand" -like 'fertig:teil:*') {
+        Warn ("  ${text}: " + "$stand".Substring(12))
+        Warn "    Die Mail geht trotzdem raus - mit dem Stand, der da ist."
+        return 'teil'
+    }
+    Warn "  ${text}: Auffrischen wurde in $MailFrischFristSek s nicht fertig ($stand) - die Mail geht mit dem vorhandenen Stand raus."
+    return 'frist'
+}
+
 function SchickeStundenmail($ziele) {
     $dash = $ziele | Where-Object { $_.url -like '*regiocom*' -and
                                     $_.url -notlike '*_mobile*' -and
@@ -1847,6 +1902,7 @@ function SchickeStundenmail($ziele) {
     $okTeam = $false
     $letzteKennung = ''     # Zuschnitt des zuletzt gebauten Satzes
     $letzterStamm  = ''     # und dessen Dateistamm
+    $frischFuer    = ''     # Zuschnitt, fuer den zuletzt aufgefrischt wurde
     $id = 310
 
     foreach ($k in $kreise) {
@@ -1856,6 +1912,15 @@ function SchickeStundenmail($ziele) {
         $mappe = [bool]$k.Mappe
         $kennung = "$std|$stack|$team|$mappe"
         $zuschnitt = if ($kennung -eq 'ALL|ALL|ALL|False') { 'ohne Filter' } else { "$std / $stack / $team" }
+
+        # ---- 0. Erst aktualisieren (05.10.) ----
+        # VOR dem Zuschnitt: die Zeilenzahl in Schritt 2 soll den frischen Stand
+        # messen, nicht den des letzten Abrufs. Gleiche Zuschnitte hintereinander
+        # frischen nur einmal auf (das Dashboard haelt einen Stand 45 s fuer frisch).
+        if ("$std|$stack|$team" -ne $frischFuer) {
+            [void](FrischeAuf $dash $std $stack $team $k.Text)
+            $frischFuer = "$std|$stack|$team"
+        }
 
         # ---- 1. Empfaenger und Zuschnitt setzen ----
         $id++
@@ -2061,6 +2126,57 @@ function StelleLigalisteSicher($alle) {
     if (-not (OeffneLigalisteAusDashboard)) { return $false }
     [void](VerankereNeuenTab $vorher 15)
     return $true
+}
+# ---------- Ligaliste da, aber NICHT am Dashboard (05.10.) --------------------
+#  Befund aus dem Logbuch vom 29.09.: von 11:45 bis 14:51 kam kein einziges
+#  Liga-Paket an ("Liga: 0 Agenten, letztes Paket nie"), obwohl dieser Waechter
+#  lief. StelleLigalisteSicher steigt aus, sobald IRGENDEIN Tab mit liga_listen
+#  in der Adresse offen ist - ob der am Dashboard haengt, fragte niemand. Ein
+#  von Hand geoeffneter oder von Edge wiederhergestellter Ligalisten-Tab hat
+#  keinen opener: sein Crawler funkt ins Leere, und das Dashboard selbst darf
+#  ohne Nutzer-Geste kein Fenster oeffnen ("Popup wurde blockiert").
+#  Massgeblich ist deshalb das LEBENSZEICHEN im Dashboard, nicht der Tab:
+#  hat es keine Verbindung zum Ligalisten-Fenster UND seit fuenf Minuten kein
+#  Paket, ruft der Waechter rcOpenKpiQuelle() MIT Nutzer-Geste auf. Die Funktion
+#  verbindet zuerst ein bestehendes Fenster neu (ohne es neu zu laden) und
+#  oeffnet nur sonst ein neues - ein alert() gibt es dort nicht mehr.
+#  In den ersten zwei Minuten nach dem Dashboard-Start bleibt es still: das
+#  Dashboard verbindet sich nach 12 s selbst neu.
+function StelleLigalisteVerbunden($alle) {
+    $hatTab = $false
+    foreach ($t in $alle) { if ("$($t.url)" -like '*liga_listen*') { $hatTab = $true } }
+    if (-not $hatTab) { return $false }          # kein Tab: dafuer ist StelleLigalisteSicher da
+    if (-not (DarfOeffnen 'ligaVerbinden')) { return $false }
+    $dash = DashboardTab $alle
+    if (-not $dash) { return $false }
+    $js = '(function(){try{' +
+          ' var w = window.rcKpiWin, verbunden = false; try { verbunden = !!(w && !w.closed); } catch(e){}' +
+          ' var lu = window.rcKpiLastUpdate ? (+new Date(window.rcKpiLastUpdate)) : 0;' +
+          ' var alterMin = lu ? (Date.now()-lu)/60000 : 9999;' +
+          ' var L = window.rcDriftLage, startUm = (L && L.startUm) ? L.startUm : 0;' +
+          ' var laeuftMin = startUm ? (Date.now()-startUm)/60000 : 9999;' +
+          ' if (verbunden || alterMin < 5 || laeuftMin < 2) return "ok";' +
+          ' if (typeof window.rcOpenKpiQuelle !== "function") return "fehlt";' +
+          ' return window.rcOpenKpiQuelle() ? "verbunden" : "blockiert";' +
+          '}catch(e){ return "fehler"; }})()'
+    $vorher = TabIds
+    $w = $null
+    try {
+        $w = Verbinde $dash.webSocketDebuggerUrl
+        # userGesture ist zwingend - ohne sie blockt der Popup-Blocker window.open.
+        Sende $w 72 'Runtime.evaluate' @{ expression = $js; returnByValue = $true; userGesture = $true }
+        $a = Empfange $w 8000
+        $w.Dispose(); $w = $null
+        if (-not $a) { return $false }
+        if (($a | ConvertFrom-Json).result.result.value -ne 'verbunden') { return $false }
+        # Ging dabei ein neuer Tab auf, sofort verankern (sonst startet der Crawler
+        # dort erst im naechsten Durchlauf). Kein neuer Tab = bestehender verbunden.
+        [void](VerankereNeuenTab $vorher 6)
+        return $true
+    } catch {
+        if ($w) { try { $w.Dispose() } catch { } }
+        return $false
+    }
 }
 function StelleGenesysSicher($alle) {
     foreach ($t in $alle) {
@@ -2638,6 +2754,9 @@ $MailCc         = ''
 #  Leer lassen oder 'ALL' = kein Filter (alles).
 #  Standort: das KUERZEL, nicht der Name -> AL ADP B E P SER ZWT NBB SKA
 #  Stack:    wie im Mapping, z.B. 'VKD_Tech', 'MF_CARE', 'VUM'
+#            Ein GANZES Projekt (05.10.): 'P:kabel', 'P:mobile' oder 'P:um' -
+#            nimmt alle Mitarbeiter dieses ESL-Projekts, auch die ohne
+#            Stack-Zuordnung in der Mitarbeiter-Excel.
 #  Team:     der Team-NAME aus der Mitarbeiter-Excel, z.B. 'VKD-TECH-83'
 #            (NICHT die Nummer aus der Ligaliste - danach wird nicht gefiltert)
 #
@@ -2853,6 +2972,8 @@ while ($true) {
     # frueher nur EINMAL beim Start bzw. gar nicht - siehe StelleLigalisteSicher.
     if ($AutoLigaliste) {
         try { if (StelleLigalisteSicher $alle) { Schritt "  Ligaliste fehlte - aus dem Dashboard heraus geoeffnet." } } catch { }
+        # Tab da, aber das Dashboard bekommt nichts (05.10.): neu verbinden.
+        try { if (StelleLigalisteVerbunden $alle) { Schritt "  Ligaliste hing nicht am Dashboard - neu verbunden." } } catch { }
     }
     if ($AutoGenesys) {
         try { if (StelleGenesysSicher $alle) { Schritt "  Genesys-Monitor fehlte - aus dem Dashboard heraus geoeffnet." } } catch { }

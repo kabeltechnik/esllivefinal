@@ -20,7 +20,25 @@
 const path = require('path');
 const fs = require('fs');
 
-const EXPORT = path.join(__dirname, '..', 'Test Excels', 'Export_20260714_205722.xlsx');
+// Referenzdatei vom 14.07.; fehlt sie (der Ordner wird mit neuen Exporten
+// befuellt — 28.09. geschehen), der NEUESTE Kabel-Export dort: gleicher
+// Spaltensatz (13 Spalten, "produktgrupe" an Stelle 5). Die Pruefungen haengen
+// an keinen festen Zahlen, nur an diesem Aufbau.
+const ORDNER = path.join(__dirname, '..', 'Test Excels');
+const EXPORT = (function(){
+  const wunsch = path.join(ORDNER, 'Export_20260714_205722.xlsx');
+  if (fs.existsSync(wunsch)) return wunsch;
+  let kandidaten = [];
+  try { kandidaten = fs.readdirSync(ORDNER).filter(f => /^Export_\d{8}_\d{6}\.xlsx$/.test(f)).sort().reverse(); } catch (e) {}
+  for (const f of kandidaten) {
+    try {
+      const X = require('xlsx'), wb = X.readFile(path.join(ORDNER, f));
+      const kopf = (X.utils.sheet_to_json(wb.Sheets['dataTable'], { header: 1 })[0] || []).map(x => String(x).toLowerCase().trim());
+      if (kopf.length === 13 && kopf[5] === 'produktgrupe') return path.join(ORDNER, f);
+    } catch (e) {}
+  }
+  return wunsch;
+})();
 
 let XLSX;
 try { XLSX = require(path.join(process.env.LOCALAPPDATA || '', 'Temp', 'claude')); } catch (e) {}
@@ -53,7 +71,7 @@ if (!fs.existsSync(EXPORT)) { console.log('  Testdatei fehlt: ' + EXPORT); proce
 
 const wb = XLSX.readFile(EXPORT);
 const d = XLSX.utils.sheet_to_json(wb.Sheets['dataTable'], { header: 1 });
-const ix = { datum: 0, standort: 1, vo: 3, prod: 5, merkmal: 6, erg: 8, anz: 9 };
+const ix = { datum: 0, standort: 1, vo: 3, prod: 5, merkmal: 6, produkt: 7, erg: 8, anz: 9 };
 
 // ---------------------------------------------------------------------------
 //  Nachbau von rcAccumRow — nur der Teil, um den es hier geht
@@ -79,6 +97,10 @@ for (let i = 1; i < d.length; i++) {
   const mm = String(r[ix.merkmal] || '').toLowerCase();
   const bcrRel = !/nicht\s*bcr/.test(mm);
   if (anz <= 0 || !erg.includes('angenommen')) continue;
+  // Wie rcAccumRow: Potential Tracking / "Info World" ist kein Abschluss (Nutzer-
+  // Vorgabe 06.08.) — diese Zeilen tragen keine Gruppe. Die Datei vom 14.07. hatte
+  // keine; ab den Exporten vom 28.09. stehen sie drin.
+  if (/potential\s*tracking/.test(mm) || /^\s*info\s*world\s*$/i.test(String(r[ix.produkt] || ''))) continue;
   angenommen += anz;
   const gruppe = String(r[ix.prod] || '').trim();
   // SO wie im Dashboard: die Zaehlung laeuft VOR und AUSSERHALB von classify.

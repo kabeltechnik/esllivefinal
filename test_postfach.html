@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="de"><head><meta charset="utf-8"><title>Postfach-Pruefseite</title>
+<style>#pfLog{position:fixed;right:0;bottom:0;z-index:2147483647;max-height:40vh;overflow:auto;background:#000;color:#9f9;font:11px monospace;margin:0;padding:6px;}</style>
+</head>
+<body>
+<pre id="pfLog"></pre>
+<script>
+// Pruefseite Mail-Zentrum (30.10.): falscher Datendienst + ECHTE Gastseite und v22
+// (Muster: test_abgleich_esl.html?dienst=1). Server: .claude/launch.json "esl-offline-py".
+//   test_postfach.html        Seite da, rechts neben Steuerung, Aktionen, Re-Inject
+//   test_postfach.html?aus=1  Stand ohne postfach (Schalter aus): keine Seite, kein Abruf
+// Ergebnis in window.__ergebnis = {ok, rot}; Protokoll unten rechts.
+const Q = new URLSearchParams(location.search), AUS = Q.get('aus') === '1';
+let ok = 0, rot = 0;
+const L = (t) => { document.getElementById('pfLog').textContent += t + '\n'; };
+function pruefe(n, b, h){ if (b) { ok++; L('OK   ' + n); } else { rot++; L('ROT  ' + n + (h ? '  (' + h + ')' : '')); } }
+const warte = (ms) => new Promise((r) => setTimeout(r, ms));
+async function bis(test, ms){ const t0 = Date.now(); while (Date.now() - t0 < ms) { try { if (test()) return true; } catch(e){} await warte(200); } return false; }
+const pad = (n) => String(n).padStart(2, '0'), d0 = new Date();
+const heute = d0.getFullYear() + '-' + pad(d0.getMonth() + 1) + '-' + pad(d0.getDate());
+const P = window.__pf = { aktionen: [], anfragen: [], fehler: [] };
+window.addEventListener('error', (e) => P.fehler.push(String(e.message)));
+
+const PF_DATEN = {
+  ungelesen: 12,
+  mails: [
+    { entryId: '00AA11BB22CC33DD', zeit: heute + 'T09:15', absender: 'Projektleitung', email: 'pl@regiocom.com', betreff: 'Zielvorgabe November', ungelesen: true, vorschau: 'Bitte bis Freitag', kategorie: 'Management', wichtig: 'projektleitung' },
+    { entryId: '00AA11BB22CC33EE', zeit: heute + 'T08:50', absender: 'Chef Beispiel', email: 'chef@firma.de', betreff: 'Besprechung Qualitaet', ungelesen: false, vorschau: '', kategorie: 'Rest', wichtig: '' },
+    { entryId: '00AA11BB22CC33FF', zeit: heute + 'T08:40', absender: 'Vodafone Disposition', email: 'vodafone-disposition@regiocom.com', betreff: 'MA: Muster, Anna, Grund: KRV', ungelesen: true, vorschau: '', kategorie: 'Steuerung', wichtig: '' }
+  ],
+  abwesend: [{ ma: 'Muster, Anna', grund: 'KRV', von: heute, bis: '', zeit: heute + 'T08:40', entryId: '00AA11BB22CC33FF' }],
+  infos: [{ ma: 'Probe, Lena', art: 'Auffälligkeit', text: 'AHT hoch', zeit: heute + 'T08:00', entryId: '00AA11BB22CC3400' }],
+  termine: [{ entryId: '00AA11BB22CC3401', start: '10:30', ende: '11:00', titel: 'Teamleiter-Runde', ganztaegig: false }]
+};
+const jetzt = Date.now();
+const STAND = { nr: 1, aktiv: 'kabel', dienst: { start: jetzt, edge: 'eigen', flags: { zustand: '', fehlt: [] } },
+  esl: { kabel: { nr: 0 }, mobile: { nr: 0 }, um: { nr: 0 } }, liga: { nr: 0, zeit: 0 },
+  vortage: { kabel: { nr: 0 }, mobile: { nr: 0 }, um: { nr: 0 } }, ereignisse: [] };
+if (!AUS) STAND.postfach = { nr: 1, zeit: jetzt, ok: true, grund: '' };
+
+const ORIG = window.fetch.bind(window);
+window.fetch = function(input, init){
+  const u = new URL(typeof input === 'string' ? input : input.url, location.href);
+  if (u.pathname.indexOf('/__dienst/') !== 0) return ORIG(input, init);
+  const pfad = u.pathname.slice('/__dienst'.length), art = ((init && init.method) || 'GET').toUpperCase();
+  P.anfragen.push(art + ' ' + pfad);
+  const antw = (b, s, t) => Promise.resolve(new Response(b, { status: s, headers: { 'content-type': t } }));
+  const json = (o) => antw(JSON.stringify(o), 200, 'application/json');
+  if (art === 'GET' && pfad === '/api/stand') return json(STAND);
+  if (art === 'GET' && pfad === '/api/postfach' && !AUS) return json(Object.assign({ nr: 1, zeit: jetzt, ok: true, grund: '' }, PF_DATEN));
+  if (art === 'POST' && pfad === '/api/postfach/aktion') { P.aktionen.push(JSON.parse(init.body)); return json({ ok: true }); }
+  if (art === 'POST' && pfad === '/api/projekt') return json({ ok: true });
+  if (art === 'GET' && pfad === '/api/mapping.xlsx') return antw('fehlt (Pruefseite)', 503, 'text/plain');
+  return antw('nicht gefaelscht: ' + pfad, 404, 'text/plain');
+};
+// Mapping nur fuer diese Pruefung; der alte Wert kommt am Ende zurueck.
+const MAP_ALT = localStorage.getItem('rcWcaMapping');
+localStorage.setItem('rcWcaMapping', JSON.stringify({ voMap: {}, ccsMap: { 1: { name: 'Muster Anna', team: 'T-82', standort: 'Alanya', ccsId: '1' } }, standortMap: {}, stackMap: {} }));
+
+async function gastLaden(){
+  const g = await ORIG('ESL_Live_Arena.html', { cache: 'no-store' });
+  const doc = new DOMParser().parseFromString(await g.text(), 'text/html');
+  const sk = Array.from(doc.scripts).filter((s) => !s.src);
+  let code = sk[0].textContent;
+  const ersetze = (alt, neu) => { if (code.split(alt).length !== 2) throw new Error('Gastseite: "' + alt + '" nicht genau einmal'); code = code.replace(alt, () => neu); };
+  ersetze('{ basis: location.origin }', "{ basis: location.origin + '/__dienst' }");
+  ersetze("'/esl_live_arena_v22.js?v='", JSON.stringify('esl_live_arena_v22.js?v='));
+  doc.querySelectorAll('style').forEach((s) => document.head.appendChild(s.cloneNode(true)));
+  const el = document.createElement('script'); el.textContent = code; document.body.appendChild(el);
+}
+const anz = (id) => document.querySelectorAll('#' + id).length;
+
+(async function(){
+  try {
+    await gastLaden();
+    const da = await bis(() => window.__rcOverlayEl && window.rcDienstLage && window.rcDienstLage.zuletztOk, 45000);
+    pruefe('Dashboard laeuft im Dienst-Modus', da);
+    if (AUS) {
+      await warte(6000);
+      pruefe('Schalter aus: kein Reiter Postfach', anz('rcPagePostfach') === 0 && anz('rcPagePostfachContent') === 0);
+      pruefe('Schalter aus: /api/postfach nie abgefragt', P.anfragen.every((a) => a.indexOf('/api/postfach') < 0), P.anfragen.join(' '));
+    } else {
+      const reiter = await bis(() => document.getElementById('rcPagePostfach'), 15000);
+      pruefe('Reiter Postfach erscheint', reiter);
+      pruefe('Start bleibt auf Arena', window.rcActivePage === 'arena', window.rcActivePage);
+      const ck = document.getElementById('rcPageCockpit');
+      pruefe('Reiter direkt rechts neben Steuerung', ck && ck.nextElementSibling && ck.nextElementSibling.id === 'rcPagePostfach');
+      pruefe('nicht in der Rotation', (window.rcAutoRotPages || []).indexOf('postfach') < 0, JSON.stringify(window.rcAutoRotPages));
+      await bis(() => document.querySelectorAll('#rcPagePostfachContent .rc-pf-kachel').length === 4, 8000);
+      document.getElementById('rcPagePostfach').click();
+      const c = document.getElementById('rcPagePostfachContent');
+      pruefe('Klick zeigt die Seite', c && c.style.display !== 'none' && window.rcActivePage === 'postfach');
+      pruefe('vier Kacheln', c.querySelectorAll('.rc-pf-kachel').length === 4);
+      pruefe('Abwesend mit Team aus dem Mapping', /Muster, Anna\s*T-82/.test(c.querySelector('[data-pf-box="abwesend"]').textContent), c.querySelector('[data-pf-box="abwesend"]').textContent);
+      pruefe('Arena ist ausgeblendet', (document.getElementById('rcPageArenaContent') || {}).style.display === 'none');
+      c.querySelector('[data-pf-art="antworten"][data-pf-id="00AA11BB22CC33DD"]').click();
+      await bis(() => P.aktionen.length > 0, 3000);
+      pruefe('Antworten geht als Aktion an den Dienst', JSON.stringify(P.aktionen[0]) === JSON.stringify({ art: 'antworten', entryId: '00AA11BB22CC33DD' }), JSON.stringify(P.aktionen));
+      c.querySelector('[data-pf-filter="Steuerung"]').click();
+      const box = document.querySelector('#rcPagePostfachContent [data-pf-box="posteingang"]');
+      pruefe('Filter Steuerung', box.querySelector('.rc-pf-chip.an').getAttribute('data-pf-filter') === 'Steuerung' && box.querySelectorAll('.rc-pf-mail').length === 1);
+      let imSpeicher = false;
+      for (let i = 0; i < localStorage.length; i++) { const v = localStorage.getItem(localStorage.key(i)) || ''; if (v.indexOf('Zielvorgabe November') >= 0 || v.indexOf('Teamleiter-Runde') >= 0) imSpeicher = true; }
+      pruefe('kein Mailinhalt im localStorage', !imSpeicher);
+      // Re-Inject: v22 ein zweites Mal in dieselbe Seite
+      const quelle = await (await ORIG('esl_live_arena_v22.js?f=' + Date.now(), { cache: 'reload' })).text();
+      (0, eval)(quelle);
+      await bis(() => document.getElementById('rcPagePostfach') && document.querySelectorAll('#rcPagePostfachContent .rc-pf-kachel').length === 4, 15000);
+      pruefe('Re-Inject: je 1 Reiter, 1 Inhalt, 1 Dashboard, 1 Stil', anz('rcPagePostfach') === 1 && anz('rcPagePostfachContent') === 1 && anz('rcLiveDashboard') === 1 && anz('rcPostfachCss') === 1,
+        anz('rcPagePostfach') + '/' + anz('rcPagePostfachContent') + '/' + anz('rcLiveDashboard') + '/' + anz('rcPostfachCss'));
+      pruefe('Re-Inject: Start wieder auf Arena, nicht in Rotation', window.rcActivePage === 'arena' && (window.rcAutoRotPages || []).indexOf('postfach') < 0);
+    }
+    pruefe('keine Fehler aus dem Postfach-Block', P.fehler.every((f) => !/rcPostfach/.test(f)), P.fehler.join(' | '));
+  } catch (e) { pruefe('Lauf ohne Ausnahme', false, (e && e.stack) || e); }
+  if (MAP_ALT == null) localStorage.removeItem('rcWcaMapping'); else localStorage.setItem('rcWcaMapping', MAP_ALT);
+  L(rot ? '\n' + rot + ' fehlgeschlagen, ' + ok + ' bestanden' : '\nALLE ' + ok + ' PRUEFUNGEN BESTANDEN');
+  window.__ergebnis = { ok, rot };
+})();
+</script>
+</body></html>

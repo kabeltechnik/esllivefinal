@@ -6,6 +6,24 @@
       "runtimeExecutable": "python",
       "runtimeArgs": ["-m", "http.server", "8412", "--bind", "127.0.0.1"],
       "port": 8412
+    },
+    {
+      "name": "esl-offline-py",
+      "runtimeExecutable": "py",
+      "runtimeArgs": ["-m", "http.server", "8412", "--bind", "127.0.0.1"],
+      "port": 8412
+    },
+    {
+      "name": "esl-schein",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["pruefwerkzeuge/esl_schein_server.js"],
+      "port": 8413
+    },
+    {
+      "name": "liga-schein",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["pruefwerkzeuge/liga_schein_server.js"],
+      "port": 8414
     }
   ]
 }

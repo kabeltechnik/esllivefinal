@@ -1,8 +1,0 @@
-{
-  "status": "ok",
-  "rows": [
-    { "agent": "Muster, Max", "ccsid": "4711", "calls": 42, "cs": 91.5, "datum": "2026-07-27" },
-    { "agent": "Beispiel, Bea", "ccsid": "4712", "calls": 37, "cs": 88.0, "datum": "2026-07-27" }
-  ],
-  "meta": { "total": 2, "interval": "day" }
-}

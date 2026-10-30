@@ -143,24 +143,35 @@ abschnitt('7. Der Baum kommt aus der GELADENEN VORLAGE, nicht aus dem Fensternam
 // einVersuch() ihn erreicht — die Pruefung gilt nur dem gesendeten Body.
 async function pruefeTab(bezeichnung, windowName, erwarteterBaum, mitEigenemKontext){
   global.__letzterBody = null;
+  // Seit 05.10. geht der Zeitraum-Abruf ueber abrufMitFrist und damit ueber den
+  // ROH-fetch (window.__rcFetchRoh) — nicht mehr ueber das gehookte fetch. Der
+  // Hook hielt den eigenen Wochenlauf sonst fuer einen Ok-Klick des Nutzers.
+  global.__hookBenutzt = false;
   const w = { name: windowName, __rcLastGetData: {
     url: 'https://ccs.vodafone.de/x', body: mitEigenemKontext || GEMESSEN.kabel_woche
-  }};
+  }, __rcFetchRoh: (url, o) => { global.__letzterBody = o.body; return Promise.reject(new Error('Testabbruch')); } };
   const body = konst('RC_LOC_ALLE') + konst('RC_FIGURES') + konst('RC_ABFRAGEN') +
     schneideAus(src, 'function baueAbfrage(') +
     schneideAus(src, 'function projektAusName(') +
     schneideAus(src, 'function projektAusPaket(') +
+    'var ABRUF_FRIST_MS = 90000, ABRUF_FRIST_ZEITRAUM_MS = 150000;' +
+    schneideAus(src, 'function abrufMitFrist(') +
     schneideAus(src, 'async function fetchDaterangeKpis(') +
     '; return fetchDaterangeKpis;';
   const fetchDaterangeKpis = new Function('window', 'URLSearchParams', 'fetch', 'console', body)(
     w, URLSearchParams,
-    (url, o) => { global.__letzterBody = o.body; return Promise.reject(new Error('Testabbruch')); },
+    (url, o) => { global.__hookBenutzt = true; global.__letzterBody = o.body; return Promise.reject(new Error('Testabbruch')); },
     console);
   try { await fetchDaterangeKpis('intraday'); } catch (e) {}
   const gesendet = new URLSearchParams(global.__letzterBody || '');
   pruef(bezeichnung + ': Baum im gesendeten Request = ' + erwarteterBaum,
     gesendet.get('nodeid_inlist') === erwarteterBaum,
     'gesendet: ' + gesendet.get('nodeid_inlist'));
+  if (!global.__hookGeprueft) {
+    global.__hookGeprueft = true;
+    pruef('der Zeitraum-Abruf laeuft am Hook vorbei (Roh-fetch) — der eigene Wochenlauf gilt nicht als Ok-Klick',
+      global.__hookBenutzt === false && !!global.__letzterBody);
+  }
 }
 
 const UM_CAP = 'type=get-result&script_id=11035&script_id_secure=T&user_id=1&nodeid_inlist=12090&nodeid_inlist_c=12090&description_settings_list=1%3B11035%3BVodafone_UM';
@@ -186,7 +197,10 @@ const UM_CAP = 'type=get-result&script_id=11035&script_id_secure=T&user_id=1&nod
       schneideAus(src, 'function baueAbfrage(') +
       schneideAus(src, 'function projektAusName(') +
       schneideAus(src, 'function projektAusPaket(') +
+      'var ABRUF_FRIST_MS = 90000, ABRUF_FRIST_ZEITRAUM_MS = 150000;' +
+      schneideAus(src, 'function abrufMitFrist(') +
       schneideAus(src, 'async function fetchDaterangeKpis(') + '; return fetchDaterangeKpis;';
+    w.__rcFetchRoh = (url, o) => { global.__letzterBody = o.body; return Promise.reject(new Error('x')); };
     const fn = new Function('window', 'URLSearchParams', 'fetch', 'console', body)(
       w, URLSearchParams, (url, o) => { global.__letzterBody = o.body; return Promise.reject(new Error('x')); }, console);
     try { await fn('intraday'); } catch (e) {}

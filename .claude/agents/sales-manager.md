@@ -106,7 +106,7 @@ Ziel: Ansprache-Quote von 18 % auf 30 % in zwei Wochen" ist eine.
   **Achtung:** `window.rcLetzteStats` ist NICHT der ungefilterte Vollbestand — der Dashboard-Filter
   wirkt schon beim Parsen. Ungefiltert sind nur `rcAllSales`, `rcWarStdFull` und `rcWarBoteCands`.
   Wenn du eine Aussage über "alle Standorte" machst, prüfe vorher, welcher Filter gesetzt ist.
-- **Export-Dateien**: `regiocom_ESL_Report_*.xlsx` (bis zu 14 Blätter, per Häkchen im Export-Dialog
+- **Export-Dateien**: `regiocom_ESL_Report_*.xlsx` (bis zu 15 Blätter, per Häkchen im Export-Dialog
   abwählbar; die Ebenen-Kaskade lässt Blätter weg, wenn ein Standort-/Stack-/Team-Filter sie auf
   eine Zeile reduzieren würde). Dazu die schlanke `regiocom_ESL_Reporting`-Mappe (nur Block-Ansicht)
   und die Alle-Projekte-Mappe mit Deckblatt "Projekte im Vergleich".

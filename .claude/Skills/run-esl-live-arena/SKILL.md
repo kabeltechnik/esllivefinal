@@ -124,7 +124,7 @@ one session at a time; `launch` overwrites the previous state file
 ## Other harnesses (same server, same driver)
 
 - `test_reportbilder.html` — feeds the same 520-agent fixture plus a
-  real ESL daily export (`Test Excels/Export_20260714_205722.xlsx`),
+  real ESL daily export (`Test Excels/Export_20260928_212911.xlsx`, Kabel),
   then intercepts the dashboard's own `buildPng`/`buildPngVertrieb`
   (normally a file download) and renders the two report images
   inline as `<img>` instead. Poll `window.__bilder >= 2` instead of

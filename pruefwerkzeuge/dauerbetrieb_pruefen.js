@@ -185,6 +185,10 @@ abschnitt('4. Speicher-Waechter — stufenweise statt alles-oder-nichts');
 
         const quelle = [
             'var RC_SP_TAGE = 60, RC_SP_PROBE = 51, RC_SP_LETZTE = 0, RC_SP_ABSTAND_MS = 600000;',
+            // 27.10.: die Historien-Schluessel kommen aus rcHistSchluessel (Datendienst:
+            // alle drei Projekte). Ohne Marke in window ist das wie bisher rcKey(basis).
+            schneideAus(src, 'function rcDienstModus()'),
+            schneideAus(src, 'function rcHistSchluessel(basis)'),
             schneideAus(src, 'function rcSpeicherFrei()'),
             schneideAus(src, 'function rcSpeicherBelegtKB()'),
             schneideAus(src, 'function rcSpeicherHistorieKappen(tage)'),

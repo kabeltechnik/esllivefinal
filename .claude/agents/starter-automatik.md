@@ -1,9 +1,9 @@
 ---
 name: starter-automatik
 description: >
-  Spezialist für die Start- und Automatisierungs-Infrastruktur: die vier .cmd-Starter
-  (ESL_Start.cmd mit der ganzen Logik, ESL_Start_Mobile/_UM als Wrapper, ESL_Start_Mobile_UM als
-  abgebrochener Altweg), die daraus erzeugte ESL_Start.ps1, esl_autopilot.user.js samt seiner
+  Spezialist für die Start- und Automatisierungs-Infrastruktur: die drei .cmd-Starter
+  (ESL_Start.cmd mit der ganzen Logik, ESL_Start_Mobile/_UM als Wrapper; der Altweg
+  ESL_Start_Mobile_UM ist am 11.10. gelöscht), die daraus erzeugte ESL_Start.ps1, esl_autopilot.user.js samt seiner
   erzeugten Mobile-/UM-Varianten, die Edge-Fernsteuerung über das Chrome DevTools Protocol
   (Anker-Verbindungen, Wächter-Takt, Neu-Tab-Versorgung), die automatische Neuanmeldung nach
   Sitzungsablauf und die Stundenmail-Kette bis esl_mail_report.ps1.
@@ -39,8 +39,7 @@ bleiben ausdrücklich im Profil auf dem Netzlaufwerk — nur das überlebt den C
 
 Drei Projekte, drei eigene Browser: `EdgeProfil`/9222 (Kabel) · `EdgeProfil_mobile`/9223 ·
 `EdgeProfil_um`/9224. Getrennte Profile = getrennte Cookie-Jars = getrennte ESL-Sitzungen.
-`ESL_Start_Mobile_UM.cmd` **bricht absichtlich hart ab** (hängt fest auf 9222) — das ist gewolltes
-Verhalten, kein Befund.
+`ESL_Start_Mobile_UM.cmd` (hing fest auf 9222, brach nur noch ab) ist am 11.10. gelöscht.
 
 ## Die Fehlerklasse, die dieses Projekt am teuersten zu stehen kam
 
@@ -176,6 +175,25 @@ Stelle. Jeder wird VOR dem Setzen auf Existenz geprüft; `starter_einstellungen_
 beide Dateien gegeneinander ab und **parst den erzeugten JS-Text**, weil er durch
 PowerShell-Verkettung entsteht.
 
+**Nachtrag 05.10. spätabends:**
+- **Die vier Hintergrund-Argumente verhindern das Einfrieren verborgener Tabs NICHT** (an echtem Edge gemessen,
+  `pruefwerkzeuge/schlaf_messen.mjs fall=einzeln flags=1`). Sie nehmen nur die Zeitgeber-Drosselung weg. Gegen
+  das Einfrieren halten die Seiten selbst einen Web Lock; ein Startargument dagegen gibt es nicht
+  (`--disable-features=EdgeSleepingTabs` wirkt nicht).
+- **`StelleLigalisteVerbunden`** (neben `StelleLigalisteSicher`): ein offener Ligalisten-Tab heißt nicht, dass er
+  am Dashboard hängt. Bekommt das Dashboard fünf Minuten nichts und hat keine Verbindung, ruft der Wächter
+  `rcOpenKpiQuelle()` mit Nutzer-Geste. Eigene Drossel `ligaVerbinden`. Anlass: 29.09., drei Stunden ohne
+  Liga-Daten neben einem laufenden Starter.
+- Auf fremden Seiten zeigt der Autopilot nur noch 8 s lang „diese Seite (…) gehört nicht zu ESL oder Ligaliste".
+- **Fehlerseite des Browsers (05.10. nachts):** lädt ein Portal-Tab nicht, läuft der Autopilot auf Edges Fehlerseite
+  mit dem Hostnamen `chromewebdata` — die alte Weiche hielt das für einen fremden Tab („keine bekannte
+  Portal-Seite (chromewebdata)") und tat nichts mehr. **`/json` meldet dabei weiter die ursprüngliche Adresse:**
+  `StelleLigalisteSicher`/`StelleLigalisteVerbunden` sehen eine Fehlerseite NICHT. Geheilt wird deshalb in der
+  Seite: `fehlerseiteFlow` (in `weiche()` zuerst geprüft) lädt unsere Seiten alle 20 s neu
+  (`FEHLERSEITE_WARTE_SEK`), erkennt sie am Titel (= Hostname) oder am Fensternamen und meldet den Fehlercode
+  über `opener` ans Dashboard-Logbuch. **`seitenArt(h)` ist die EINE Liste der bekannten Adressen** — eine neue
+  Portal-Adresse gehört nur dorthin. Messgerät: `pruefwerkzeuge/fehlerseite_messen.mjs`.
+
 ### Die andere Hälfte: `esl_autopilot.user.js`
 
 Zwei Betriebsarten (Userscript per Tampermonkey oder Einspielung durch den Starter);
@@ -278,4 +296,4 @@ Erzeugte Dateien, die du nie von Hand pflegst:
 4. **Nichts installieren, keine Module.** Citrix ohne Adminrechte.
 5. **Keine Emojis.** Corporate-Design-Regel.
 6. **`graphify` sieht `.cmd`-Dateien NICHT.** `ESL_Start.cmd` ist nur mittelbar im Graph, über die
-   erzeugte `.ps1`. Für `ESL_Start_Mobile_UM.cmd` gibt es gar keine — dort ausschließlich `grep -n`.
+   erzeugte `.ps1`. Für die zwei Wrapper gibt es keine — dort ausschließlich `grep -n`.

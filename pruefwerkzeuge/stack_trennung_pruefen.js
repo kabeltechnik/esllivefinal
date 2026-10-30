@@ -27,7 +27,6 @@ const kpi  = lies('kpi_crawler.js');
 const gm   = lies('genesys_monitor_crawler.js');
 const auto = lies('esl_autopilot.user.js');
 const cmd  = lies('ESL_Start.cmd');
-const cmdMU = lies('ESL_Start_Mobile_UM.cmd');
 
 let ok = 0, bad = 0;
 function pruef(t, b, z) {
@@ -51,8 +50,11 @@ function blockBis(src, vonMarke, bisZeichen) {
 
 // ============================================================================
 console.log('\n-- 1. Fensternamen sind projektspezifisch (der Schluessel-Eingriff) --');
+// Seit 28.09. steht der Name in kpiName (erst window.open('', kpiName) — ein
+// laufendes Fenster wird wiedergefunden statt neu geladen).
 pruef('Ligaliste wird mit rcKey(\'rcKpiQuelle\') geoeffnet',
-    /window\.open\([^\n]*rcKey\('rcKpiQuelle'\)\)/.test(dash));
+    /window\.open\([^\n]*rcKey\('rcKpiQuelle'\)\)/.test(dash) ||
+    (/const kpiName = rcKey\('rcKpiQuelle'\);/.test(dash) && /window\.open\('', kpiName\)/.test(dash) && /window\.open\(kpiUrl, kpiName\)/.test(dash)));
 pruef('Genesys-Monitor mit rcKey(\'rcQueueQuelle\')',
     /window\.rcKey\('rcQueueQuelle'\)/.test(dash));
 pruef('auch der Starter-Notweg (OeffneLigalisteAusDashboard) nutzt rcKey',
@@ -167,8 +169,10 @@ pruef('das KPI_BATCH-Paket traegt die Projekt-Kennung (Body vor Fenstername)',
 // ============================================================================
 console.log('\n-- 4. Dashboard verwirft fremde Liga-Pakete --');
 pruef('rcEigenesProjekt ist definiert', /function rcEigenesProjekt\(\)/.test(dash));
-pruef('handleKpiMessage verwirft fremde Kennungen',
-    /if \(d\.projekt && d\.projekt !== rcEigenesProjekt\(\)\) return false;/.test(dash));
+// 27.09.: einzige erlaubte Ausnahme ist der Alle-Projekte-Betrieb (EIN Dashboard,
+// EINE Ligaliste fuer alle drei Projekte). Im Einzelprojekt gilt der Filter unveraendert.
+pruef('handleKpiMessage verwirft fremde Kennungen (Ausnahme nur Alle-Projekte-Betrieb)',
+    /if \(d\.projekt && d\.projekt !== rcEigenesProjekt\(\)(?: && !window\.rcAlleProjekteModus)?\) return false;/.test(dash));
 {
     const f = new Function('window', schneide(dash, 'function rcEigenesProjekt(){') + '\nreturn rcEigenesProjekt();');
     gleich('Kuerzel "" -> kabel', f({ rcProjektKuerzel: '' }), 'kabel');
@@ -257,90 +261,14 @@ pruef('Praefix-Vergleich statt exakt',
 
 // ============================================================================
 console.log('\n-- 8. Starter: ein Start je Stack --');
-pruef('ESL_Start_Mobile_UM.cmd nimmt einen Projekt-Parameter', /set "ESLPROJEKT=%~1"/.test(cmdMU));
-
-// ---- Der Start scheiterte am 05.08. abends mit
-//      "System.Object[] kann nicht in System.Uri konvertiert werden" ----
-// Das DevTools-Protokoll schickt auf demselben Kanal auch EREIGNISSE:
-// Target.createTarget loest Target.targetCreated aus. Wer schlicht die naechste
-// Nachricht liest, haelt womoeglich das Ereignis fuer die Antwort; der Wert
-// laeuft als mehrdeutiges Objekt weiter und schlaegt erst viel spaeter auf -
-// mit einer Meldung, die nur die Folge nennt, nicht die Ursache.
-// Seit 06.08. erledigt das die Funktion Antwort(): sie ueberspringt Ereignisse,
-// wartet auf genau die angeforderte id und meldet eine Ablehnung im Klartext.
-pruef('es gibt eine Funktion, die auf GENAU eine Request-Id wartet',
-    /function Antwort\(\$ws, \$id, \$timeoutMs\)/.test(cmdMU) &&
-    /if \(\$m\.id -ne \$id\) \{ continue \}/.test(cmdMU),
-    'sonst wird ein Ereignis fuer die Antwort gehalten');
-pruef('NeuerTab benutzt sie', /\$m = Antwort \$b 1 \d+/.test(cmdMU));
-pruef('ein Protokoll-Fehler wird im Klartext gemeldet, nicht verschluckt',
-    /if \(\$m\.error\) \{ throw \("Edge lehnt/.test(cmdMU));
-pruef('mehrere Frames werden als Liste behandelt', /foreach \(\$m in @\(\$o\)\)/.test(cmdMU));
-
-// ---- Der Kern des Fehlers vom 06.08.: "es oeffnet sich nur ein neuer Tab" ----
-// Page.addScriptToEvaluateOnNewDocument ist an die CDP-Sitzung gebunden. Wer
-// registriert, navigiert und sofort trennt, deckt nur die eine Navigation ab -
-// und wenn die Anmeldeseite weiterleitet, nicht einmal die. Der Tab stand offen
-// und leer. StelleAutopilotSicher in ESL_Start.cmd macht es seit jeher richtig:
-// registrieren UND das Paket per Runtime.evaluate im laufenden Dokument starten.
-pruef('RuesteAusUndFahrHin wartet auf Page.loadEventFired vor dem Trennen',
-    /WarteAufEreignis \$w 'Page\.loadEventFired'/.test(cmdMU));
-pruef('… und fuehrt das Paket zusaetzlich im laufenden Dokument aus',
-    /Sende \$w 5 'Runtime\.evaluate' @\{ expression = \$paket/.test(cmdMU));
-pruef('… aber nur, wenn der Autopilot dort noch nicht laeuft',
-    /__rcAutoPilotV2/.test(cmdMU) && /if \(-not \$laeuft\)/.test(cmdMU));
-pruef('ein Absturz beim Einspielen wird erkannt (exceptionDetails)',
-    /exceptionDetails/.test(cmdMU) && /Autopilot brach beim Einspielen ab/.test(cmdMU));
-pruef('GEGENPROBE ohne Runtime.evaluate waere die Pruefung rot',
-    !/Sende \$w 5 'Runtime\.evaluate' @\{ expression = \$paket/
-        .test(cmdMU.replace(/Sende \$w 5 'Runtime\.evaluate' @\{ expression = \$paket/g, 'nixDa')));
-// Das Paket ist rund 2 MB. Eine feste 5-Sekunden-Frist liess .Wait() still
-// scheitern, waehrend der Sendevorgang WEITERLIEF - der naechste Sende-Aufruf
-// warf dann "There is already one outstanding 'SendAsync' call".
-pruef('die Sende-Frist waechst mit der Paketgroesse',
-    /\$frist = \d+ \+ \[int\]\(\$bytes\.Length \/ \d+\)/.test(cmdMU));
-pruef('… und ein Ablauf bricht ab, statt still weiterzumachen',
-    /throw \("Senden von '\$methode' hat laenger als/.test(cmdMU));
-pruef('Page.navigate meldet einen Ladefehler ueber errorText',
-    /\$nav\.result\.errorText/.test(cmdMU));
-
-// ---- Live-Fund 06.08.: "der neue Tab war ueber die Fernsteuerung nicht
-//      auffindbar" ----
-// Der Tab war sichtbar da, nur der Abgleich targetId gegen /json traf nicht.
-// Deshalb gibt es jetzt einen ZWEITEN, ID-unabhaengigen Weg: der Eintrag, der
-// vor Target.createTarget noch nicht in der Liste stand.
-pruef('die Tab-Liste wird VOR dem Anlegen gemerkt',
-    /\$vorher = @\{\}/.test(cmdMU) && /foreach \(\$z in \(AlleZiele\)\) \{ if \(\$z\.id\) \{ \$vorher\[\[string\]\$z\.id\] = \$true \} \}/.test(cmdMU));
-pruef('… und dient als Rueckfall, wenn die targetId nicht trifft',
-    /-not \$vorher\[\[string\]\$_\.id\]/.test(cmdMU));
-pruef('der Rueckfall greift NUR bei genau einem neuen Tab (sonst waere er geraten)',
-    /if \(\$neu\.Count -eq 1\)/.test(cmdMU));
-pruef('GEGENPROBE ohne die Count-1-Bedingung waere die Pruefung rot',
-    !/if \(\$neu\.Count -eq 1\)/.test(cmdMU.replace(/if \(\$neu\.Count -eq 1\)/g, 'if ($neu.Count -ge 1)')));
-pruef('bei komplettem Fehlschlag wird die echte Tab-Liste ausgegeben',
-    /Das steht gerade in der Liste:/.test(cmdMU) &&
-    /id=" \+ \$z\.id \+ "  type=" \+ \$z\.type/.test(cmdMU));
-pruef('NeuerTab liefert das ZIEL-Objekt, nicht nur die targetId',
-    /\$ziel = NeuerTab \}/.test(cmdMU) && !/\$tid = NeuerTab \}/.test(cmdMU));
-pruef('die Aufrufstelle prueft auf einen brauchbaren WebSocket-Zugang',
-    /if \(-not \(\$ziel -and \$ziel\.webSocketDebuggerUrl\)\)/.test(cmdMU));
-pruef('ZielZuId erzwingt EINE Tab-Id und EIN Ergebnis',
-    /\$id = \[string\]\(@\(\$tid\)\[0\]\)/.test(cmdMU) && /\$z = @\(\$z\)\[0\]/.test(cmdMU));
-pruef('RuesteAusUndFahrHin normalisiert Ziel und Adresse',
-    /\$z = @\(\$ziel\)\[0\]/.test(cmdMU) &&
-    /\$wsUrl = \[string\]\(@\(\$z\.webSocketDebuggerUrl\)\[0\]\)/.test(cmdMU));
-pruef('Verbinde nimmt nur eine einzelne Adresse an',
-    /\$u = \[string\]\(@\(\$wsUrl\)\[0\]\)/.test(cmdMU));
-// Ein gescheiterter Lauf darf nicht wie ein Erfolg aussehen: die Meldung
-// "Nichts zu tun - es laeuft bereits alles" kam auch dann, wenn KEIN Tab
-// eingerichtet werden konnte.
-pruef('kein Erfolg gemeldet, wenn KEIN Tab eingerichtet wurde',
-    /Es wurde KEIN Tab eingerichtet/.test(cmdMU) && /if \(\$Projekte\.Count -eq 0\)/.test(cmdMU));
-pruef('der Parameter grenzt die Projektliste ein',
-    /\$NurProjekt = \("\$env:ESLPROJEKT"\)\.Trim\(\)\.ToLower\(\)/.test(cmdMU) &&
-    /Where-Object \{ \$_\.marke -eq \$NurProjekt \}/.test(cmdMU));
-pruef('unbekannter Wert bricht ab statt still beide zu starten',
-    /Unbekanntes Projekt/.test(cmdMU));
+// ESL_Start_Mobile_UM.cmd (der alte Dazuschalt-Weg, hing fest auf Port 9222
+// und haette Mobile-/UM-Tabs in den KABEL-Browser gelegt) ist am 11.10.
+// entfernt worden - seit 07.08. brach sie nur noch ab. Ihre Innereien zu
+// pruefen ergibt keinen Sinn mehr; geprueft wird, dass sie weg bleibt.
+pruef('ESL_Start_Mobile_UM.cmd ist entfernt',
+    !fs.existsSync(path.join(W, 'ESL_Start_Mobile_UM.cmd')));
+pruef('... und steht nicht mehr im Update-Paket',
+    !/name:\s*'ESL_Start_Mobile_UM\.cmd'/.test(lies('bundle_bauen.js')));
 // Seit 06.08. spaetabends rufen die Wrapper ESL_Start.cmd direkt (ein PC =
 // ein Projekt, eigener Edge) — nicht mehr das Dazuschalten von Tabs im
 // laufenden Kabel-Edge (geteilte Server-Sitzung kippte die Projekte).
@@ -408,20 +336,6 @@ console.log('\n-- EIGENER BROWSER JE PROJEKT (07.08.) --');
     // Stundenmail: drei gleichzeitige Starter duerfen nicht drei Mails schicken.
     pruef('Stundenmail laeuft nur im Kabel-Starter',
         /\$MailAktiv -and \$ProjektWahl -ne 'kabel'/.test(st));
-}
-{
-    // Der alte Dazuschalt-Weg wuerde jetzt Mobile-/UM-Tabs in den KABEL-Browser
-    // legen (er haengt fest auf 9222). Er muss abbrechen, BEVOR er etwas tut —
-    // ein Lauf von dort sieht sonst wie ein Erfolg aus und faellt erst Stunden
-    // spaeter durch falsche Zahlen auf.
-    const mu = cmdMU;
-    const abbruch = mu.indexOf('Diese Startdatei ist abgeloest');
-    const ersterTab = mu.indexOf('Target.createTarget');
-    pruef('ESL_Start_Mobile_UM.cmd bricht ab, bevor es einen Tab anlegt',
-        abbruch !== -1 && (ersterTab === -1 || abbruch < ersterTab),
-        'Abbruch@' + abbruch + ' ersterTab@' + ersterTab);
-    pruef('... und nennt den Ersatzweg beim Namen',
-        /ESL_Start_Mobile\.cmd/.test(mu) && /ESL_Start_UM\.cmd/.test(mu));
 }
 
 // ============================================================================

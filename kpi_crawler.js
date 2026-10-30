@@ -172,6 +172,79 @@
 
   const channel = new BroadcastChannel(CHANNEL_NAME);
 
+  // ---------- Wachhalter (05.10. spaetabends) ----------
+  // Befund aus der Konsole dieser Seite vom 05.10.: "Sperre von Live-Takt ist
+  // verfallen (787 s)". 13 Minuten lang feuerte hier KEIN Zeitgeber, und der
+  // Abruf, den das Dashboard angestossen hatte, kam nie zurueck — in der
+  // Sekunde, in der der Tab angeklickt wurde, lief alles weiter. Edge legt
+  // verborgene Tabs schlafen ("Schlafende Tabs"): Zeitgeber und Netzabrufe
+  // stehen, Nachrichten kommen noch an. Die Ligaliste ist im Betrieb IMMER
+  // der Tab im Hintergrund, das Dashboard liegt vorn.
+  // An echtem Edge 154 gemessen (pruefwerkzeuge/schlaf_messen.mjs):
+  //   - ohne Schutz friert der verborgene Tab nach der Schlaf-Schwelle ein
+  //   - die Hintergrund-Argumente des Starters aendern daran NICHTS
+  //   - haelt die Seite einen Web Lock, friert Edge sie nicht ein
+  //     (edge://discards: "Is Freezable: nein — holding Web Lock")
+  // Der Lock wird nie zurueckgegeben (Promise ohne Ende) und faellt mit der
+  // Seite. Ein Re-Inject laesst den vorhandenen stehen (window.__rcWachLock).
+  const wach = window.rcCrawlerWach = window.rcCrawlerWach || { lock:null, grund:'', eingefroren:0, seit:0, zuletztSek:0, aufgetautUm:0 };
+  function wachhalten(){
+    if (window.__rcWachLock) { wach.lock = true; return 'steht schon'; }
+    try {
+      if (!(navigator.locks && navigator.locks.request)) {
+        wach.lock = false; wach.grund = 'Web Locks gibt es in diesem Browser nicht';
+        return wach.grund;
+      }
+      const name = 'rc_wach_liga_' + Date.now() + '_' + Math.round(performance.now() * 1000);
+      window.__rcWachLock = { name: name, seit: Date.now() };
+      navigator.locks.request(name, function(){
+        wach.lock = true; wach.grund = '';
+        return new Promise(function(){});      // nie fertig: der Lock gilt, solange die Seite lebt
+      }).catch(function(e){
+        window.__rcWachLock = null; wach.lock = false; wach.grund = String(e && e.message || e);
+        console.warn('[KPI Crawler] Wachhalter: Web Lock nicht bekommen (' + wach.grund +
+          ') — Edge kann diesen Tab im Hintergrund einfrieren.');
+      });
+      return 'angefordert';
+    } catch(e){
+      window.__rcWachLock = null; wach.lock = false; wach.grund = String(e && e.message || e);
+      return wach.grund;
+    }
+  }
+  // Kurze Klartext-Zeile ans Dashboard — sie landet dort im Logbuch. Ohne das
+  // steht eine Stoerung der Ligaliste nur in DIESER Konsole, und die liest im
+  // Betrieb niemand (der Tab liegt im Hintergrund).
+  function meldeHinweis(text){
+    const msg = { type:'KPI_HINWEIS', text:String(text || '').slice(0, 300), zeit:Date.now(), projekt:projektAusName() };
+    try { channel.postMessage(msg); } catch(e){}
+    try { if (window.opener && !window.opener.closed) window.opener.postMessage(msg, '*'); } catch(e){}
+    try { if (window.rcDashWin && !window.rcDashWin.closed) window.rcDashWin.postMessage(msg, '*'); } catch(e){}
+  }
+  // Friert der Browser den Tab trotzdem ein, soll das mit Dauer dastehen statt
+  // als Raetsel ("irgendwann kamen keine Zahlen mehr"). Die Horcher haengen am
+  // window, damit ein Re-Inject die alten abmeldet statt neue zu stapeln.
+  try {
+    if (window.__rcCrawlerFreeze) {
+      document.removeEventListener('freeze', window.__rcCrawlerFreeze.f);
+      document.removeEventListener('resume', window.__rcCrawlerFreeze.r);
+    }
+  } catch(e){}
+  window.__rcCrawlerFreeze = {
+    f: function(){ wach.eingefroren++; wach.seit = Date.now(); },
+    r: function(){
+      const sek = wach.seit ? Math.round((Date.now() - wach.seit) / 1000) : 0;
+      wach.seit = 0; wach.zuletztSek = sek; wach.aufgetautUm = Date.now();
+      const txt = 'Ligalisten-Tab war ' + (sek >= 120 ? Math.round(sek / 60) + ' Min' : sek + ' s') +
+        ' vom Browser eingefroren (Edge "Schlafende Tabs") — in der Zeit lief kein Abruf.';
+      console.warn('[KPI Crawler] ' + txt);
+      meldeHinweis(txt);
+    }
+  };
+  try {
+    document.addEventListener('freeze', window.__rcCrawlerFreeze.f);
+    document.addEventListener('resume', window.__rcCrawlerFreeze.r);
+  } catch(e){}
+
   // ---------- Original-Datenanfrage der Seite mitschneiden ----------
   // Die Ligaliste laedt ihre Tabelle ueber POST an get_data.rb (siehe DevTools).
   // Wir merken uns die letzte solche Anfrage (mit gueltigem Sicherheits-Token,
@@ -513,7 +586,6 @@
     const iAqZ  = findKpi(map, 'Auflegerquote', Z);
     const iCsZ  = findKpi(map, 'CS', Z);
     const iTnZ  = findKpi(map, 'TNPS', Z);
-    const iFqZ  = findKpi(map, 'TNPS Antwortquote %', Z);
     const iDdsZ = findKpi(map, 'TNPS Deep Detractor %', Z);
     const iFtfZ = findKpi(map, 'First-Time-Fix', Z);
     // NENNER der Kern-KPIs — bis 29.07. fuer KEINE Kennzahl geholt. Zwei Folgen:
@@ -525,7 +597,6 @@
     const iAqN  = findKpi(map, 'Auflegerquote', 'Nenner');
     const iCsN  = findKpi(map, 'CS', 'Nenner');
     const iTnN  = findKpi(map, 'TNPS', 'Nenner');
-    const iFqN  = findKpi(map, 'TNPS Antwortquote %', 'Nenner');
     const iDdsN = findKpi(map, 'TNPS Deep Detractor %', 'Nenner');
     const iFtfN = findKpi(map, 'First-Time-Fix', 'Nenner');
     const iTotFixN = findKpi(map, 'Total-Fix', 'Nenner');
@@ -625,6 +696,11 @@
         // Das Dashboard rechnet mit null keine Quote mehr, sondern zeigt "—".
         const callSpalte = iCalls >= 0 ? iCalls : iCallsAcd;
         const callCount = callSpalte >= 0 ? (cellNum(cells, callSpalte) || 0) : null;
+        // FQ (Feedbackquote) liefert die Ligaliste seit 10/2026 nicht mehr (TNPS Antwortquote % bleibt leer).
+        // Nutzer-Vorgabe 30.10.: FQ = TNPS-Antworten (Promotoren + Neutrale + Detraktoren) / Calls x 100.
+        const pT = cellNum(cells, iPromTnps), dT = cellNum(cells, iDetrTnps), nT = cellNum(cells, iNeutTnps);
+        const tnpsAntw = (pT != null || dT != null || nT != null) ? (pT || 0) + (dT || 0) + (nT || 0) : null;
+        const fqN = callCount > 0 ? callCount : null;
 
         kpis.push({
           ccsId, agentName,
@@ -642,7 +718,8 @@
           cs:    cellNum(cells, iCs),
           csDds: cellNum(cells, iCsDds),   // CS Deep Detractor %
           tnps:  cellNum(cells, iTnps),
-          fq:    cellNum(cells, iFq),      // TNPS Antwortquote %
+          fq:    fqN && tnpsAntw != null ? tnpsAntw / fqN * 100 : null,   // selbst gerechnet (s. o.)
+          tnpsAq: cellNum(cells, iFq),     // TNPS Antwortquote % (Portal)
           dds:   cellNum(cells, iDds),     // TNPS Deep Detractor %
           ftf:      cellNum(cells, iFtf),    // First-Time-Fix
           totalFix: cellNum(cells, iTotFix), // Total-Fix
@@ -652,7 +729,7 @@
           aqZ:   cellNum(cells, iAqZ),
           csZ:   cellNum(cells, iCsZ),
           tnpsZ: cellNum(cells, iTnZ),
-          fqZ:   cellNum(cells, iFqZ),
+          fqZ:   fqN ? tnpsAntw : null,
           ddsZ:  cellNum(cells, iDdsZ),
           ftfZ:  cellNum(cells, iFtfZ),
           // Nenner = Bezugsmenge. Ist er 0, gibt es keine Basis: dann ist die
@@ -660,7 +737,7 @@
           aqN:   cellNum(cells, iAqN),
           csN:   cellNum(cells, iCsN),
           tnpsN: cellNum(cells, iTnN),
-          fqN:   cellNum(cells, iFqN),
+          fqN,
           ddsN:  cellNum(cells, iDdsN),
           ftfN:  cellNum(cells, iFtfN),
           totalFixN: cellNum(cells, iTotFixN),
@@ -982,8 +1059,22 @@
   // Der Hook ruft diesen Handler fuer JEDEN get_data.rb-Request der SEITE auf
   // (= jeden Ok-Klick des Nutzers). Replays laufen NICHT hierher — sie nutzen
   // window.__rcFetchRoh und verwerten ihre Antwort selbst (sonst doppelt).
+  // Stand die geklickte Abfrage NICHT auf Intraday (Woche, Monat, Gestern ...),
+  // holt der Crawler den Live-Stand gleich selbst nach (05.10.). Vorher blieb
+  // das Dashboard bis zum naechsten Takt auf "Ligaliste nicht live" stehen und
+  // forderte den Nutzer auf, "Intraday" + Ok zu waehlen — genau den Handgriff,
+  // den der Replay ohnehin macht (er stellt daterange/interval selbst um).
+  var klickNachholTimer = null;
+  const KLICK_NACHHOL_MS = 2500;
   window.__rcKlickHandler = function(reqBody, text){
-    try { verwerteAntwort(reqBody, text, 'Ok-Klick'); } catch(e){
+    try {
+      const res = verwerteAntwort(reqBody, text, 'Ok-Klick');
+      if (res && res.n > 0 && res.dr && res.dr !== 'intraday' && res.dr !== 'today') {
+        if (klickNachholTimer) clearTimeout(klickNachholTimer);
+        klickNachholTimer = setTimeout(function(){ klickNachholTimer = null; pollKpis(false); }, KLICK_NACHHOL_MS);
+        console.log('[KPI Crawler] Abfrage stand auf "' + res.dr + '" — der Live-Stand (Intraday) wird gleich selbst nachgeholt, du musst nichts umstellen.');
+      }
+    } catch(e){
       console.warn('[KPI Crawler] Klick-Antwort nicht verwertbar:', e);
     }
   };
@@ -1080,6 +1171,34 @@
     return h;
   };
 
+  // ---------- Abruf mit FRIST (05.10.) ----------
+  // Bis hierher warteten Replay und Zeitraum-Abruf OHNE Zeitgrenze auf das
+  // Portal. Blieb eine Antwort aus, kam das finally nie: die Seiten-Sperre
+  // stand, bis sie verfiel, das Dashboard bekam auf "Jetzt" keine Antwort, und
+  // kein Nachfassen wurde angemeldet (Fallstrick 9: ein Rueckruf, der nur im
+  // Erfolgsfall feuert). Die Frist deckt Anfrage UND Lesen der Antwort.
+  // Immer ueber den ROH-fetch: eigene Abrufe duerfen nicht durch den Hook
+  // laufen — er hielte sie fuer einen Ok-Klick des Nutzers.
+  const ABRUF_FRIST_MS = 90000;            // Live: gemessen 10-30 s je Antwort
+  const ABRUF_FRIST_ZEITRAUM_MS = 150000;  // Woche/Monat auf Tagesbasis dauern laenger
+  function abrufMitFrist(url, init, fristMs){
+    const F = window.__rcFetchRoh || window.fetch;
+    const frist = fristMs || ABRUF_FRIST_MS;
+    const ac = (typeof AbortController === 'function') ? new AbortController() : null;
+    let t = null;
+    const lauf = F(url, ac ? Object.assign({}, init, { signal: ac.signal }) : init)
+      .then(function(r){ return r.text().then(function(text){ return { ok: r.ok, status: r.status, text: text }; }); });
+    const grenze = new Promise(function(_, nein){
+      t = setTimeout(function(){
+        try { if (ac) ac.abort(); } catch(e){}
+        nein(new Error('keine Antwort in ' + Math.round(frist / 1000) + ' s'));
+      }, frist);
+    });
+    return Promise.race([lauf, grenze]).then(
+      function(a){ clearTimeout(t); return a; },
+      function(e){ clearTimeout(t); throw e; });
+  }
+
   // Live-Takt. Mit mitgeschnittenem Token laeuft das KOMPLETT an der Seite vorbei:
   // ein direkter intraday-Request, kein Ok-Klick, keine Select-Aenderung. Damit
   // kann der Crawler die Ansicht des Nutzers gar nicht mehr verstellen — genau die
@@ -1168,17 +1287,16 @@
         p.set('interval',  'cumulate');
         p.set('startdate', 'undefined');
         p.set('enddate',   'undefined');
-        // Roh-fetch: der eigene Replay darf nicht durch den Hook laufen —
-        // sonst wuerde jede Antwort doppelt verwertet und der gemerkte
-        // Nutzer-Klick durch den eigenen Replay ueberschrieben.
-        const F = window.__rcFetchRoh || window.fetch;
+        // Roh-fetch (in abrufMitFrist): der eigene Replay darf nicht durch den
+        // Hook laufen — sonst wuerde jede Antwort doppelt verwertet und der
+        // gemerkte Nutzer-Klick durch den eigenen Replay ueberschrieben.
         let r;
         try {
-          r = await F(cap.url, { method:'POST', credentials:'include',
+          r = await abrufMitFrist(cap.url, { method:'POST', credentials:'include',
             headers:{ 'content-type':'application/x-www-form-urlencoded;charset=UTF-8', 'accept':'*/*', 'x-requested-with':'XMLHttpRequest' },
-            body: p.toString() });
+            body: p.toString() }, ABRUF_FRIST_MS);
         } catch(e){ return { ok:false, n:0, grund:'fetch-fehler: ' + (e && e.message || e) }; }
-        const text = await r.text();
+        const text = r.text;
         if (!r.ok) {
           const ora = (text.match(/ORA-\d{5}[^<\n"]*/) || [''])[0];
           return { ok:false, n:0, grund:'HTTP ' + r.status + (ora ? ' — ' + ora : '') };
@@ -1658,23 +1776,28 @@
     // Ein Rueckfall wuerde ab hier nur noch verschleiern, WAS schiefging —
     // genau die Ambiguitaet, die am 05.08. eine Stunde gekostet hat.
     async function einVersuch(p){
+      // ROH-fetch mit Frist (05.10.). Bis dahin lief dieser Abruf ueber das
+      // gehookte window.fetch: der Hook hielt den eigenen Wochenlauf fuer einen
+      // Ok-Klick des Nutzers, ersetzte dessen gemerkte Abfrage durch den hier
+      // GEBAUTEN Rumpf und schickte die Wochenzeilen ein zweites Mal als
+      // "current_week" ans Dashboard — das meldete darauf "Ligaliste steht auf
+      // current_week ... Intraday + Ok waehlen" (Logbuch 05.10., 17:13:43).
       let r;
       try {
-        r = await fetch(cap.url, { method:'POST', credentials:'include',
+        r = await abrufMitFrist(cap.url, { method:'POST', credentials:'include',
           headers:{ 'content-type':'application/x-www-form-urlencoded;charset=UTF-8', 'accept':'*/*', 'x-requested-with':'XMLHttpRequest' },
-          body: p.toString() });
-      } catch(e){ return { kpis:null, reason:'fetch-fehler:'+e }; }
+          body: p.toString() }, ABRUF_FRIST_ZEITRAUM_MS);
+      } catch(e){ return { kpis:null, reason:'fetch-fehler:' + (e && e.message || e) }; }
       // Den ORACLE-Fehler MITLESEN, nicht nur den Status. "HTTP 500" allein
       // sagt nichts; "ORA-00936: Ausdruck fehlt" nennt die Ursache (ein leerer
       // Ausdruck in der Abfrage — typisch fuer eine leere Auswahlliste oder
       // eine Knoten-Kennung, die es nicht mehr gibt). Genau diese Zeile hat
       // am 05.08. eine Stunde Suche gekostet.
       if (!r.ok) {
-        let ora = '';
-        try { const t500 = await r.text(); ora = (t500.match(/ORA-\d{5}[^<\n"]*/) || [''])[0]; } catch(e){}
+        const ora = (String(r.text || '').match(/ORA-\d{5}[^<\n"]*/) || [''])[0];
         return { kpis:null, reason:'HTTP ' + r.status + (ora ? ' — ' + ora : '') };
       }
-      const text = await r.text();
+      const text = r.text;
       const html = extractTableHtml(text);
       if (!html) {
         const ora = (text.match(/ORA-\d{5}[^<\n"]*/) || [''])[0];
@@ -1877,7 +2000,20 @@
   // wartet. Das abschliessende .catch ist Pflicht (Fallstrick 9): ohne es
   // landet jede Stoerung als unhandled rejection im Logbuch des Nutzers, und
   // die Kette bricht dort ab, wo niemand hinsieht.
+  // Der Takt merkt selbst, wenn er ausgesetzt hat (05.10.): stand er laenger als
+  // zwei Abstaende, war der Tab eingefroren oder gedrosselt. Das geht als
+  // Klartext ans Dashboard-Logbuch — ausser das Auftauen hat es eben schon
+  // gemeldet (ein Ereignis, eine Zeile).
+  var letzterTaktUm = 0;
   function taktUndWoche(){
+    const jetzt = Date.now();
+    if (letzterTaktUm && jetzt - letzterTaktUm > POLL_INTERVAL * 2 && jetzt - (wach.aufgetautUm || 0) > 60000) {
+      const txt = 'Ligalisten-Takt stand ' + Math.round((jetzt - letzterTaktUm) / 60000) +
+        ' Min still (Tab im Hintergrund eingefroren oder gedrosselt) — hole jetzt nach.';
+      console.warn('[KPI Crawler] ' + txt);
+      meldeHinweis(txt);
+    }
+    letzterTaktUm = jetzt;
     return Promise.resolve()
       .then(() => pollKpis(false))
       .then(wochenlaufPruefen)
@@ -2337,21 +2473,31 @@
     // Wochenlauf ERST nach dem Live-Takt: beide nehmen dieselbe Seiten-Sperre,
     // und die Live-Zahlen sind das, worauf der Wandmonitor wartet.
     taktUndWoche();
+  } else if (autoKlickAn()) {
+    // Ehrlicher Text (05.10.): seit der Auto-Abfrage (16.08.) stand hier weiter
+    // "es wird NICHTS von selbst geklickt" — der Nutzer klickte deshalb jedes
+    // Mal von Hand Woche und Intraday durch, obwohl beides von selbst kommt.
+    console.log('[KPI Crawler] Noch keine Abfrage gemerkt — du musst nichts tun: in 15 s fragt die Auto-Abfrage selbst ab (Ok-Knopf).');
   } else {
-    console.log('[KPI Crawler] Warte auf deinen ersten Ok-Klick — es wird NICHTS von selbst geklickt oder verstellt.');
+    console.log('[KPI Crawler] Warte auf deinen ersten Ok-Klick — die Auto-Abfrage ist abgeschaltet (rcCrawlerAutoKlick(true) schaltet sie ein).');
   }
 
   if (window.kpiCrawlerInterval) clearInterval(window.kpiCrawlerInterval);
   window.kpiCrawlerInterval = setInterval(taktUndWoche, POLL_INTERVAL);
 
-  console.log('[KPI Crawler] v6.0 gestartet — DU fuehrst, der Crawler folgt. ' +
-    'Ablauf: (1) Vorlage laden (Kabel/Mobile/UM), (2) "Aktuelle Woche" + Intervall "Tag" + Ok -> Wochen-Historie geht ans Dashboard, ' +
-    '(3) "Intraday" + Ok -> Live-Paket geht ans Dashboard, (4) ab da alle ' + (POLL_INTERVAL/60000) + ' Minuten automatisch ein ' +
-    'Intraday-Replay DEINES Requests (gleicher Baum, gleiche Standorte, gleiche Kennzahlen — nur daterange/interval umgestellt). ' +
-    'Kein Ok-Klick, kein Select-Verstellen, kein eigener Harvest mehr. Das Projekt der Pakete kommt aus der geladenen Vorlage ' +
-    '(description_settings_list), nicht aus dem Fensternamen. Bleibt ein Replay ohne Daten, wird nach 20 s nachgefasst (max. ' + NACHFASS_MAX + 'x); ' +
+  const wachStand = wachhalten();
+  console.log('[KPI Crawler] v6.1 gestartet. Nichts zu klicken: alle ' + (POLL_INTERVAL/60000) + ' Minuten kommt der Intraday-Stand von selbst ' +
+    '(Replay der letzten Abfrage — gleicher Baum, gleiche Standorte, gleiche Kennzahlen, nur Zeitraum/Intervall umgestellt), ' +
+    'einmal je Tag die Woche auf Tagesbasis. Ohne gemerkte Abfrage klickt die Auto-Abfrage den Ok-Knopf selbst ' +
+    '(rcCrawlerAutoKlick(false) schaltet das ab). Dein eigener Ok-Klick gilt weiter und bestimmt Vorlage, Standorte und Kennzahlen; ' +
+    'steht er nicht auf Intraday, wird der Live-Stand gleich nachgeholt. Das Projekt der Pakete kommt aus der geladenen Vorlage ' +
+    '(description_settings_list), nicht aus dem Fensternamen. Bleibt ein Abruf ohne Daten, wird nach 20 s nachgefasst (max. ' + NACHFASS_MAX + 'x); ' +
     'eine ehrlich leere Antwort (0 Zeilen) gilt nicht als Fehler. ' +
+    'Wachhalter: ' + (wachStand === 'angefordert' || wachStand === 'steht schon'
+      ? 'an — der Tab darf im Hintergrund liegen, Edge legt ihn nicht schlafen.'
+      : 'NICHT moeglich (' + wachStand + ') — liegt der Tab im Hintergrund, kann Edge ihn einfrieren.') + ' ' +
     'Konsole: rcCrawlerHarvestWoche() (Woche von Hand nachziehen) · rcCrawlerHarvestRange("2026-07-01","2026-07-13") · rcCrawlerWeekRaw("current_week") · rcCrawlerSperre()');
+  if (wachStand !== 'angefordert' && wachStand !== 'steht schon') meldeHinweis('Ligaliste: Wachhalter nicht moeglich (' + wachStand + ') — liegt der Tab im Hintergrund, kann Edge ihn einfrieren.');
 
   window.addEventListener('beforeunload', () => {
     if (window.kpiCrawlerInterval) clearInterval(window.kpiCrawlerInterval);
